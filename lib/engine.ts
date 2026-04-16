@@ -293,11 +293,22 @@ export function calcularInventario(
     const somaHerancaBens = ativos
       .filter((a) => a.heranca === true)
       .reduce((s, a) => s + Math.max(0, Number(a.valor) || 0), 0)
-    const patrimonioComum = Math.max(0, somaNaoHeranca - totalPassivos)
-    patrimonioComumOut = patrimonioComum
-    patrimonioHerancaOut = somaHerancaBens
-    meacao = patrimonioComum / 2
-    herancaVal = patrimonioComum / 2 + somaHerancaBens
+    const somaAtivosTotal = somaNaoHeranca + somaHerancaBens
+    const usarPl =
+      ativos.length === 0 || somaAtivosTotal === 0
+
+    if (usarPl) {
+      meacao = pl / 2
+      herancaVal = pl / 2
+      patrimonioComumOut = pl / 2
+      patrimonioHerancaOut = pl / 2
+    } else {
+      const patrimonioComum = Math.max(0, somaNaoHeranca - totalPassivos)
+      patrimonioComumOut = patrimonioComum
+      patrimonioHerancaOut = somaHerancaBens
+      meacao = patrimonioComum / 2
+      herancaVal = patrimonioComum / 2 + somaHerancaBens
+    }
   } else if (isUniversal) {
     meacao = pl / 2
     herancaVal = pl / 2
