@@ -51,7 +51,7 @@ export interface KPIs {
 export interface InventarioResult {
   /** Pool comum (após dívidas), regimes parcial/aquestos; útil para exibição. */
   patrimonioComum: number
-  /** Soma dos bens com heranca === true (regimes parcial/aquestos). */
+  /** Soma dos bens com heranca === true (não inclui undefined; regimes parcial/aquestos). */
   patrimonioHeranca: number
   meacao: number
   heranca: number
@@ -286,11 +286,12 @@ export function calcularInventario(
   let patrimonioHerancaOut = 0
 
   if (isParcialOuAquestos) {
+    // heranca !== true: inclui false e undefined (ativos antigos sem campo → patrimônio comum)
     const somaNaoHeranca = ativos
-      .filter(a => a.heranca !== true)
+      .filter((a) => a.heranca !== true)
       .reduce((s, a) => s + Math.max(0, Number(a.valor) || 0), 0)
     const somaHerancaBens = ativos
-      .filter(a => a.heranca === true)
+      .filter((a) => a.heranca === true)
       .reduce((s, a) => s + Math.max(0, Number(a.valor) || 0), 0)
     const patrimonioComum = Math.max(0, somaNaoHeranca - totalPassivos)
     patrimonioComumOut = patrimonioComum
