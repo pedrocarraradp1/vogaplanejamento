@@ -1,25 +1,10 @@
-"use client"
-
-import { useState } from "react"
-import { Sidebar } from "@/components/sidebar"
-import { ContentArea } from "@/components/content-area"
-import { PlanoProvider } from "@/lib/plano-context"
-
-export default function Home() {
-  const [activeSection, setActiveSection] = useState("dados-pessoais")
-
+/**
+ * Rota "/" — redirecionamento por perfil é feito no middleware (advisor → /dashboard, cliente → /meu-diagnostico).
+ */
+export default function HomePage() {
   return (
-    <PlanoProvider>
-      <div className="min-h-screen bg-background">
-        <Sidebar
-          activeSection={activeSection}
-          onSectionChange={setActiveSection}
-        />
-        <ContentArea 
-          activeSection={activeSection} 
-          onNavigate={setActiveSection}
-        />
-      </div>
-    </PlanoProvider>
+    <div className="min-h-screen flex items-center justify-center bg-background text-muted-foreground text-sm">
+      Redirecionando…
+    </div>
   )
 }

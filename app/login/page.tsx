@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
@@ -46,6 +45,9 @@ export default function LoginPage() {
           <p className="text-sm text-muted-foreground">
             Voga Planejamento Financeiro
           </p>
+          <p className="text-xs text-muted-foreground pt-2 leading-relaxed">
+            Acesso exclusivo por convite do assessor. Não há cadastro público — clientes recebem credenciais pelo escritório.
+          </p>
         </div>
 
         <form onSubmit={onSubmit} className="space-y-4">
@@ -83,11 +85,6 @@ export default function LoginPage() {
           </Button>
         </form>
 
-        <p className="text-center text-xs text-muted-foreground">
-          <Link href="/" className="underline underline-offset-4 hover:text-foreground">
-            Voltar ao início
-          </Link>
-        </p>
       </div>
     </div>
   )

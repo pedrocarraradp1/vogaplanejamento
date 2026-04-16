@@ -322,14 +322,16 @@ export function PlanoProvider({ children }: { children: React.ReactNode }) {
         return { error: "Sessão inválida. Faça login novamente." }
       }
 
-      const { error } = await supabase.from("clientes").upsert(
-        {
-          id: user.id,
-          dados: state as unknown as Record<string, unknown>,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "id" }
-      )
+      const { error } = await (supabase as unknown as import("@supabase/supabase-js").SupabaseClient)
+        .from("clientes")
+        .upsert(
+          {
+            id: user.id,
+            dados: state,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "id" }
+        )
 
       if (error) return { error: error.message }
       return { error: null }
