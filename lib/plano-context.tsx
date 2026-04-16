@@ -33,6 +33,8 @@ export interface Ativo {
   descricao: string
   instituicao: string
   valor: number
+  /** Se true, o bem vai direto à herança (sem incidir na meação nos regimes parcial/aquestos). Padrão false. */
+  heranca?: boolean
 }
 
 export interface Passivo {
@@ -203,7 +205,10 @@ export function PlanoProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const setAtivos = useCallback((ativos: Ativo[]) => {
-    setState(prev => ({ ...prev, ativos }))
+    setState(prev => ({
+      ...prev,
+      ativos: ativos.map(a => ({ ...a, heranca: a.heranca === true })),
+    }))
   }, [])
 
   const setPassivos = useCallback((passivos: Passivo[]) => {
@@ -281,13 +286,22 @@ export function PlanoProvider({ children }: { children: React.ReactNode }) {
       state.dadosPessoais.despesa
     )
 
+    const totalPassivosInv = state.passivos.reduce((s, p) => s + (p.valor || 0), 0)
+    const plInventario =
+      state.sucessao.plEditavel > 0 ? state.sucessao.plEditavel : saldoInicial
+    const regimeInventario =
+      state.sucessao.regimeSucessao ||
+      state.dadosPessoais.regime ||
+      "Comunhão Parcial de Bens"
     const inventario = calcularInventario(
-      state.sucessao.plEditavel,
-      state.sucessao.regimeSucessao,
+      plInventario,
+      regimeInventario,
       state.sucessao.herdeiros,
       state.sucessao.itcmd,
       state.sucessao.honorarios,
-      state.sucessao.cartoriais
+      state.sucessao.cartoriais,
+      state.ativos,
+      totalPassivosInv
     )
 
     const protecaoResult = calcularProtecao(

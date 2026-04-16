@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { ArrowLeft, Download, TrendingUp, DollarSign, Clock, PiggyBank } from "lucide-react"
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ReferenceLine, Cell, PieChart, Pie, Legend,
+  ResponsiveContainer, ReferenceLine, Cell, PieChart, Pie, Legend, Label,
 } from "recharts"
 import { usePlano } from "@/lib/plano-context"
 import {
@@ -52,9 +52,38 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     calcularKPIs(projecao, premissasCompletas, dadosPessoais.renda, dadosPessoais.despesa)
   , [projecao, premissasCompletas, dadosPessoais.renda, dadosPessoais.despesa])
 
-  const inventario = useMemo(() =>
-    calcularInventario(sucessao.plEditavel, sucessao.regimeSucessao, sucessao.herdeiros, sucessao.itcmd, sucessao.honorarios, sucessao.cartoriais)
-  , [sucessao])
+  const totalPassivosInv = useMemo(
+    () => state.passivos.reduce((s, p) => s + (p.valor || 0), 0),
+    [state.passivos]
+  )
+
+  const plInventario = sucessao.plEditavel > 0 ? sucessao.plEditavel : saldoInicial
+  const regimeInventario =
+    sucessao.regimeSucessao || dadosPessoais.regime || "Comunhão Parcial de Bens"
+
+  const inventario = useMemo(
+    () =>
+      calcularInventario(
+        plInventario,
+        regimeInventario,
+        sucessao.herdeiros,
+        sucessao.itcmd,
+        sucessao.honorarios,
+        sucessao.cartoriais,
+        state.ativos,
+        totalPassivosInv,
+      ),
+    [
+      plInventario,
+      regimeInventario,
+      sucessao.herdeiros,
+      sucessao.itcmd,
+      sucessao.honorarios,
+      sucessao.cartoriais,
+      state.ativos,
+      totalPassivosInv,
+    ]
+  )
 
   const protecaoResult = useMemo(() =>
     calcularProtecao(protecao.custoVida, protecao.anosCob, protecao.eduFilhos, protecao.dividasPend, saldoInicial, premissas.rendimento)
@@ -94,6 +123,11 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   }
   const fmtFull = (v: number) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v)
+
+  const patrimonioLiquidoCentro = useMemo(
+    () => getPatrimonioLiquido(),
+    [state.ativos, state.passivos]
+  )
 
   // ── Exportar PDF ──────────────────────────────────────────────────────────
   const exportarPDF = async () => {
@@ -251,7 +285,45 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                     innerRadius={56}
                     outerRadius={112}
                     paddingAngle={2}
+                    labelLine
+                    label={(props: {
+                      name?: string
+                      percent?: number
+                      x: number
+                      y: number
+                      textAnchor: string
+                    }) => {
+                      const { name, percent, x, y, textAnchor } = props
+                      return (
+                        <text
+                          x={x}
+                          y={y}
+                          textAnchor={textAnchor as "start" | "middle" | "end"}
+                          fill="#ffffff"
+                          fontSize={12}
+                        >
+                          {`${name} ${((percent ?? 0) * 100).toFixed(1)}%`}
+                        </text>
+                      )
+                    }}
                   >
+                    <Label
+                      position="center"
+                      content={({ viewBox }) => {
+                        const cx = (viewBox as { cx?: number; cy?: number } | undefined)?.cx ?? 0
+                        const cy = (viewBox as { cx?: number; cy?: number } | undefined)?.cy ?? 0
+                        return (
+                          <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
+                            <tspan x={cx} dy="-0.5em" fontSize={12} fill="#9CA3AF">
+                              Patrimônio Líquido
+                            </tspan>
+                            <tspan x={cx} dy="1.35em" fontSize={20} fontWeight={700} fill="#ffffff">
+                              {fmtFull(patrimonioLiquidoCentro)}
+                            </tspan>
+                          </text>
+                        )
+                      }}
+                    />
                     {distribuicaoAtivos.map((entry, i) => (
                       <Cell key={`${entry.name}-${i}`} fill={entry.fill} />
                     ))}

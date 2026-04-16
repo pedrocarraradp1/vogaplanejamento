@@ -3,7 +3,18 @@ import React from "react"
 interface DashboardPDFProps {
   dadosPessoais: { nome: string; nascimento: string; renda: number; despesa: number }
   kpis: { patrimonioApos: number; patrimonioAposReal: number; rendaMensalReal: number; idadeLF: number | null; taxaPoupanca: number }
-  inventario: { meacao: number; heranca: number; porHerdeiro: number; custoITCMD: number; custoHon: number; custoCart: number; custoTotal: number; percentualCusto: number }
+  inventario: {
+    patrimonioComum: number
+    patrimonioHeranca: number
+    meacao: number
+    heranca: number
+    porHerdeiro: number
+    custoITCMD: number
+    custoHon: number
+    custoCart: number
+    custoTotal: number
+    percentualCusto: number
+  }
   sucessao: { plEditavel: number; itcmd: number; honorarios: number; cartoriais: number; herdeiros: number }
   protecao: { custoVida: number; anosCob: number; eduFilhos: number; dividasPend: number }
   capitalSeguravel: number

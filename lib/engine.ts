@@ -49,6 +49,10 @@ export interface KPIs {
 }
 
 export interface InventarioResult {
+  /** Pool comum (após dívidas), regimes parcial/aquestos; útil para exibição. */
+  patrimonioComum: number
+  /** Soma dos bens com heranca === true (regimes parcial/aquestos). */
+  patrimonioHeranca: number
   meacao: number
   heranca: number
   porHerdeiro: number
@@ -254,37 +258,87 @@ export function calcularKPIs(
 
 // ─── Inventário Sucessório ────────────────────────────────────────────────────
 
+/** Compatível com `Ativo` do plano (usa valor e heranca). */
+export interface Ativo {
+  valor: number
+  heranca?: boolean
+}
+
 export function calcularInventario(
   pl: number,
   regime: string,
   herdeiros: number,
   itcmd: number,
   honorarios: number,
-  cartoriais: number
+  cartoriais: number,
+  ativos: Ativo[] = [],
+  totalPassivos = 0
 ): InventarioResult {
-  const temMeacao =
-    regime === "Comunhão Parcial de Bens"       ||
-    regime === "Comunhão Universal de Bens"      ||
+  const isParcialOuAquestos =
+    regime === "Comunhão Parcial de Bens" ||
     regime === "Participação Final nos Aquestos"
+  const isUniversal = regime === "Comunhão Universal de Bens"
+  const isSeparacao = regime === "Separação Total de Bens"
 
-  const meacao      = temMeacao ? pl * 0.5 : 0
-  const heranca     = pl - meacao
-  const porHerdeiro = herdeiros > 0 ? heranca / herdeiros : heranca
+  let meacao: number
+  let herancaVal: number
+  let patrimonioComumOut = 0
+  let patrimonioHerancaOut = 0
 
-  const custoITCMD = heranca * (itcmd      / 100)
-  const custoHon   = pl      * (honorarios / 100)
-  const custoCart  = pl      * (cartoriais / 100)
+  if (isParcialOuAquestos) {
+    const somaNaoHeranca = ativos
+      .filter(a => a.heranca !== true)
+      .reduce((s, a) => s + Math.max(0, Number(a.valor) || 0), 0)
+    const somaHerancaBens = ativos
+      .filter(a => a.heranca === true)
+      .reduce((s, a) => s + Math.max(0, Number(a.valor) || 0), 0)
+    const patrimonioComum = Math.max(0, somaNaoHeranca - totalPassivos)
+    patrimonioComumOut = patrimonioComum
+    patrimonioHerancaOut = somaHerancaBens
+    meacao = patrimonioComum / 2
+    herancaVal = patrimonioComum / 2 + somaHerancaBens
+  } else if (isUniversal) {
+    meacao = pl / 2
+    herancaVal = pl / 2
+    patrimonioComumOut = pl / 2
+    patrimonioHerancaOut = pl / 2
+  } else if (isSeparacao) {
+    meacao = 0
+    herancaVal = pl
+    patrimonioComumOut = 0
+    patrimonioHerancaOut = pl
+  } else {
+    const temMeacao =
+      regime === "Comunhão Universal de Bens" ||
+      regime === "Comunhão Parcial de Bens" ||
+      regime === "Participação Final nos Aquestos"
+    meacao = temMeacao ? pl * 0.5 : 0
+    herancaVal = pl - meacao
+    patrimonioComumOut = temMeacao ? pl * 0.5 : 0
+    patrimonioHerancaOut = herancaVal
+  }
+
+  const porHerdeiro = herdeiros > 0 ? herancaVal / herdeiros : herancaVal
+
+  const custoITCMD = herancaVal * (itcmd / 100)
+  const custoHon = herancaVal * (honorarios / 100)
+  const custoCart = herancaVal * (cartoriais / 100)
   const custoTotal = custoITCMD + custoHon + custoCart
 
+  const plPct = pl > 0 ? pl : 0
+
   return {
-    meacao:          Math.round(meacao),
-    heranca:         Math.round(heranca),
-    porHerdeiro:     Math.round(porHerdeiro),
-    custoITCMD:      Math.round(custoITCMD),
-    custoHon:        Math.round(custoHon),
-    custoCart:       Math.round(custoCart),
-    custoTotal:      Math.round(custoTotal),
-    percentualCusto: Math.round((pl > 0 ? (custoTotal / pl) * 100 : 0) * 10) / 10,
+    patrimonioComum: Math.round(patrimonioComumOut),
+    patrimonioHeranca: Math.round(patrimonioHerancaOut),
+    meacao: Math.round(meacao),
+    heranca: Math.round(herancaVal),
+    porHerdeiro: Math.round(porHerdeiro),
+    custoITCMD: Math.round(custoITCMD),
+    custoHon: Math.round(custoHon),
+    custoCart: Math.round(custoCart),
+    custoTotal: Math.round(custoTotal),
+    percentualCusto:
+      Math.round((plPct > 0 ? (custoTotal / plPct) * 100 : 0) * 10) / 10,
   }
 }
 

@@ -32,6 +32,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
     descricao: "",
     instituicao: "",
     valor: 0,
+    heranca: false,
   })
 
   // Modal Passivo
@@ -63,7 +64,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
   // Ativo handlers
   const openAddAtivo = () => {
     setEditingAtivo(null)
-    setAtivoForm({ tipo: "", descricao: "", instituicao: "", valor: 0 })
+    setAtivoForm({ tipo: "", descricao: "", instituicao: "", valor: 0, heranca: false })
     setAtivoModalOpen(true)
   }
 
@@ -74,6 +75,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
       descricao: ativo.descricao,
       instituicao: ativo.instituicao,
       valor: ativo.valor,
+      heranca: ativo.heranca === true,
     })
     setAtivoModalOpen(true)
   }
@@ -407,6 +409,26 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                 placeholder="Ex: BTG Pactual, Brasília-DF..."
                 className="bg-[#0D1220] border-white/10 text-foreground placeholder:text-muted-foreground"
               />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+                Bem de Herança
+              </label>
+              <Select
+                value={ativoForm.heranca ? "sim" : "nao"}
+                onValueChange={(value) =>
+                  setAtivoForm({ ...ativoForm, heranca: value === "sim" })
+                }
+              >
+                <SelectTrigger className="bg-[#0D1220] border-white/10 text-foreground">
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent className="bg-[#131929] border-white/10">
+                  <SelectItem value="nao">Não</SelectItem>
+                  <SelectItem value="sim">Sim</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

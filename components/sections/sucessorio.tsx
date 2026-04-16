@@ -1,29 +1,57 @@
 "use client"
 
+import { useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, ArrowRight } from "lucide-react"
 import { usePlano } from "@/lib/plano-context"
+import { calcularInventario } from "@/lib/engine"
 
 interface SucessorioProps {
   onNavigate: (section: string) => void
 }
 
+const fmt = (v: number) =>
+  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v)
+
 export function Sucessorio({ onNavigate }: SucessorioProps) {
-  const { state, setSucessao } = usePlano()
-  const { sucessao } = state
+  const { state, setSucessao, getPatrimonioLiquido } = usePlano()
+  const { sucessao, dadosPessoais, ativos, passivos } = state
 
-  const formatCurrency = (value: number) => {
-    if (!value) return ""
-    return new Intl.NumberFormat("pt-BR").format(value)
-  }
+  const totalPassivosInv = useMemo(
+    () => passivos.reduce((s, p) => s + (p.valor || 0), 0),
+    [passivos]
+  )
 
-  const parseCurrency = (value: string) => {
-    const numericValue = value.replace(/\D/g, "")
-    return parseInt(numericValue, 10) || 0
-  }
+  const plInventario = sucessao.plEditavel > 0 ? sucessao.plEditavel : getPatrimonioLiquido()
+  const regimeInventario =
+    sucessao.regimeSucessao || dadosPessoais.regime || "Comunhão Parcial de Bens"
+
+  const inventario = useMemo(
+    () =>
+      calcularInventario(
+        plInventario,
+        regimeInventario,
+        sucessao.herdeiros,
+        sucessao.itcmd,
+        sucessao.honorarios,
+        sucessao.cartoriais,
+        ativos,
+        totalPassivosInv,
+      ),
+    [
+      plInventario,
+      regimeInventario,
+      sucessao.herdeiros,
+      sucessao.itcmd,
+      sucessao.honorarios,
+      sucessao.cartoriais,
+      ativos,
+      totalPassivosInv,
+    ]
+  )
 
   const handleProximo = () => {
     onNavigate("protecao")
@@ -105,59 +133,20 @@ export function Sucessorio({ onNavigate }: SucessorioProps) {
         </CardContent>
       </Card>
 
-      {/* Card 2 - Proteção Financeira */}
       <Card className="bg-card border-border">
-        <CardHeader className="pb-4">
+        <CardHeader className="pb-2">
           <CardTitle className="text-base font-medium text-foreground">
-            Proteção Financeira
+            Prévia — Inventário sucessório
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label className="text-sm text-muted-foreground">
-                Custo de Vida Mensal (R$)
-              </Label>
-              <Input
-                value={formatCurrency(sucessao.custoVida)}
-                onChange={(e) => setSucessao({ custoVida: parseCurrency(e.target.value) })}
-                className="bg-[#131929] border-white/10 text-foreground focus:border-primary focus:ring-1 focus:ring-primary"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-sm text-muted-foreground">
-                Anos de Cobertura Desejada
-              </Label>
-              <Input
-                type="number"
-                value={sucessao.anosCob || ""}
-                onChange={(e) => setSucessao({ anosCob: parseInt(e.target.value) || 0 })}
-                className="bg-[#131929] border-white/10 text-foreground focus:border-primary focus:ring-1 focus:ring-primary"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-sm text-muted-foreground">
-                Educação dos Filhos (R$)
-              </Label>
-              <Input
-                value={formatCurrency(sucessao.eduFilhos)}
-                onChange={(e) => setSucessao({ eduFilhos: parseCurrency(e.target.value) })}
-                className="bg-[#131929] border-white/10 text-foreground focus:border-primary focus:ring-1 focus:ring-primary"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-sm text-muted-foreground">
-                Dívidas Pendentes (R$)
-              </Label>
-              <Input
-                value={formatCurrency(sucessao.dividasPend)}
-                onChange={(e) => setSucessao({ dividasPend: parseCurrency(e.target.value) })}
-                className="bg-[#131929] border-white/10 text-foreground focus:border-primary focus:ring-1 focus:ring-primary"
-              />
-            </div>
+        <CardContent className="space-y-2 text-sm">
+          <div className="flex justify-between gap-4 text-muted-foreground">
+            <span>Valor da herança (estimado)</span>
+            <span className="font-medium text-foreground tabular-nums">{fmt(inventario.heranca)}</span>
+          </div>
+          <div className="flex justify-between gap-4 text-muted-foreground">
+            <span>Custo total previsto (sobre a herança)</span>
+            <span className="font-medium text-foreground tabular-nums">{fmt(inventario.custoTotal)}</span>
           </div>
         </CardContent>
       </Card>
