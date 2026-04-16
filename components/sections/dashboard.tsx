@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { ArrowLeft, Download, TrendingUp, DollarSign, Clock, PiggyBank } from "lucide-react"
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ReferenceLine, Cell,
+  ResponsiveContainer, ReferenceLine, Cell, PieChart, Pie, Legend,
 } from "recharts"
 import { usePlano } from "@/lib/plano-context"
 import {
@@ -20,6 +20,10 @@ interface DashboardProps {
   onNavigate: (section: string) => void
 }
 
+const CORES_DIST_ATIVOS = [
+  "#1E5CE6", "#22C787", "#F5A623", "#8B5CF6", "#EC4899", "#06B6D4",
+]
+
 export function Dashboard({ onNavigate }: DashboardProps) {
   const { state, getPatrimonioLiquido, getAporteMensal, getIdadeAtual } = usePlano()
   const { dadosPessoais, objetivos, premissas, sucessao, protecao } = state
@@ -30,6 +34,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const saldoInicial = getPatrimonioLiquido()
   const aporteM      = getAporteMensal()
   const idadeAtual   = getIdadeAtual()
+  const patrimonioTotalSucessao = sucessao.plEditavel === 0 ? saldoInicial : sucessao.plEditavel
 
   const premissasCompletas = useMemo(() => ({
     ...premissas, saldoInicial, aporteM, idadeAtual,
@@ -56,10 +61,27 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   , [protecao, saldoInicial, premissas.rendimento])
 
   const dadosGrafico = useMemo(() =>
-    projecao
-      .filter((_, i) => i % 5 === 0 || i === projecao.length - 1)
-      .map(p => ({ ...p, valor: viewMode === "nominal" ? p.saldoNominal : p.saldoReal }))
+    projecao.map(p => ({
+      ...p,
+      valor: viewMode === "nominal" ? p.saldoNominal : p.saldoReal,
+    }))
   , [projecao, viewMode])
+
+  const distribuicaoAtivos = useMemo(() => {
+    const acc = new Map<string, number>()
+    for (const a of state.ativos) {
+      const k = a.tipo?.trim() || "Sem tipo"
+      acc.set(k, (acc.get(k) ?? 0) + Math.max(0, a.valor ?? 0))
+    }
+    return [...acc.entries()]
+      .filter(([, v]) => v > 0)
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, value], i) => ({
+        name,
+        value,
+        fill: CORES_DIST_ATIVOS[i % CORES_DIST_ATIVOS.length],
+      }))
+  }, [state.ativos])
 
   const projecaoDetalhada = useMemo(() =>
     projecao.filter((_, i) => i % 5 === 0)
@@ -206,6 +228,48 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         })}
       </div>
 
+      {/* Distribuição de Ativos */}
+      <Card className="bg-[#0D1220] border-[rgba(255,255,255,0.06)]">
+        <CardHeader>
+          <CardTitle className="text-foreground text-lg font-medium">Distribuição de Ativos</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {distribuicaoAtivos.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-12">
+              Cadastre ativos na seção Patrimônio para ver a distribuição por tipo.
+            </p>
+          ) : (
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={distribuicaoAtivos}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={56}
+                    outerRadius={112}
+                    paddingAngle={2}
+                  >
+                    {distribuicaoAtivos.map((entry, i) => (
+                      <Cell key={`${entry.name}-${i}`} fill={entry.fill} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ backgroundColor: "#131929", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px" }}
+                    labelStyle={{ color: "#ffffff", fontWeight: 600 }}
+                    itemStyle={{ color: "#ffffff" }}
+                    formatter={(v: number) => fmtFull(v)}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 12, color: "#9CA3AF" }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Evolução Patrimonial */}
       <Card className="bg-[#0D1220] border-[rgba(255,255,255,0.06)]">
         <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -226,7 +290,15 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dadosGrafico} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
-                <XAxis dataKey="idade" stroke="#4A5268" tick={{ fill: "#4A5268", fontSize: 12 }} tickLine={false} axisLine={{ stroke: "rgba(255,255,255,0.04)" }} />
+                <XAxis
+                  dataKey="idade"
+                  stroke="#4A5268"
+                  tick={{ fill: "#4A5268", fontSize: 12 }}
+                  tickLine={false}
+                  axisLine={{ stroke: "rgba(255,255,255,0.04)" }}
+                  interval="preserveStartEnd"
+                  tickCount={15}
+                />
                 <YAxis stroke="#4A5268" tick={{ fill: "#4A5268", fontSize: 12 }} tickLine={false} axisLine={false} tickFormatter={fmt} />
                 <Tooltip
                   contentStyle={{ backgroundColor: "#131929", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px" }}
@@ -255,37 +327,65 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="space-y-4">
+            {/* Seção 1 — Distribuição Patrimonial */}
+            <div className="space-y-4 rounded-xl border border-[rgba(255,255,255,0.06)] bg-[#0D1220] p-5">
               <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Distribuição Patrimonial</h4>
-              {[
-                { label: "Patrimônio (simulação)", valor: fmtFull(sucessao.plEditavel) },
-                { label: "Meação (cônjuge)",        valor: fmtFull(inventario.meacao) },
-                { label: "Valor da Herança",         valor: fmtFull(inventario.heranca) },
-                { label: "Herdeiros",                valor: String(sucessao.herdeiros) },
-                { label: "Por Herdeiro",             valor: fmtFull(inventario.porHerdeiro), cor: "text-[#22C787]" },
-              ].map(item => (
-                <div key={item.label} className="flex justify-between py-2 border-b border-[rgba(255,255,255,0.06)]">
-                  <span className="text-sm text-muted-foreground">{item.label}</span>
-                  <span className={`text-sm font-medium ${item.cor ?? "text-foreground"}`}>{item.valor}</span>
+              <div className="space-y-0">
+                <div className="flex justify-between gap-4 py-2.5 border-b border-[rgba(255,255,255,0.06)]">
+                  <span className="text-sm text-muted-foreground">Patrimônio Total</span>
+                  <span className="text-sm font-medium text-foreground text-right tabular-nums">{fmtFull(patrimonioTotalSucessao)}</span>
                 </div>
-              ))}
+                <div className="py-2.5 border-b border-[rgba(255,255,255,0.06)]">
+                  <div className="flex justify-between gap-4">
+                    <span className="text-sm text-muted-foreground">
+                      Meação (Cônjuge) <span className="text-muted-foreground/80">(50%)</span>
+                    </span>
+                    <span className="text-sm font-medium text-foreground text-right tabular-nums">{fmtFull(inventario.meacao)}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+                    Não há incidência de ITCMD sobre a meação
+                  </p>
+                </div>
+                <div className="flex justify-between gap-4 py-2.5 border-b border-[rgba(255,255,255,0.06)]">
+                  <span className="text-sm text-muted-foreground">Valor da Herança</span>
+                  <span className="text-sm font-medium text-foreground text-right tabular-nums">{fmtFull(inventario.heranca)}</span>
+                </div>
+                <div className="flex justify-between gap-4 py-2.5 border-b border-[rgba(255,255,255,0.06)]">
+                  <span className="text-sm text-muted-foreground">Número de Herdeiros</span>
+                  <span className="text-sm font-medium text-foreground">{sucessao.herdeiros}</span>
+                </div>
+                <div className="flex justify-between gap-4 pt-2.5">
+                  <span className="text-sm text-muted-foreground">Parte de Cada Herdeiro</span>
+                  <span className="text-sm font-bold text-foreground text-right tabular-nums">{fmtFull(inventario.porHerdeiro)}</span>
+                </div>
+              </div>
             </div>
-            <div className="space-y-4">
+
+            {/* Seção 2 — Custos do Inventário */}
+            <div className="space-y-4 rounded-xl border border-[rgba(255,255,255,0.06)] bg-[#0D1220] p-5">
               <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Custos do Inventário</h4>
-              {[
-                { label: `ITCMD (${sucessao.itcmd}%)`,           valor: fmtFull(inventario.custoITCMD) },
-                { label: `Honorários (${sucessao.honorarios}%)`, valor: fmtFull(inventario.custoHon) },
-                { label: `Cartório (${sucessao.cartoriais}%)`,   valor: fmtFull(inventario.custoCart) },
-                { label: "Custo Total",                           valor: fmtFull(inventario.custoTotal), cor: "text-[#EF4444]" },
-              ].map(item => (
-                <div key={item.label} className="flex justify-between py-2 border-b border-[rgba(255,255,255,0.06)]">
-                  <span className="text-sm text-muted-foreground">{item.label}</span>
-                  <span className={`text-sm font-medium ${item.cor ?? "text-foreground"}`}>{item.valor}</span>
+              <div className="space-y-0">
+                <div className="flex justify-between gap-4 py-2.5 border-b border-[rgba(255,255,255,0.06)]">
+                  <span className="text-sm text-muted-foreground">ITCMD ({sucessao.itcmd}%)</span>
+                  <span className="text-sm font-medium text-foreground text-right tabular-nums">{fmtFull(inventario.custoITCMD)}</span>
                 </div>
-              ))}
-              <div className="flex justify-between py-2">
-                <span className="text-sm text-muted-foreground">% do Patrimônio</span>
-                <span className="px-2 py-1 bg-[#F5A623]/20 text-[#F5A623] text-xs font-medium rounded">{inventario.percentualCusto}%</span>
+                <div className="flex justify-between gap-4 py-2.5 border-b border-[rgba(255,255,255,0.06)]">
+                  <span className="text-sm text-muted-foreground">Custos Cartoriais ({sucessao.cartoriais}%)</span>
+                  <span className="text-sm font-medium text-foreground text-right tabular-nums">{fmtFull(inventario.custoCart)}</span>
+                </div>
+                <div className="flex justify-between gap-4 py-2.5 border-b border-[rgba(255,255,255,0.06)]">
+                  <span className="text-sm text-muted-foreground">Honorários Advocatícios ({sucessao.honorarios}%)</span>
+                  <span className="text-sm font-medium text-foreground text-right tabular-nums">{fmtFull(inventario.custoHon)}</span>
+                </div>
+                <div className="flex justify-between gap-4 py-3">
+                  <span className="text-sm text-muted-foreground">Custo Total Previsto</span>
+                  <span className="text-sm font-bold text-[#EF4444] text-right tabular-nums">{fmtFull(inventario.custoTotal)}</span>
+                </div>
+                <div className="pt-1">
+                  <span className="inline-flex rounded-full border border-[rgba(255,255,255,0.06)] bg-[#131929] px-3 py-1.5 text-xs font-medium text-muted-foreground">
+                    Representa {inventario.percentualCusto}% do patrimônio total
+                  </span>
+                </div>
               </div>
             </div>
           </div>
