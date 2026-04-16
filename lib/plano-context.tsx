@@ -112,64 +112,52 @@ interface PlanoContextType {
   salvarPlano: () => Promise<{ error: string | null }>
 }
 
-// ─── Estado inicial ───────────────────────────────────────────────────────────
+// ─── Estado inicial (vazio — sem dados de exemplo) ───────────────────────────
 
-const initialPL      = 200000
-const initialAporteM = 20000
-
-const initialPremissas: Premissas = {
-  rendimento:     9,
-  inflacao:       4,
-  prazo:          70,
-  idadeApos:      65,
-  retiradaMensal: 31000,
+const emptyPremissas: Premissas = {
+  rendimento:     0,
+  inflacao:       0,
+  prazo:          0,
+  idadeApos:      0,
+  retiradaMensal: 0,
   novaEntrada:    0,
   idadeEntrada:   0,
 }
 
 const initialState: PlanoState = {
   dadosPessoais: {
-    nome:        "Guilherme e Mariana",
-    conjuge:     "Mariana",
-    profissao:   "Médico",
-    nascimento:  "1995-07-02",
-    estadoCivil: "Casado(a)",
-    regime:      "Comunhão Parcial de Bens",
+    nome:        "",
+    conjuge:     "",
+    profissao:   "",
+    nascimento:  "",
+    estadoCivil: "",
+    regime:      "",
     filhos:      0,
-    renda:       50000,
-    despesa:     30000,
+    renda:       0,
+    despesa:     0,
   },
-  ativos: [
-    { id: "1", tipo: "Líquido", descricao: "Aplicações BTG Pactual", instituicao: "BTG Pactual", valor: 200000 },
-  ],
+  ativos: [],
   passivos: [],
-  objetivos: [
-    { id: "1", descricao: "Aquisição de Imóvel", prazo: 5,  valor: 1500000, recorrente: false, aCada: 0 },
-    { id: "2", descricao: "Viagens",              prazo: 0,  valor: 35000,   recorrente: true,  aCada: 1 },
-    { id: "3", descricao: "Compra de Veículo",    prazo: 3,  valor: 80000,   recorrente: true,  aCada: 3 },
-  ],
-  premissas: initialPremissas,
+  objetivos: [],
+  premissas: emptyPremissas,
   sucessao: {
-    plEditavel:     200000,
-    itcmd:          4,
-    honorarios:     5,
-    cartoriais:     2,
-    herdeiros:      2,
-    regimeSucessao: "Comunhão Parcial de Bens",
+    plEditavel:     0,
+    itcmd:          0,
+    honorarios:     0,
+    cartoriais:     0,
+    herdeiros:      0,
+    regimeSucessao: "",
   },
   protecao: {
-    custoVida:   30000,
-    anosCob:     10,
-    eduFilhos:   100000,
+    custoVida:   0,
+    anosCob:     0,
+    eduFilhos:   0,
     dividasPend: 0,
   },
   projecao: calcularProjecao(
-    { ...initialPremissas, saldoInicial: initialPL, aporteM: initialAporteM, idadeAtual: 29 },
-    [
-      { id: "1", descricao: "Aquisição de Imóvel", prazo: 5,  valor: 1500000, recorrente: false, aCada: 0 },
-      { id: "2", descricao: "Viagens",              prazo: 0,  valor: 35000,   recorrente: true,  aCada: 1 },
-      { id: "3", descricao: "Compra de Veículo",    prazo: 3,  valor: 80000,   recorrente: true,  aCada: 3 },
-    ]
+    { ...emptyPremissas, saldoInicial: 0, aporteM: 0, idadeAtual: 0 },
+    [],
+    []
   ),
   kpis:           null,
   inventario:     null,
@@ -199,7 +187,7 @@ export function PlanoProvider({ children }: { children: React.ReactNode }) {
 
   const getIdadeAtual = useCallback(() => {
     const nasc = state.dadosPessoais.nascimento
-    if (!nasc) return 30
+    if (!nasc) return 0
     const nascDate = new Date(nasc)
     const hoje     = new Date()
     let idade      = hoje.getFullYear() - nascDate.getFullYear()
@@ -246,7 +234,7 @@ export function PlanoProvider({ children }: { children: React.ReactNode }) {
     const aporteM    = Math.max(0, state.dadosPessoais.renda - state.dadosPessoais.despesa)
     const idadeAtual = (() => {
       const nasc = state.dadosPessoais.nascimento
-      if (!nasc) return 30
+      if (!nasc) return 0
       const nascDate = new Date(nasc)
       const hoje     = new Date()
       let idade      = hoje.getFullYear() - nascDate.getFullYear()
@@ -269,7 +257,7 @@ export function PlanoProvider({ children }: { children: React.ReactNode }) {
     const aporteM    = Math.max(0, state.dadosPessoais.renda - state.dadosPessoais.despesa)
     const idadeAtual = (() => {
       const nasc = state.dadosPessoais.nascimento
-      if (!nasc) return 30
+      if (!nasc) return 0
       const nascDate = new Date(nasc)
       const hoje     = new Date()
       let idade      = hoje.getFullYear() - nascDate.getFullYear()

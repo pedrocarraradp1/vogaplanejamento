@@ -46,24 +46,7 @@ interface SidebarProps {
 export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 bg-sidebar border-r border-sidebar-border flex flex-col">
-      {/* Logo */}
-      <div className="p-6">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-xl">V</span>
-          </div>
-          <div>
-            <span className="text-foreground font-bold text-lg tracking-wide">VOGA</span>
-            <p className="text-muted-foreground text-xs">btg pactual · Planejamento</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Divider */}
-      <div className="mx-4 border-t border-sidebar-border" />
-
-      {/* Navigation */}
-      <nav className="flex-1 py-6 px-3 space-y-6 overflow-y-auto">
+      <nav className="flex-1 py-8 px-3 space-y-6 overflow-y-auto">
         {navGroups.map((group) => (
           <div key={group.title}>
             <h3 className="px-3 mb-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -102,19 +85,6 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
           </div>
         ))}
       </nav>
-
-      {/* Footer */}
-      <div className="p-4 border-t border-sidebar-border">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center">
-            <span className="text-primary-foreground font-semibold text-sm">A</span>
-          </div>
-          <div>
-            <p className="text-foreground font-medium text-sm">André</p>
-            <p className="text-muted-foreground text-xs">Advisor · Voga Wealth</p>
-          </div>
-        </div>
-      </div>
     </aside>
   )
 }
