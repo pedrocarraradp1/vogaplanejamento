@@ -180,10 +180,10 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent className="bg-card border-border">
-                  <SelectItem value="comunhao-parcial">Comunhão Parcial de Bens</SelectItem>
-                  <SelectItem value="comunhao-universal">Comunhão Universal de Bens</SelectItem>
-                  <SelectItem value="separacao-total">Separação Total de Bens</SelectItem>
-                  <SelectItem value="participacao-final">Participação Final nos Aquestos</SelectItem>
+                  <SelectItem value="Comunhão Parcial de Bens">Comunhão Parcial de Bens</SelectItem>
+                  <SelectItem value="Comunhão Universal de Bens">Comunhão Universal de Bens</SelectItem>
+                  <SelectItem value="Separação Total de Bens">Separação Total de Bens</SelectItem>
+                  <SelectItem value="Participação Final nos Aquestos">Participação Final nos Aquestos</SelectItem>
                 </SelectContent>
               </Select>
             </div>
