@@ -21,7 +21,7 @@ interface PatrimonioProps {
 }
 
 export function Patrimonio({ onNavigate }: PatrimonioProps) {
-  const { state, setAtivos, setPassivos, setPremissas } = usePlano()
+  const { state, setAtivos, setPassivos } = usePlano()
   const { ativos, passivos } = state
 
   // Modal Ativo
@@ -36,11 +36,13 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
   })
 
   // Modal Passivo
+  type PassivoForm = Omit<Passivo, "id" | "modelo"> & { modelo: Passivo["modelo"] }
+
   const [passivoModalOpen, setPassivoModalOpen] = useState(false)
   const [editingPassivo, setEditingPassivo] = useState<Passivo | null>(null)
-  const [passivoForm, setPassivoForm] = useState<Omit<Passivo, "id">>({
+  const [passivoForm, setPassivoForm] = useState<PassivoForm>({
     tipo: "",
-    modelo: "",
+    modelo: "SAC",
     descricao: "",
     valor: 0,
     taxa: 0,
@@ -103,7 +105,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
   // Passivo handlers
   const openAddPassivo = () => {
     setEditingPassivo(null)
-    setPassivoForm({ tipo: "", modelo: "", descricao: "", valor: 0, taxa: 0, prazo: 0 })
+    setPassivoForm({ tipo: "", modelo: "SAC", descricao: "", valor: 0, taxa: 0, prazo: 0 })
     setPassivoModalOpen(true)
   }
 
@@ -111,7 +113,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
     setEditingPassivo(passivo)
     setPassivoForm({
       tipo: passivo.tipo,
-      modelo: passivo.modelo || "",
+      modelo: passivo.modelo,
       descricao: passivo.descricao,
       valor: passivo.valor,
       taxa: passivo.taxa,
@@ -145,7 +147,6 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
   const patrimonioLiquido = totalAtivos - totalPassivos
 
   const handleNext = () => {
-    setPremissas({ saldoInicial: patrimonioLiquido })
     onNavigate("objetivos")
   }
 
@@ -490,7 +491,9 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                 </label>
                 <Select
                   value={passivoForm.modelo}
-                  onValueChange={(value) => setPassivoForm({ ...passivoForm, modelo: value })}
+                  onValueChange={(value) =>
+                    setPassivoForm({ ...passivoForm, modelo: value as Passivo["modelo"] })
+                  }
                 >
                   <SelectTrigger className="bg-[#0D1220] border-white/10 text-foreground">
                     <SelectValue placeholder="Selecione" />

@@ -59,7 +59,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
   const plInventario = sucessao.plEditavel > 0 ? sucessao.plEditavel : saldoInicial
   const regimeInventario =
-    sucessao.regimeSucessao || dadosPessoais.regime || "Comunhão Parcial de Bens"
+    dadosPessoais.regime || sucessao.regimeSucessao || "Comunhão Parcial de Bens"
 
   const inventario = useMemo(
     () =>
