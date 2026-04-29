@@ -1,8 +1,12 @@
 "use client"
 
+import { useMemo, useState } from "react"
 import { usePlano } from "@/lib/plano-context"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, ArrowRight, ShieldCheck, ShieldX } from "lucide-react"
+import { ArrowLeft, ArrowRight, ShieldCheck, ShieldX, Info, AlertTriangle, CheckCircle } from "lucide-react"
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell, Legend,
@@ -10,6 +14,154 @@ import {
 
 interface ProtecaoFinanceiraProps {
   onNavigate: (section: string) => void
+}
+
+function BeneficioFiscalPrevidenciaCard() {
+  const [rendaBrutaAnual, setRendaBrutaAnual] = useState<number>(0)
+  const [aportePGBL, setAportePGBL] = useState<number>(0)
+
+  const parseCurrency = (value: string) => parseInt(value.replace(/\D/g, ""), 10) || 0
+  const formatCurrency = (value: number) => {
+    if (!value) return ""
+    return new Intl.NumberFormat("pt-BR").format(value)
+  }
+  const fmtFull = (v: number) =>
+    new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v)
+
+  const calcs = useMemo(() => {
+    const renda = Math.max(0, rendaBrutaAnual)
+    const aporte = Math.max(0, aportePGBL)
+    const aliquota = 0.275
+
+    const limiteDeducao = renda * 0.12
+    const aporteEfetivo = Math.min(aporte, limiteDeducao)
+
+    const baseSem = renda
+    const irSem = baseSem * aliquota
+
+    const baseCom = Math.max(0, renda - aporteEfetivo)
+    const irCom = baseCom * aliquota
+
+    const economia = Math.max(0, irSem - irCom)
+    const economiaPctRenda = renda > 0 ? (economia / renda) * 100 : 0
+
+    return {
+      renda,
+      aporte,
+      limiteDeducao,
+      aporteEfetivo,
+      baseSem,
+      irSem,
+      baseCom,
+      irCom,
+      economia,
+      economiaPctRenda,
+    }
+  }, [rendaBrutaAnual, aportePGBL])
+
+  return (
+    <Card className="bg-card border-border">
+      <CardHeader className="pb-4">
+        <CardTitle className="text-base font-medium text-foreground">Calculadora de Benefício Fiscal PGBL</CardTitle>
+        <CardDescription>Simule a economia de imposto de renda com investimento em PGBL</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label className="text-xs uppercase text-muted-foreground tracking-wide">RENDA BRUTA ANUAL (R$)</Label>
+            <Input
+              value={formatCurrency(rendaBrutaAnual)}
+              onChange={(e) => setRendaBrutaAnual(parseCurrency(e.target.value))}
+              placeholder="0"
+              className="bg-[#131929] border-white/10 text-foreground focus:border-primary"
+            />
+            <p className="text-xs text-muted-foreground">Soma de todos os rendimentos tributáveis do ano</p>
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs uppercase text-muted-foreground tracking-wide">APORTE EM PGBL (R$)</Label>
+            <Input
+              value={formatCurrency(aportePGBL)}
+              onChange={(e) => setAportePGBL(parseCurrency(e.target.value))}
+              placeholder="0"
+              className="bg-[#131929] border-white/10 text-foreground focus:border-primary"
+            />
+            <p className="text-xs text-muted-foreground">Valor investido em PGBL no ano (limite: 12% da renda bruta)</p>
+          </div>
+        </div>
+
+        <div className="flex items-start gap-2 p-3 bg-[rgba(30,92,230,0.10)] rounded-lg border border-[#1E5CE6]/30">
+            <Info className="w-4 h-4 text-primary mt-0.5" />
+            <div className="text-sm text-foreground">
+              Limite de Dedução:{" "}
+              <strong className="text-primary">{fmtFull(calcs.limiteDeducao)}</strong>{" "}
+              <span className="text-muted-foreground">(12% da renda bruta)</span>
+            </div>
+          </div>
+
+        <div className="bg-[rgba(34,199,135,0.10)] border border-[#22C787]/30 rounded-xl p-5">
+          <p className="text-xs font-medium text-[#22C787] uppercase tracking-wide mb-2">ECONOMIA FISCAL ESTIMADA</p>
+          <p className="text-3xl font-bold text-[#22C787]">{fmtFull(calcs.economia)}</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Equivalente a {calcs.economiaPctRenda.toFixed(1).replace(".", ",")}% da renda bruta anual
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="rounded-xl border border-[rgba(255,255,255,0.06)] bg-[#0D1220] p-5">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">SEM PGBL</p>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-sm text-muted-foreground">Base de Cálculo</span>
+                <span className="text-sm font-semibold text-foreground tabular-nums">{fmtFull(calcs.baseSem)}</span>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-sm text-muted-foreground">Imposto Devido 27,5%</span>
+                <span className="text-sm font-semibold text-foreground tabular-nums">{fmtFull(calcs.irSem)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-[#22C787]/30 bg-[#0D1220] p-5">
+            <p className="text-xs font-semibold text-[#22C787] uppercase tracking-wide mb-4">COM PGBL</p>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-sm text-muted-foreground">Base de Cálculo</span>
+                <span className="text-sm font-semibold text-foreground tabular-nums">{fmtFull(calcs.baseCom)}</span>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-sm text-muted-foreground">Imposto Devido 27,5%</span>
+                <span className="text-sm font-semibold text-[#22C787] tabular-nums">{fmtFull(calcs.irCom)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-[rgba(255,255,255,0.06)] bg-[#0D1220] p-5">
+          <p className="text-sm font-medium text-foreground mb-4">Observações Importantes</p>
+          <ul className="space-y-2 text-sm text-muted-foreground">
+            {[
+              "Declaração Completa: O benefício fiscal só se aplica para quem faz a declaração completa do IR",
+              "Limite de 12%: A dedução é limitada a 12% da renda bruta tributável anual",
+              "Economia Imediata: O benefício fiscal representa uma economia real no imposto a pagar",
+              "Tributação no Resgate: O valor total resgatado será tributado no futuro (principal + rendimentos)",
+              "Tabela Regressiva: Opte pela tabela regressiva para alíquota de 10% após 10 anos",
+              "VGBL vs PGBL: VGBL é indicado para quem faz declaração simplificada (sem benefício fiscal)",
+              "Planejamento Sucessório: Previdência privada não entra em inventário",
+            ].map((t) => (
+              <li key={t} className="flex items-start gap-2">
+                <CheckCircle className="w-4 h-4 text-[#22C787] mt-0.5 flex-shrink-0" />
+                <span>{t}</span>
+              </li>
+            ))}
+          </ul>
+
+          <p className="text-xs text-muted-foreground mt-4 italic">
+            * Valores calculados com base na alíquota máxima de 27,5%. Consulte seu contador para análise personalizada.
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  )
 }
 
 export function ProtecaoFinanceira({ onNavigate }: ProtecaoFinanceiraProps) {
@@ -219,6 +371,8 @@ export function ProtecaoFinanceira({ onNavigate }: ProtecaoFinanceiraProps) {
           </div>
         </div>
       </div>
+
+      <BeneficioFiscalPrevidenciaCard />
 
       {/* Footer */}
       <div className="flex items-center gap-4">
