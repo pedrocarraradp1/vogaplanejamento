@@ -16,6 +16,23 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
   const { state, setDadosPessoais } = usePlano()
   const { dadosPessoais } = state
 
+  const PROFISSOES_PRINCIPAIS = useMemo(
+    () => [
+      "Médico(a)",
+      "Advogado(a)",
+      "Engenheiro(a)",
+      "Empresário(a)",
+      "Servidor(a) Público(a)",
+      "Professor(a)",
+      "Arquiteto(a)",
+      "Dentista",
+      "Contador(a)",
+      "Administrador(a)",
+      "Consultor(a)",
+    ],
+    [],
+  )
+
   const isCasado = dadosPessoais.estadoCivil === "casado"
 
   const capacidadePoupanca = useMemo(() => {
@@ -108,13 +125,49 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
               >
                 Profissão
               </Label>
-              <Input
-                id="profissao"
-                value={dadosPessoais.profissao}
-                onChange={(e) => setDadosPessoais({ profissao: e.target.value })}
-                placeholder="Profissão"
-                className="h-11 bg-[#131929] border-[rgba(255,255,255,0.14)] text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
-              />
+              {(() => {
+                const profissaoAtual = (dadosPessoais.profissao ?? "").trim()
+                const isProfissaoPrincipal = PROFISSOES_PRINCIPAIS.includes(profissaoAtual)
+                const selectValue = isProfissaoPrincipal ? profissaoAtual : "Outros"
+                const otherValue = isProfissaoPrincipal ? "" : profissaoAtual
+
+                return (
+                  <div className="space-y-2">
+                    <Select
+                      value={selectValue}
+                      onValueChange={(value) => {
+                        if (value === "Outros") {
+                          setDadosPessoais({ profissao: isProfissaoPrincipal ? "" : profissaoAtual })
+                          return
+                        }
+                        setDadosPessoais({ profissao: value })
+                      }}
+                    >
+                      <SelectTrigger className="h-11 bg-[#131929] border-[rgba(255,255,255,0.14)] text-foreground focus:border-primary focus:ring-1 focus:ring-primary/30">
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-card border-border">
+                        {PROFISSOES_PRINCIPAIS.map((p) => (
+                          <SelectItem key={p} value={p}>
+                            {p}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="Outros">Outros</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    {selectValue === "Outros" && (
+                      <Input
+                        id="profissao"
+                        value={otherValue}
+                        onChange={(e) => setDadosPessoais({ profissao: e.target.value })}
+                        placeholder="Digite sua profissão"
+                        className="h-11 bg-[#131929] border-[rgba(255,255,255,0.14)] text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
+                      />
+                    )}
+                  </div>
+                )
+              })()}
             </div>
 
             {/* Data de Nascimento */}
