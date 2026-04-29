@@ -19,11 +19,16 @@ interface ProjecaoProps {
 }
 
 export function Projecao({ onNavigate }: ProjecaoProps) {
-  const { state, setPremissas, getPatrimonioLiquido } = usePlano()
-  const { premissas, objetivos, dadosPessoais } = state
+  const { state, setPremissas } = usePlano()
+  const { premissas, objetivos, dadosPessoais, ativos, passivos } = state
 
   // ── Derivados automáticos ────────────────────────────────────────────────
-  const saldoInicialCalculado = getPatrimonioLiquido()
+  // Padronização pedida: patrimônio líquido total = (ativos líquidos + imobilizado + participações + outros) − passivos
+  const saldoInicialCalculado = useMemo(() => {
+    const totalAtivos = (ativos ?? []).reduce((s, a) => s + (Number(a.valor) || 0), 0)
+    const totalPassivos = (passivos ?? []).reduce((s, p) => s + (Number(p.valor) || 0), 0)
+    return totalAtivos - totalPassivos
+  }, [ativos, passivos])
 
   const idadeAtualCalculada = useMemo(() => {
     if (!dadosPessoais.nascimento) return 0
@@ -46,7 +51,8 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
   }), [premissas, saldoInicialCalculado, aporteMensal, idadeAtualCalculada])
 
   // ── Estado local ─────────────────────────────────────────────────────────
-  const [viewMode, setViewMode] = useState<"nominal" | "real">("nominal")
+  const [displayMode, setDisplayMode] = useState<"nominal" | "real">("nominal")
+  const [inflacaoDisplay, setInflacaoDisplay] = useState<number>(5)
 
   const [showCenarios, setShowCenarios] = useState(true)
   const [cenarioConservador, setCenarioConservador] = useState(7)
@@ -78,77 +84,126 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
   const rendaApos = premissas.rendaAposentadoria ?? 0
   const retiradaLiquida = Math.max(0, retiradaDesejada - rendaApos)
 
-  const calcularPatrimonioApos = (taxaAnualPct: number) => {
+  const deflatorPorIdade = (idade: number) => {
+    const anos = Math.max(0, idade - idadeAtualCalculada)
+    const inf = (Number(inflacaoDisplay) || 0) / 100
+    return Math.pow(1 + inf, anos)
+  }
+  const deflatorAposentadoria = useMemo(() => {
+    const inf = (Number(inflacaoDisplay) || 0) / 100
+    return Math.pow(1 + inf, anosAteAposentadoria)
+  }, [inflacaoDisplay, anosAteAposentadoria])
+
+  /**
+   * Fórmulas lado a lado (para comparação e padronização)
+   *
+   * Simulação em tempo real (fonte da verdade):
+   * - patrimônio projetado vem da engine `calcularProjecao(premissasCompletas, objetivosEngine, passivos)`
+   * - base: saldoInicial = patrimônio líquido total (soma ativos − soma passivos), aporteM, idadeAtual, idadeApos, etc.
+   * - convenção de capitalização: a engine trabalha em passos anuais com taxa anual `r`,
+   *   e modela aportes mensais via `fvMensal(aporteM, r)` (aproximação mensal consistente).
+   *
+   * Cenários (antes estava divergente):
+   * - usava uma fórmula simplificada anual: P*(1+taxa)^n + A*((1+taxa)^n-1)/taxa
+   * - (alternativa mensal mais precisa, se fosse usada): (1 + taxa/12)^(12n)
+   *
+   * Correção:
+   * - cenários agora também usam `calcularProjecao`, mudando apenas `rendimento` (taxa do cenário),
+   *   garantindo que quando Moderado = premissas.rendimento, os resultados ficam idênticos.
+   */
+
+  const projecaoConservadora = useMemo(() => {
+    return calcularProjecao({ ...premissasCompletas, rendimento: cenarioConservador }, objetivosEngine, state.passivos)
+  }, [premissasCompletas, objetivosEngine, state.passivos, cenarioConservador])
+
+  const projecaoModerada = useMemo(() => {
+    return calcularProjecao({ ...premissasCompletas, rendimento: cenarioModerado }, objetivosEngine, state.passivos)
+  }, [premissasCompletas, objetivosEngine, state.passivos, cenarioModerado])
+
+  const projecaoAgressiva = useMemo(() => {
+    return calcularProjecao({ ...premissasCompletas, rendimento: cenarioAgressivo }, objetivosEngine, state.passivos)
+  }, [premissasCompletas, objetivosEngine, state.passivos, cenarioAgressivo])
+
+  const objetivoPatrimonioParaTaxa = (taxaAnualPct: number) => {
     const taxa = (Number(taxaAnualPct) || 0) / 100
-    const P = Math.max(0, saldoInicialCalculado || 0)
-    const A = Math.max(0, aporteMensal || 0) * 12
-    const n = anosAteAposentadoria
-    if (n === 0) return P
-    if (taxa === 0) return P + A * n
-    return P * Math.pow(1 + taxa, n) + A * ((Math.pow(1 + taxa, n) - 1) / taxa)
+    return taxa > 0 ? (retiradaLiquida * 12) / taxa : Infinity
   }
 
-  const calcularRendaMensalApos = (patrimonio: number, taxaAnualPct: number) => {
-    const taxa = (Number(taxaAnualPct) || 0) / 100
-    return (Math.max(0, patrimonio) * taxa) / 12
-  }
-
-  const calcularIdadeIndependencia = (taxaAnualPct: number) => {
-    const taxa = (Number(taxaAnualPct) || 0) / 100
-    const objetivoPatrimonio = taxa > 0 ? (retiradaLiquida * 12) / taxa : Infinity
+  const idadeIndependenciaNaProjecao = (projecaoLocal: ProjecaoAno[], taxaAnualPct: number) => {
+    const objetivoPatrimonio = objetivoPatrimonioParaTaxa(taxaAnualPct)
     if (!isFinite(objetivoPatrimonio)) return null
-
-    let patrimonio = Math.max(0, saldoInicialCalculado || 0)
-    const aporteAnual = Math.max(0, aporteMensal || 0) * 12
-    for (let t = 0; t <= anosAteAposentadoria; t++) {
-      const idade = idadeAtualCalculada + t
-      if (patrimonio >= objetivoPatrimonio) return idade
-      patrimonio = patrimonio * (1 + taxa) + aporteAnual
+    for (const ano of projecaoLocal) {
+      if (!ano.isAposentado && (ano.saldoNominal ?? 0) >= objetivoPatrimonio) return ano.idade
     }
     return null
   }
 
+  const patrimonioNaIdadeApos = (projecaoLocal: ProjecaoAno[]) =>
+    projecaoLocal.find((p) => p.idade === premissas.idadeApos)?.saldoNominal ?? 0
+
+  const rendaMensalNaApos = (patrimonio: number, taxaAnualPct: number) =>
+    (Math.max(0, patrimonio) * ((Number(taxaAnualPct) || 0) / 100)) / 12
+
   const cenarios = useMemo(() => {
-    const items = [
-      { key: "conservador" as const, nome: "Conservador", taxa: cenarioConservador, cor: "#22C787", corBg: "bg-[rgba(34,199,135,0.08)]", corBorder: "border-[#22C787]/30", vol: "Baixa", sub: "Baixo risco, foco em renda fixa" },
-      { key: "moderado" as const, nome: "Moderado", taxa: cenarioModerado, cor: "#1E5CE6", corBg: "bg-[rgba(30,92,230,0.08)]", corBorder: "border-[#1E5CE6]/30", vol: "Média", sub: "Risco médio, mix balanceado" },
-      { key: "agressivo" as const, nome: "Agressivo", taxa: cenarioAgressivo, cor: "#F5A623", corBg: "bg-[#0D1220]", corBorder: "border-[#F5A623]/30", vol: "Alta", sub: "Alto risco, foco em ações" },
-    ]
-    return items.map((c) => {
-      const patrimonioApos = calcularPatrimonioApos(c.taxa)
-      const rendaMensalApos = calcularRendaMensalApos(patrimonioApos, c.taxa)
-      const idadeIF = calcularIdadeIndependencia(c.taxa)
+    return [
+      {
+        key: "conservador" as const,
+        nome: "Conservador",
+        taxa: cenarioConservador,
+        cor: "#22C787",
+        corBg: "bg-[rgba(34,199,135,0.08)]",
+        corBorder: "border-[#22C787]/30",
+        vol: "Baixa",
+        sub: "Baixo risco, foco em renda fixa",
+        projecao: projecaoConservadora,
+      },
+      {
+        key: "moderado" as const,
+        nome: "Moderado",
+        taxa: cenarioModerado,
+        cor: "#1E5CE6",
+        corBg: "bg-[rgba(30,92,230,0.08)]",
+        corBorder: "border-[#1E5CE6]/30",
+        vol: "Média",
+        sub: "Risco médio, mix balanceado",
+        projecao: projecaoModerada,
+      },
+      {
+        key: "agressivo" as const,
+        nome: "Agressivo",
+        taxa: cenarioAgressivo,
+        cor: "#F5A623",
+        corBg: "bg-[#0D1220]",
+        corBorder: "border-[#F5A623]/30",
+        vol: "Alta",
+        sub: "Alto risco, foco em ações",
+        projecao: projecaoAgressiva,
+      },
+    ].map((c) => {
+      const patrimonioApos = patrimonioNaIdadeApos(c.projecao)
+      const rendaMensalApos = rendaMensalNaApos(patrimonioApos, c.taxa)
+      const idadeIF = idadeIndependenciaNaProjecao(c.projecao, c.taxa)
       return { ...c, patrimonioApos, rendaMensalApos, idadeIF }
     })
-  }, [cenarioConservador, cenarioModerado, cenarioAgressivo, saldoInicialCalculado, aporteMensal, anosAteAposentadoria, retiradaLiquida, idadeAtualCalculada])
+  }, [cenarioConservador, cenarioModerado, cenarioAgressivo, projecaoConservadora, projecaoModerada, projecaoAgressiva, premissas.idadeApos])
 
-  const dadosLinhaCenarios = useMemo(() => {
-    const aporteAnual = Math.max(0, aporteMensal || 0) * 12
-    const P0 = Math.max(0, saldoInicialCalculado || 0)
-
-    const taxaC = (cenarioConservador || 0) / 100
-    const taxaM = (cenarioModerado || 0) / 100
-    const taxaA = (cenarioAgressivo || 0) / 100
-
-    const out: Array<{ idade: number; conservador: number; moderado: number; agressivo: number }> = []
-
-    let pc = P0
-    let pm = P0
-    let pa = P0
-    for (let t = 0; t <= anosAteAposentadoria; t++) {
-      const idade = idadeAtualCalculada + t
-      out.push({
-        idade,
-        conservador: Math.round(pc),
-        moderado: Math.round(pm),
-        agressivo: Math.round(pa),
-      })
-      pc = pc * (1 + taxaC) + aporteAnual
-      pm = pm * (1 + taxaM) + aporteAnual
-      pa = pa * (1 + taxaA) + aporteAnual
+  const dadosLinhaCenariosDisplay = useMemo(() => {
+    const map = new Map<number, { idade: number; conservador: number; moderado: number; agressivo: number }>()
+    const addSerie = (serie: "conservador" | "moderado" | "agressivo", proj: ProjecaoAno[]) => {
+      for (const p of proj) {
+        if (p.idade < idadeAtualCalculada || p.idade > (premissas.idadeApos || 0)) continue
+        const d = displayMode === "real" ? deflatorPorIdade(p.idade) : 1
+        const val = Math.round(((p.saldoNominal ?? 0) as number) / d)
+        const row = map.get(p.idade) ?? { idade: p.idade, conservador: 0, moderado: 0, agressivo: 0 }
+        row[serie] = val
+        map.set(p.idade, row)
+      }
     }
-    return out
-  }, [aporteMensal, saldoInicialCalculado, anosAteAposentadoria, idadeAtualCalculada, cenarioConservador, cenarioModerado, cenarioAgressivo])
+    addSerie("conservador", projecaoConservadora)
+    addSerie("moderado", projecaoModerada)
+    addSerie("agressivo", projecaoAgressiva)
+    return [...map.values()].sort((a, b) => a.idade - b.idade)
+  }, [projecaoConservadora, projecaoModerada, projecaoAgressiva, displayMode, inflacaoDisplay, idadeAtualCalculada, premissas.idadeApos])
 
   // ── Engine ───────────────────────────────────────────────────────────────
   const objetivosEngine = useMemo(() =>
@@ -170,9 +225,41 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
   const dadosGrafico = useMemo(() =>
     projecao.map(p => ({
       ...p,
-      valor: viewMode === "nominal" ? p.saldoNominal : p.saldoReal,
+      valor:
+        displayMode === "nominal"
+          ? p.saldoNominal
+          : (Number(p.saldoNominal) || 0) / deflatorPorIdade(p.idade),
     }))
-  , [projecao, viewMode])
+  , [projecao, displayMode, inflacaoDisplay, idadeAtualCalculada])
+
+  const ToggleNominalReal = (
+    <div className="flex items-center gap-3">
+      <div className="inline-flex rounded-lg bg-[#131929] p-1">
+        {(["nominal", "real"] as const).map(mode => (
+          <button
+            key={mode}
+            onClick={() => setDisplayMode(mode)}
+            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+              displayMode === mode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {mode === "nominal" ? "Nominal" : "Real"}
+          </button>
+        ))}
+      </div>
+      {displayMode === "real" && (
+        <div className="flex items-center gap-2">
+          <Input
+            type="number"
+            value={inflacaoDisplay}
+            onChange={(e) => setInflacaoDisplay(parseFloat(e.target.value) || 0)}
+            className="h-9 w-24 bg-[#131929] border-white/10 text-foreground focus:border-primary"
+          />
+          <span className="text-xs text-muted-foreground whitespace-nowrap">% a.a.</span>
+        </div>
+      )}
+    </div>
+  )
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -407,20 +494,119 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
         </CardContent>
       </Card>
 
+      {/* Card 5 — Simulação em Tempo Real */}
+      <Card className="bg-card border-border">
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-base font-medium text-foreground">Simulação em tempo real</CardTitle>
+          {ToggleNominalReal}
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* KPIs */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-[rgba(30,92,230,0.08)] border border-[#1E5CE6]/30 rounded-xl p-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Patrimônio na Aposentadoria</p>
+                  <p className="text-2xl font-bold text-primary mt-1">{formatarMoeda(kpis.patrimonioApos)}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{formatarMoeda(kpis.patrimonioAposReal)} em valor real</p>
+                </div>
+                <TrendingUp className="w-5 h-5 text-primary" />
+              </div>
+            </div>
+            <div className="bg-[rgba(34,199,135,0.08)] border border-[#22C787]/30 rounded-xl p-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Renda Mensal Real</p>
+                  <p className="text-2xl font-bold text-[#22C787] mt-1">{formatarMoedaCompleta(kpis.rendaMensalReal)}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Com {premissas.rendimento}% a.a.</p>
+                </div>
+                <DollarSign className="w-5 h-5 text-[#22C787]" />
+              </div>
+            </div>
+            <div className="bg-[#0D1220] border border-[rgba(255,255,255,0.06)] rounded-xl p-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Liberdade Financeira</p>
+                  <p className="text-2xl font-bold text-[#F5A623] mt-1">
+                    {kpis.idadeLF ? `${kpis.idadeLF} anos` : "—"}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {kpis.idadeLF ? `Em ${kpis.idadeLF - idadeAtualCalculada} anos` : "Ajuste as premissas"}
+                  </p>
+                </div>
+                <Clock className="w-5 h-5 text-[#F5A623]" />
+              </div>
+            </div>
+          </div>
+
+          {/* Gráfico */}
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={dadosGrafico} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                <XAxis dataKey="idade" stroke="#4A5268"
+                  tick={{ fill: "#4A5268", fontSize: 12 }} tickLine={false}
+                  axisLine={{ stroke: "rgba(255,255,255,0.04)" }} interval="preserveStartEnd" />
+                <YAxis stroke="#4A5268" tick={{ fill: "#4A5268", fontSize: 12 }}
+                  tickLine={false} axisLine={false} tickFormatter={formatarMoeda} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: "#131929", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "#fff" }}
+                  labelStyle={{ color: "#ffffff", fontWeight: 600 }}
+                  itemStyle={{ color: "#ffffff" }}
+                  formatter={(value: number, _name: string, props: any) => {
+                    const entry = props?.payload
+                    const idade = Number(entry?.idade) || idadeAtualCalculada
+                    const d = displayMode === "real" ? deflatorPorIdade(idade) : 1
+                    const saldoNominal = Number(entry?.saldoNominal) || 0
+                    const saldoReal = saldoNominal / d
+                    const rendaMensal =
+                      displayMode === "nominal"
+                        ? (saldoNominal * premissas.rendimento / 100) / 12
+                        : (saldoReal * premissas.rendimento / 100) / 12
+
+                    return [
+                      <div className="space-y-1">
+                        <div>
+                          {displayMode === "nominal" ? "Patrimônio Nominal" : "Patrimônio Real"}: {formatarMoedaCompleta(value)}
+                        </div>
+                        <div>Renda Mensal Gerada: {formatarMoedaCompleta(rendaMensal)}</div>
+                      </div>,
+                      "",
+                    ]
+                  }}
+                  labelFormatter={(label) => `Idade: ${label} anos`}
+                />
+                <ReferenceLine x={premissas.idadeApos} stroke="#F5A623" strokeDasharray="5 5"
+                  label={{ value: "Aposentadoria", position: "top", fill: "#F5A623", fontSize: 12 }} />
+                <Bar dataKey="valor" radius={[2, 2, 0, 0]}>
+                  {dadosGrafico.map((entry: ProjecaoAno & { valor: number }, index: number) => (
+                    <Cell key={`cell-${index}`}
+                      fill={entry.valor >= 0 ? "rgba(30,92,230,0.35)" : "rgba(240,75,75,0.2)"} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Card — Cenários Alternativos */}
       <Card className="bg-card border-border">
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-base font-medium text-foreground">
             Cenários Alternativos de Investimento
           </CardTitle>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowCenarios((v) => !v)}
-            className="text-muted-foreground hover:text-foreground"
-          >
-            {showCenarios ? "Ocultar Cenários" : "Ver Cenários"}
-          </Button>
+          <div className="flex items-center gap-3">
+            {ToggleNominalReal}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowCenarios((v) => !v)}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              {showCenarios ? "Ocultar Cenários" : "Ver Cenários"}
+            </Button>
+          </div>
         </CardHeader>
         {showCenarios && (
           <CardContent className="space-y-6">
@@ -491,11 +677,15 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
                       },
                       {
                         label: "Patrimônio na Aposentadoria",
-                        values: cenarios.map((c) => fmtFull(c.patrimonioApos)),
+                        values: cenarios.map((c) =>
+                          fmtFull(displayMode === "real" ? c.patrimonioApos / deflatorAposentadoria : c.patrimonioApos)
+                        ),
                       },
                       {
                         label: "Renda Mensal na Aposentadoria",
-                        values: cenarios.map((c) => fmtFull(c.rendaMensalApos)),
+                        values: cenarios.map((c) =>
+                          fmtFull(displayMode === "real" ? c.rendaMensalApos / deflatorAposentadoria : c.rendaMensalApos)
+                        ),
                       },
                       {
                         label: "Independência Financeira",
@@ -522,7 +712,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
               </p>
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={dadosLinhaCenarios} margin={{ top: 10, right: 30, left: 20, bottom: 10 }}>
+                  <LineChart data={dadosLinhaCenariosDisplay} margin={{ top: 10, right: 30, left: 20, bottom: 10 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
                     <XAxis
                       dataKey="idade"
@@ -579,107 +769,6 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
           <p className="text-sm text-muted-foreground">
             Simula a trajetória patrimonial até o prazo definido, com aportes, objetivos e fase de aposentadoria.
           </p>
-        </CardContent>
-      </Card>
-
-      {/* Card 5 — Simulação em Tempo Real */}
-      <Card className="bg-card border-border">
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-base font-medium text-foreground">Simulação em tempo real</CardTitle>
-          <div className="inline-flex rounded-lg bg-[#131929] p-1">
-            {(["nominal", "real"] as const).map(mode => (
-              <button key={mode} onClick={() => setViewMode(mode)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
-                  viewMode === mode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-                }`}>
-                {mode === "nominal" ? "Nominal" : "Real"}
-              </button>
-            ))}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* KPIs */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-[rgba(30,92,230,0.08)] border border-[#1E5CE6]/30 rounded-xl p-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Patrimônio na Aposentadoria</p>
-                  <p className="text-2xl font-bold text-primary mt-1">{formatarMoeda(kpis.patrimonioApos)}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{formatarMoeda(kpis.patrimonioAposReal)} em valor real</p>
-                </div>
-                <TrendingUp className="w-5 h-5 text-primary" />
-              </div>
-            </div>
-            <div className="bg-[rgba(34,199,135,0.08)] border border-[#22C787]/30 rounded-xl p-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Renda Mensal Real</p>
-                  <p className="text-2xl font-bold text-[#22C787] mt-1">{formatarMoedaCompleta(kpis.rendaMensalReal)}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Com {premissas.rendimento}% a.a.</p>
-                </div>
-                <DollarSign className="w-5 h-5 text-[#22C787]" />
-              </div>
-            </div>
-            <div className="bg-[#0D1220] border border-[rgba(255,255,255,0.06)] rounded-xl p-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Liberdade Financeira</p>
-                  <p className="text-2xl font-bold text-[#F5A623] mt-1">
-                    {kpis.idadeLF ? `${kpis.idadeLF} anos` : "—"}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {kpis.idadeLF ? `Em ${kpis.idadeLF - idadeAtualCalculada} anos` : "Ajuste as premissas"}
-                  </p>
-                </div>
-                <Clock className="w-5 h-5 text-[#F5A623]" />
-              </div>
-            </div>
-          </div>
-
-          {/* Gráfico */}
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={dadosGrafico} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
-                <XAxis dataKey="idade" stroke="#4A5268"
-                  tick={{ fill: "#4A5268", fontSize: 12 }} tickLine={false}
-                  axisLine={{ stroke: "rgba(255,255,255,0.04)" }} interval="preserveStartEnd" />
-                <YAxis stroke="#4A5268" tick={{ fill: "#4A5268", fontSize: 12 }}
-                  tickLine={false} axisLine={false} tickFormatter={formatarMoeda} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: "#131929", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "#fff" }}
-                  labelStyle={{ color: "#ffffff", fontWeight: 600 }}
-                  itemStyle={{ color: "#ffffff" }}
-                  formatter={(value: number, _name: string, props: any) => {
-                    const entry = props?.payload
-                    const rendaMensal =
-                      viewMode === "nominal"
-                        ? ((Number(entry?.saldoNominal) || 0) * premissas.rendimento / 100) / 12
-                        : ((Number(entry?.saldoReal) || 0) * premissas.rendimento / 100) / 12
-
-                    return [
-                      <div className="space-y-1">
-                        <div>
-                          {viewMode === "nominal" ? "Patrimônio Nominal" : "Patrimônio Real"}: {formatarMoedaCompleta(value)}
-                        </div>
-                        <div>Renda Mensal Gerada: {formatarMoedaCompleta(rendaMensal)}</div>
-                      </div>,
-                      "",
-                    ]
-                  }}
-                  labelFormatter={(label) => `Idade: ${label} anos`}
-                />
-                <ReferenceLine x={premissas.idadeApos} stroke="#F5A623" strokeDasharray="5 5"
-                  label={{ value: "Aposentadoria", position: "top", fill: "#F5A623", fontSize: 12 }} />
-                <Bar dataKey="valor" radius={[2, 2, 0, 0]}>
-                  {dadosGrafico.map((entry: ProjecaoAno & { valor: number }, index: number) => (
-                    <Cell key={`cell-${index}`}
-                      fill={entry.valor >= 0 ? "rgba(30,92,230,0.35)" : "rgba(240,75,75,0.2)"} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
         </CardContent>
       </Card>
 
