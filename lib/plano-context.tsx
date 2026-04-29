@@ -62,6 +62,7 @@ export interface Premissas {
   prazo: number
   idadeApos: number
   retiradaMensal: number
+  rendaAposentadoria: number
   novaEntrada: number
   idadeEntrada: number
 }
@@ -122,8 +123,20 @@ const emptyPremissas: Premissas = {
   prazo:          0,
   idadeApos:      0,
   retiradaMensal: 0,
+  rendaAposentadoria: 0,
   novaEntrada:    0,
   idadeEntrada:   0,
+}
+
+const defaultPremissas: Premissas = {
+  rendimento: 9,
+  inflacao: 4,
+  prazo: 50,
+  idadeApos: 65,
+  retiradaMensal: 0,
+  rendaAposentadoria: 0,
+  novaEntrada: 0,
+  idadeEntrada: 0,
 }
 
 const initialState: PlanoState = {
@@ -141,7 +154,7 @@ const initialState: PlanoState = {
   ativos: [],
   passivos: [],
   objetivos: [],
-  premissas: emptyPremissas,
+  premissas: defaultPremissas,
   sucessao: {
     plEditavel:     0,
     itcmd:          4,
@@ -157,7 +170,7 @@ const initialState: PlanoState = {
     dividasPend: 0,
   },
   projecao: calcularProjecao(
-    { ...emptyPremissas, saldoInicial: 0, aporteM: 0, idadeAtual: 0 },
+    { ...defaultPremissas, saldoInicial: 0, aporteM: 0, idadeAtual: 0 },
     [],
     []
   ),

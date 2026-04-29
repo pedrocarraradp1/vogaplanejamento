@@ -204,7 +204,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
           <CardTitle className="text-base font-medium text-foreground">Aposentadoria</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label className="text-xs uppercase text-muted-foreground tracking-wide">Idade de Aposentadoria</Label>
               <Input type="number" value={premissas.idadeApos || ""}
@@ -235,7 +235,50 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
                 className="w-full accent-primary"
               />
             </div>
+            <div className="space-y-2">
+              <Label className="text-xs uppercase text-muted-foreground tracking-wide">
+                Renda Mensal na Aposentadoria (R$)
+              </Label>
+              <Input
+                value={formatCurrency(premissas.rendaAposentadoria ?? 0)}
+                onChange={(e) => setPremissas({ rendaAposentadoria: parseCurrency(e.target.value) })}
+                placeholder="0"
+                className="bg-[#131929] border-white/10 text-foreground focus:border-primary"
+              />
+              <input
+                type="range"
+                min={0}
+                max={150000}
+                step={500}
+                value={premissas.rendaAposentadoria ?? 0}
+                onChange={(e) => setPremissas({ rendaAposentadoria: parseInt(e.target.value) || 0 })}
+                className="w-full accent-primary"
+              />
+              <p className="text-xs text-muted-foreground">
+                INSS, previdência, aluguéis e outras rendas na aposentadoria
+              </p>
+            </div>
           </div>
+
+          {(() => {
+            const retiradaDesejada = premissas.retiradaMensal ?? 0
+            const rendaApos = premissas.rendaAposentadoria ?? 0
+            const retiradaLiquida = Math.max(0, retiradaDesejada - rendaApos)
+            const cobreTudo = rendaApos >= retiradaDesejada && retiradaDesejada > 0
+            const cor = cobreTudo ? "text-emerald-400" : "text-primary"
+
+            return (
+              <div className="rounded-lg bg-[#131929] border border-white/10 px-4 py-3">
+                <p className={`text-sm font-medium ${cor}`}>
+                  Retirada líquida do patrimônio: {formatarMoedaCompleta(retiradaLiquida)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  (Retirada desejada {formatarMoedaCompleta(retiradaDesejada)} - Renda na aposentadoria{" "}
+                  {formatarMoedaCompleta(rendaApos)})
+                </p>
+              </div>
+            )
+          })()}
           <p className="text-xs text-muted-foreground">
             Os aportes cessam na aposentadoria. A retirada cresce com a inflação anualmente.
           </p>
@@ -382,7 +425,23 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
                   contentStyle={{ backgroundColor: "#131929", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "#fff" }}
                   labelStyle={{ color: "#ffffff", fontWeight: 600 }}
                   itemStyle={{ color: "#ffffff" }}
-                  formatter={(value: number) => [formatarMoedaCompleta(value), viewMode === "nominal" ? "Patrimônio Nominal" : "Patrimônio Real"]}
+                  formatter={(value: number, _name: string, props: any) => {
+                    const entry = props?.payload
+                    const rendaMensal =
+                      viewMode === "nominal"
+                        ? ((Number(entry?.saldoNominal) || 0) * premissas.rendimento / 100) / 12
+                        : ((Number(entry?.saldoReal) || 0) * premissas.rendimento / 100) / 12
+
+                    return [
+                      <div className="space-y-1">
+                        <div>
+                          {viewMode === "nominal" ? "Patrimônio Nominal" : "Patrimônio Real"}: {formatarMoedaCompleta(value)}
+                        </div>
+                        <div>Renda Mensal Gerada: {formatarMoedaCompleta(rendaMensal)}</div>
+                      </div>,
+                      "",
+                    ]
+                  }}
                   labelFormatter={(label) => `Idade: ${label} anos`}
                 />
                 <ReferenceLine x={premissas.idadeApos} stroke="#F5A623" strokeDasharray="5 5"

@@ -9,6 +9,7 @@ export interface Premissas {
   prazo: number
   idadeApos: number
   retiradaMensal: number
+  rendaAposentadoria: number // renda já existente na aposentadoria (INSS, aluguéis etc.)
   novaEntrada: number        // valor de entrada extra (herança, venda, etc.)
   idadeEntrada: number       // idade em que a entrada ocorre (0 = não usar)
 }
@@ -172,8 +173,9 @@ export function calcularProjecao(
   const inf = premissas.inflacao   / 100
   const {
     saldoInicial, aporteM, idadeAtual, prazo,
-    idadeApos, retiradaMensal, novaEntrada, idadeEntrada,
+    idadeApos, retiradaMensal, rendaAposentadoria, novaEntrada, idadeEntrada,
   } = premissas
+  const retiradaEfetiva = Math.max(0, retiradaMensal - (rendaAposentadoria || 0))
 
   const resultado: ProjecaoAno[] = []
   let saldo = saldoInicial
@@ -194,7 +196,7 @@ export function calcularProjecao(
     if (t === 0) {
       saldo = saldoInicial + fvMensal(aporteM, r) - objetivosAno - dividasAno + entradaAno
     } else if (isAposentado) {
-      saldo = saldo * (1 + r) - retiradaMensal * 12 * fatorInf + entradaAno
+      saldo = saldo * (1 + r) - retiradaEfetiva * 12 * fatorInf + entradaAno
     } else {
       saldo = saldo * (1 + r) + fvMensal(aporteM * fatorInf, r) - objetivosAno - dividasAno + entradaAno
     }
@@ -202,7 +204,7 @@ export function calcularProjecao(
     const saldoReal       = saldo / fatorInf
     const taxaReal        = r - inf
     const rendaMensalReal = isAposentado
-      ? retiradaMensal
+      ? retiradaEfetiva
       : Math.max(0, saldoReal * taxaReal / 12)
 
     resultado.push({
@@ -234,12 +236,13 @@ export function calcularKPIs(
   const r   = premissas.rendimento / 100
   const inf = premissas.inflacao   / 100
   const taxaReal             = r - inf
-  const retiradaAnual        = premissas.retiradaMensal * 12
+  const retiradaEfetiva      = Math.max(0, premissas.retiradaMensal - (premissas.rendaAposentadoria || 0))
+  const retiradaAnual        = retiradaEfetiva * 12
   const patrimonioNecessario = taxaReal > 0 ? retiradaAnual / taxaReal : Infinity
 
   let idadeLF: number | null = null
   for (const ano of projecao) {
-    if (!ano.isAposentado && ano.saldoNominal >= patrimonioNecessario) {
+    if (!ano.isAposentado && ano.saldoReal >= patrimonioNecessario) {
       idadeLF = ano.idade
       break
     }
