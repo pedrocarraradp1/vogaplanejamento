@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
+import Image from 'next/image'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 
@@ -43,6 +44,15 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body className={`${inter.variable} font-sans antialiased`}>
+        <div style={{ position: 'fixed', top: 20, right: 24, zIndex: 50 }}>
+          <Image
+            src="/logo-voga.png"
+            alt="Voga"
+            width={100}
+            height={32}
+            style={{ objectFit: 'contain' }}
+          />
+        </div>
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
