@@ -11,6 +11,7 @@ import {
   ResponsiveContainer, ReferenceLine, Cell, PieChart, Pie, Legend, Label,
 } from "recharts"
 import { usePlano } from "@/lib/plano-context"
+import { CenariosInvestimento } from "@/components/ui/cenarios-investimento"
 import {
   calcularProjecao, calcularKPIs, calcularInventario, calcularProtecao,
   type ProjecaoAno,
@@ -479,6 +480,9 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Cenários Alternativos de Investimento */}
+      <CenariosInvestimento />
 
       {/* Planejamento Sucessório */}
       <Card className="bg-[#0D1220] border-[rgba(255,255,255,0.06)]">
