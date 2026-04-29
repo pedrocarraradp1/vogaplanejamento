@@ -20,6 +20,22 @@ interface ObjetivosProps {
   onNavigate: (section: string) => void
 }
 
+const OBJETIVOS_PREDEFINIDOS = [
+  "Compra de Imóvel Residencial",
+  "Compra de Imóvel para Investimento",
+  "Compra de Veículo",
+  "Viagem Internacional",
+  "Viagem Nacional",
+  "Educação dos Filhos",
+  "Faculdade / Pós-graduação",
+  "Casamento",
+  "Reforma / Decoração",
+  "Abertura de Empresa / Negócio",
+  "Reserva de Emergência",
+  "Independência Financeira",
+  "Troca de Veículo",
+] as const
+
 export function Objetivos({ onNavigate }: ObjetivosProps) {
   const { state, setObjetivos } = usePlano()
   const { objetivos } = state
@@ -225,12 +241,48 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
               <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
                 Descrição
               </label>
-              <Input
-                value={form.descricao}
-                onChange={(e) => setForm({ ...form, descricao: e.target.value })}
-                placeholder="Ex: Compra de Imóvel, Viagem, Veículo..."
-                className="bg-[#0D1220] border-white/10 text-foreground placeholder:text-muted-foreground"
-              />
+              {(() => {
+                const descricaoAtual = (form.descricao ?? "").trim()
+                const isPredefinido = (OBJETIVOS_PREDEFINIDOS as readonly string[]).includes(descricaoAtual)
+                const selectValue = isPredefinido ? descricaoAtual : "Outros"
+                const otherValue = isPredefinido ? "" : descricaoAtual
+
+                return (
+                  <div className="space-y-2">
+                    <Select
+                      value={selectValue}
+                      onValueChange={(value) => {
+                        if (value === "Outros") {
+                          setForm({ ...form, descricao: isPredefinido ? "" : descricaoAtual })
+                          return
+                        }
+                        setForm({ ...form, descricao: value })
+                      }}
+                    >
+                      <SelectTrigger className="bg-[#0D1220] border-white/10 text-foreground">
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#131929] border-white/10">
+                        {OBJETIVOS_PREDEFINIDOS.map((o) => (
+                          <SelectItem key={o} value={o}>
+                            {o}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="Outros">Outros</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    {selectValue === "Outros" && (
+                      <Input
+                        value={otherValue}
+                        onChange={(e) => setForm({ ...form, descricao: e.target.value })}
+                        placeholder="Descreva o objetivo..."
+                        className="bg-[#0D1220] border-white/10 text-foreground placeholder:text-muted-foreground"
+                      />
+                    )}
+                  </div>
+                )
+              })()}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
