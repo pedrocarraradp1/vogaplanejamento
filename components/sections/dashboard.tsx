@@ -482,7 +482,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       </Card>
 
       {/* Cenários Alternativos de Investimento */}
-      <CenariosInvestimento />
+      <CenariosInvestimento editable={false} />
 
       {/* Planejamento Sucessório */}
       <Card className="bg-[#0D1220] border-[rgba(255,255,255,0.06)]">

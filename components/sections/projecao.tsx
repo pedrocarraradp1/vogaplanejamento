@@ -469,6 +469,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
         onDisplayModeChange={setDisplayMode}
         inflacaoDisplay={inflacaoDisplay}
         onInflacaoDisplayChange={setInflacaoDisplay}
+        editable
       />
 
       {/* Card 4 — Modo de Cálculo */}

@@ -65,6 +65,9 @@ export interface Premissas {
   rendaAposentadoria: number
   novaEntrada: number
   idadeEntrada: number
+  rentabilidadeConservador: number
+  rentabilidadeModerado: number
+  rentabilidadeAgressivo: number
 }
 
 export interface Sucessao {
@@ -126,6 +129,9 @@ const emptyPremissas: Premissas = {
   rendaAposentadoria: 0,
   novaEntrada:    0,
   idadeEntrada:   0,
+  rentabilidadeConservador: 7,
+  rentabilidadeModerado: 10,
+  rentabilidadeAgressivo: 13,
 }
 
 const defaultPremissas: Premissas = {
@@ -137,6 +143,9 @@ const defaultPremissas: Premissas = {
   rendaAposentadoria: 0,
   novaEntrada: 0,
   idadeEntrada: 0,
+  rentabilidadeConservador: 7,
+  rentabilidadeModerado: 10,
+  rentabilidadeAgressivo: 13,
 }
 
 const initialState: PlanoState = {

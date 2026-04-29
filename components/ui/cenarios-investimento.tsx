@@ -27,6 +27,8 @@ export interface CenariosInvestimentoProps {
   /** Inflação % a.a. (usada para deflacionar quando displayMode="real"). */
   inflacaoDisplay?: number
   onInflacaoDisplayChange?: (value: number) => void
+  /** Se false, exibe rentabilidades como texto (sem inputs). Default: true */
+  editable?: boolean
 }
 
 type LinhaCenarios = {
@@ -37,13 +39,15 @@ type LinhaCenarios = {
 }
 
 export function CenariosInvestimento(props: CenariosInvestimentoProps) {
-  const { state } = usePlano()
+  const { state, setPremissas } = usePlano()
   const { premissas, objetivos, dadosPessoais, ativos, passivos } = state
 
   const [showCenarios, setShowCenarios] = useState(true)
-  const [cenarioConservador, setCenarioConservador] = useState(7)
-  const [cenarioModerado, setCenarioModerado] = useState(10)
-  const [cenarioAgressivo, setCenarioAgressivo] = useState(13)
+  const editable = props.editable ?? true
+
+  const cenarioConservador = premissas.rentabilidadeConservador ?? 7
+  const cenarioModerado = premissas.rentabilidadeModerado ?? 10
+  const cenarioAgressivo = premissas.rentabilidadeAgressivo ?? 13
 
   const [displayModeInternal, setDisplayModeInternal] = useState<DisplayMode>("nominal")
   const [inflacaoInternal, setInflacaoInternal] = useState<number>(5)
@@ -307,20 +311,26 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
 
                 <div className="mt-4 space-y-2">
                   <Label className="text-xs uppercase text-muted-foreground tracking-wide">Rentabilidade</Label>
-                  <div className="relative">
-                    <Input
-                      type="number"
-                      value={c.taxa}
-                      onChange={(e) => {
-                        const v = parseFloat(e.target.value) || 0
-                        if (c.key === "conservador") setCenarioConservador(v)
-                        if (c.key === "moderado") setCenarioModerado(v)
-                        if (c.key === "agressivo") setCenarioAgressivo(v)
-                      }}
-                      className="bg-[#131929] border-white/10 text-foreground focus:border-primary pr-16"
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">% a.a.</span>
-                  </div>
+                  {editable ? (
+                    <div className="relative">
+                      <Input
+                        type="number"
+                        value={c.taxa}
+                        onChange={(e) => {
+                          const v = parseFloat(e.target.value) || 0
+                          if (c.key === "conservador") setPremissas({ rentabilidadeConservador: v })
+                          if (c.key === "moderado") setPremissas({ rentabilidadeModerado: v })
+                          if (c.key === "agressivo") setPremissas({ rentabilidadeAgressivo: v })
+                        }}
+                        className="bg-[#131929] border-white/10 text-foreground focus:border-primary pr-16"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">% a.a.</span>
+                    </div>
+                  ) : (
+                    <div className="rounded-lg bg-[#131929] border border-white/10 px-3 py-2 text-sm text-foreground tabular-nums">
+                      {c.taxa}% a.a.
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
