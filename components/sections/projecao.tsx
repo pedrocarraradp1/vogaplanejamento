@@ -148,12 +148,30 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
               <Input type="number" value={premissas.rendimento || ""}
                 onChange={e => setPremissas({ rendimento: parseFloat(e.target.value) || 0 })}
                 className="bg-[#131929] border-white/10 text-foreground focus:border-primary" />
+              <input
+                type="range"
+                min={0}
+                max={20}
+                step={0.5}
+                value={premissas.rendimento ?? 0}
+                onChange={(e) => setPremissas({ rendimento: parseFloat(e.target.value) || 0 })}
+                className="w-full accent-primary"
+              />
             </div>
             <div className="space-y-2">
               <Label className="text-xs uppercase text-muted-foreground tracking-wide">Inflação Anual (%)</Label>
               <Input type="number" value={premissas.inflacao || ""}
                 onChange={e => setPremissas({ inflacao: parseFloat(e.target.value) || 0 })}
                 className="bg-[#131929] border-white/10 text-foreground focus:border-primary" />
+              <input
+                type="range"
+                min={0}
+                max={15}
+                step={0.5}
+                value={premissas.inflacao ?? 0}
+                onChange={(e) => setPremissas({ inflacao: parseFloat(e.target.value) || 0 })}
+                className="w-full accent-primary"
+              />
             </div>
             <div className="space-y-2">
               <Label className="text-xs uppercase text-muted-foreground tracking-wide">Idade Atual</Label>
@@ -166,6 +184,15 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
               <Input type="number" value={premissas.prazo || ""}
                 onChange={e => setPremissas({ prazo: parseInt(e.target.value) || 0 })}
                 className="bg-[#131929] border-white/10 text-foreground focus:border-primary" />
+              <input
+                type="range"
+                min={1}
+                max={100}
+                step={1}
+                value={premissas.prazo ?? 1}
+                onChange={(e) => setPremissas({ prazo: parseInt(e.target.value) || 0 })}
+                className="w-full accent-primary"
+              />
             </div>
           </div>
         </CardContent>
@@ -183,12 +210,30 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
               <Input type="number" value={premissas.idadeApos || ""}
                 onChange={e => setPremissas({ idadeApos: parseInt(e.target.value) || 0 })}
                 className="bg-[#131929] border-white/10 text-foreground focus:border-primary" />
+              <input
+                type="range"
+                min={30}
+                max={90}
+                step={1}
+                value={premissas.idadeApos ?? 30}
+                onChange={(e) => setPremissas({ idadeApos: parseInt(e.target.value) || 0 })}
+                className="w-full accent-primary"
+              />
             </div>
             <div className="space-y-2">
               <Label className="text-xs uppercase text-muted-foreground tracking-wide">Retirada Mensal Desejada (R$)</Label>
               <Input value={formatCurrency(premissas.retiradaMensal)}
                 onChange={e => setPremissas({ retiradaMensal: parseCurrency(e.target.value) })}
                 className="bg-[#131929] border-white/10 text-foreground focus:border-primary" />
+              <input
+                type="range"
+                min={0}
+                max={1000000}
+                step={1000}
+                value={premissas.retiradaMensal ?? 0}
+                onChange={(e) => setPremissas({ retiradaMensal: parseInt(e.target.value) || 0 })}
+                className="w-full accent-primary"
+              />
             </div>
           </div>
           <p className="text-xs text-muted-foreground">
@@ -211,6 +256,15 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
                 onChange={e => setPremissas({ novaEntrada: parseCurrency(e.target.value) })}
                 placeholder="Ex: 500.000 (herança, venda de imóvel...)"
                 className="bg-[#131929] border-white/10 text-foreground focus:border-primary" />
+              <input
+                type="range"
+                min={0}
+                max={50000000}
+                step={10000}
+                value={premissas.novaEntrada ?? 0}
+                onChange={(e) => setPremissas({ novaEntrada: parseInt(e.target.value) || 0 })}
+                className="w-full accent-primary"
+              />
               <p className="text-xs text-muted-foreground">Entrada extraordinária corrigida pela inflação no ano previsto</p>
             </div>
             <div className="space-y-2">
@@ -220,6 +274,15 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
                 onChange={e => setPremissas({ idadeEntrada: parseInt(e.target.value) || 0 })}
                 placeholder="Ex: 45"
                 className="bg-[#131929] border-white/10 text-foreground focus:border-primary" />
+              <input
+                type="range"
+                min={0}
+                max={80}
+                step={1}
+                value={premissas.idadeEntrada ?? 0}
+                onChange={(e) => setPremissas({ idadeEntrada: parseInt(e.target.value) || 0 })}
+                className="w-full accent-primary"
+              />
               <p className="text-xs text-muted-foreground">Idade em que o valor será recebido. Deixe 0 para não usar.</p>
             </div>
           </div>
