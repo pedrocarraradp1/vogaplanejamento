@@ -48,8 +48,8 @@ export default function RootLayout({
           <Image
             src="/logo-voga.png"
             alt="Voga"
-            width={100}
-            height={32}
+            width={160}
+            height={52}
             style={{ objectFit: 'contain' }}
           />
         </div>
