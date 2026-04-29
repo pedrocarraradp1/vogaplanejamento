@@ -63,6 +63,27 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
     return parseInt(cleaned, 10) || 0
   }
 
+  const DESCRICOES_ATIVOS_POR_TIPO: Record<string, string[]> = {
+    "Líquido": [
+      "Ativos Nacionais",
+      "Ativos Internacionais",
+      "Previdência Privada (PGBL/VGBL)",
+      "Outros",
+    ],
+    "Imobilizado": [
+      "Casa / Apartamento Residencial",
+      "Imóvel para Investimento",
+      "Terreno",
+      "Veículo / Carro",
+      "Outros",
+    ],
+    "Participação Societária": [
+      "Sociedade Empresarial (Quotas)",
+      "Holding Familiar",
+      "Outros",
+    ],
+  }
+
   // Ativo handlers
   const openAddAtivo = () => {
     setEditingAtivo(null)
@@ -380,12 +401,62 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
               <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
                 Descrição
               </label>
-              <Input
-                value={ativoForm.descricao}
-                onChange={(e) => setAtivoForm({ ...ativoForm, descricao: e.target.value })}
-                placeholder="Ex: CDB Banco X, Apartamento Y..."
-                className="bg-[#0D1220] border-white/10 text-foreground placeholder:text-muted-foreground"
-              />
+              {(() => {
+                const tipo = ativoForm.tipo?.trim() || ""
+                const opcoes = DESCRICOES_ATIVOS_POR_TIPO[tipo]
+
+                // Se ainda não selecionou tipo, ou tipo = "Outros", mantém input livre
+                if (!tipo || tipo === "Outros" || !opcoes) {
+                  return (
+                    <Input
+                      value={ativoForm.descricao}
+                      onChange={(e) => setAtivoForm({ ...ativoForm, descricao: e.target.value })}
+                      placeholder="Ex: CDB Banco X, Apartamento Y..."
+                      className="bg-[#0D1220] border-white/10 text-foreground placeholder:text-muted-foreground"
+                    />
+                  )
+                }
+
+                const descricaoAtual = (ativoForm.descricao ?? "").trim()
+                const isOpcaoValida = opcoes.includes(descricaoAtual)
+                const selectValue = isOpcaoValida ? descricaoAtual : "Outros"
+                const otherValue = isOpcaoValida ? "" : descricaoAtual
+
+                return (
+                  <div className="space-y-2">
+                    <Select
+                      value={selectValue}
+                      onValueChange={(value) => {
+                        if (value === "Outros") {
+                          setAtivoForm({ ...ativoForm, descricao: isOpcaoValida ? "" : descricaoAtual })
+                          return
+                        }
+                        setAtivoForm({ ...ativoForm, descricao: value })
+                      }}
+                    >
+                      <SelectTrigger className="bg-[#0D1220] border-white/10 text-foreground">
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#131929] border-white/10">
+                        {opcoes.map((o) => (
+                          <SelectItem key={o} value={o}>
+                            {o}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    {selectValue === "Outros" && (
+                      <Input
+                        value={otherValue}
+                        onChange={(e) => setAtivoForm({ ...ativoForm, descricao: e.target.value })}
+                        placeholder="Descreva o ativo..."
+                        className="bg-[#0D1220] border-white/10 text-foreground placeholder:text-muted-foreground"
+                      />
+                    )}
+                  </div>
+                )
+              })()}
             </div>
 
             <div className="space-y-2">
