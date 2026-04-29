@@ -1,14 +1,15 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, ArrowRight, TrendingUp, DollarSign, Clock, Info, AlertTriangle, CheckCircle } from "lucide-react"
+import { ArrowLeft, ArrowRight, TrendingUp, DollarSign, Clock, Info } from "lucide-react"
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, Cell,
+  LineChart, Line, Legend,
 } from "recharts"
 import { usePlano } from "@/lib/plano-context"
 import { calcularProjecao, calcularKPIs, type ProjecaoAno } from "@/lib/engine"
@@ -46,8 +47,11 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
 
   // ── Estado local ─────────────────────────────────────────────────────────
   const [viewMode, setViewMode] = useState<"nominal" | "real">("nominal")
-  const [rendaBrutaAnual, setRendaBrutaAnual] = useState<number>(0)
-  const [aportePGBL, setAportePGBL] = useState<number>(0)
+
+  const [showCenarios, setShowCenarios] = useState(true)
+  const [cenarioConservador, setCenarioConservador] = useState(7)
+  const [cenarioModerado, setCenarioModerado] = useState(10)
+  const [cenarioAgressivo, setCenarioAgressivo] = useState(13)
 
   // ── Formatadores ─────────────────────────────────────────────────────────
   const formatCurrency = (value: number) => {
@@ -65,6 +69,86 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
   const formatarMoedaCompleta = (valor: number) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL",
       minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(valor)
+
+  const fmtFull = (v: number) =>
+    new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v)
+
+  const anosAteAposentadoria = Math.max(0, (premissas.idadeApos || 0) - idadeAtualCalculada)
+  const retiradaDesejada = premissas.retiradaMensal ?? 0
+  const rendaApos = premissas.rendaAposentadoria ?? 0
+  const retiradaLiquida = Math.max(0, retiradaDesejada - rendaApos)
+
+  const calcularPatrimonioApos = (taxaAnualPct: number) => {
+    const taxa = (Number(taxaAnualPct) || 0) / 100
+    const P = Math.max(0, saldoInicialCalculado || 0)
+    const A = Math.max(0, aporteMensal || 0) * 12
+    const n = anosAteAposentadoria
+    if (n === 0) return P
+    if (taxa === 0) return P + A * n
+    return P * Math.pow(1 + taxa, n) + A * ((Math.pow(1 + taxa, n) - 1) / taxa)
+  }
+
+  const calcularRendaMensalApos = (patrimonio: number, taxaAnualPct: number) => {
+    const taxa = (Number(taxaAnualPct) || 0) / 100
+    return (Math.max(0, patrimonio) * taxa) / 12
+  }
+
+  const calcularIdadeIndependencia = (taxaAnualPct: number) => {
+    const taxa = (Number(taxaAnualPct) || 0) / 100
+    const objetivoPatrimonio = taxa > 0 ? (retiradaLiquida * 12) / taxa : Infinity
+    if (!isFinite(objetivoPatrimonio)) return null
+
+    let patrimonio = Math.max(0, saldoInicialCalculado || 0)
+    const aporteAnual = Math.max(0, aporteMensal || 0) * 12
+    for (let t = 0; t <= anosAteAposentadoria; t++) {
+      const idade = idadeAtualCalculada + t
+      if (patrimonio >= objetivoPatrimonio) return idade
+      patrimonio = patrimonio * (1 + taxa) + aporteAnual
+    }
+    return null
+  }
+
+  const cenarios = useMemo(() => {
+    const items = [
+      { key: "conservador" as const, nome: "Conservador", taxa: cenarioConservador, cor: "#22C787", corBg: "bg-[rgba(34,199,135,0.08)]", corBorder: "border-[#22C787]/30", vol: "Baixa", sub: "Baixo risco, foco em renda fixa" },
+      { key: "moderado" as const, nome: "Moderado", taxa: cenarioModerado, cor: "#1E5CE6", corBg: "bg-[rgba(30,92,230,0.08)]", corBorder: "border-[#1E5CE6]/30", vol: "Média", sub: "Risco médio, mix balanceado" },
+      { key: "agressivo" as const, nome: "Agressivo", taxa: cenarioAgressivo, cor: "#F5A623", corBg: "bg-[#0D1220]", corBorder: "border-[#F5A623]/30", vol: "Alta", sub: "Alto risco, foco em ações" },
+    ]
+    return items.map((c) => {
+      const patrimonioApos = calcularPatrimonioApos(c.taxa)
+      const rendaMensalApos = calcularRendaMensalApos(patrimonioApos, c.taxa)
+      const idadeIF = calcularIdadeIndependencia(c.taxa)
+      return { ...c, patrimonioApos, rendaMensalApos, idadeIF }
+    })
+  }, [cenarioConservador, cenarioModerado, cenarioAgressivo, saldoInicialCalculado, aporteMensal, anosAteAposentadoria, retiradaLiquida, idadeAtualCalculada])
+
+  const dadosLinhaCenarios = useMemo(() => {
+    const aporteAnual = Math.max(0, aporteMensal || 0) * 12
+    const P0 = Math.max(0, saldoInicialCalculado || 0)
+
+    const taxaC = (cenarioConservador || 0) / 100
+    const taxaM = (cenarioModerado || 0) / 100
+    const taxaA = (cenarioAgressivo || 0) / 100
+
+    const out: Array<{ idade: number; conservador: number; moderado: number; agressivo: number }> = []
+
+    let pc = P0
+    let pm = P0
+    let pa = P0
+    for (let t = 0; t <= anosAteAposentadoria; t++) {
+      const idade = idadeAtualCalculada + t
+      out.push({
+        idade,
+        conservador: Math.round(pc),
+        moderado: Math.round(pm),
+        agressivo: Math.round(pa),
+      })
+      pc = pc * (1 + taxaC) + aporteAnual
+      pm = pm * (1 + taxaM) + aporteAnual
+      pa = pa * (1 + taxaA) + aporteAnual
+    }
+    return out
+  }, [aporteMensal, saldoInicialCalculado, anosAteAposentadoria, idadeAtualCalculada, cenarioConservador, cenarioModerado, cenarioAgressivo])
 
   // ── Engine ───────────────────────────────────────────────────────────────
   const objetivosEngine = useMemo(() =>
@@ -89,24 +173,6 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
       valor: viewMode === "nominal" ? p.saldoNominal : p.saldoReal,
     }))
   , [projecao, viewMode])
-
-  // ── PGBL ─────────────────────────────────────────────────────────────────
-  const pgblCalcs = useMemo(() => {
-    const limiteDeducao      = rendaBrutaAnual * 0.12
-    const aporteEfetivo      = Math.min(aportePGBL, limiteDeducao)
-    const aliquota           = 0.275
-    const baseCalculoSemPGBL = rendaBrutaAnual
-    const baseCalculoComPGBL = rendaBrutaAnual - aporteEfetivo
-    const impostoSemPGBL     = baseCalculoSemPGBL * aliquota
-    const impostoComPGBL     = baseCalculoComPGBL * aliquota
-    const economiaFiscal     = impostoSemPGBL - impostoComPGBL
-    const percentualEconomia = rendaBrutaAnual > 0 ? (economiaFiscal / rendaBrutaAnual) * 100 : 0
-    return {
-      limiteDeducao, aporteEfetivo, baseCalculoSemPGBL, baseCalculoComPGBL,
-      impostoSemPGBL, impostoComPGBL, economiaFiscal, percentualEconomia,
-      aporteAcimaLimite: aportePGBL > limiteDeducao,
-    }
-  }, [rendaBrutaAnual, aportePGBL])
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -341,6 +407,165 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
         </CardContent>
       </Card>
 
+      {/* Card — Cenários Alternativos */}
+      <Card className="bg-card border-border">
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-base font-medium text-foreground">
+            Cenários Alternativos de Investimento
+          </CardTitle>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowCenarios((v) => !v)}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            {showCenarios ? "Ocultar Cenários" : "Ver Cenários"}
+          </Button>
+        </CardHeader>
+        {showCenarios && (
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {cenarios.map((c) => (
+                <div key={c.key} className={`rounded-xl border p-5 ${c.corBg} ${c.corBorder}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: c.cor }} />
+                        <p className="text-sm font-semibold text-foreground">{c.nome}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{c.sub}</p>
+                    </div>
+                    <div className="text-xs text-muted-foreground whitespace-nowrap">
+                      Volatilidade: <span className="text-foreground font-medium">{c.vol}</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 space-y-2">
+                    <Label className="text-xs uppercase text-muted-foreground tracking-wide">Rentabilidade</Label>
+                    <div className="relative">
+                      <Input
+                        type="number"
+                        value={c.taxa}
+                        onChange={(e) => {
+                          const v = parseFloat(e.target.value) || 0
+                          if (c.key === "conservador") setCenarioConservador(v)
+                          if (c.key === "moderado") setCenarioModerado(v)
+                          if (c.key === "agressivo") setCenarioAgressivo(v)
+                        }}
+                        className="bg-[#131929] border-white/10 text-foreground focus:border-primary pr-16"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                        % a.a.
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="rounded-xl border border-[rgba(255,255,255,0.06)] bg-[#0D1220] overflow-hidden">
+              <div className="px-5 py-4 border-b border-[rgba(255,255,255,0.06)]">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Comparação de Resultados
+                </p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-[rgba(255,255,255,0.06)]">
+                      <th className="py-3 px-4 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                        Métrica
+                      </th>
+                      {cenarios.map((c) => (
+                        <th key={c.key} className="py-3 px-4 text-right text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                          {c.nome}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      {
+                        label: "Rentabilidade",
+                        values: cenarios.map((c) => `${c.taxa}% a.a.`),
+                      },
+                      {
+                        label: "Patrimônio na Aposentadoria",
+                        values: cenarios.map((c) => fmtFull(c.patrimonioApos)),
+                      },
+                      {
+                        label: "Renda Mensal na Aposentadoria",
+                        values: cenarios.map((c) => fmtFull(c.rendaMensalApos)),
+                      },
+                      {
+                        label: "Independência Financeira",
+                        values: cenarios.map((c) => (c.idadeIF ? `${c.idadeIF} anos` : "—")),
+                      },
+                    ].map((row) => (
+                      <tr key={row.label} className="border-b border-[rgba(255,255,255,0.06)] last:border-b-0">
+                        <td className="py-3 px-4 text-sm text-muted-foreground">{row.label}</td>
+                        {row.values.map((v, i) => (
+                          <td key={i} className="py-3 px-4 text-right text-sm text-foreground tabular-nums">
+                            {v}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-[rgba(255,255,255,0.06)] bg-[#0D1220] p-5">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">
+                Evolução Patrimonial Comparativa
+              </p>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={dadosLinhaCenarios} margin={{ top: 10, right: 30, left: 20, bottom: 10 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
+                    <XAxis
+                      dataKey="idade"
+                      stroke="#4A5268"
+                      tick={{ fill: "#4A5268", fontSize: 12 }}
+                      tickLine={false}
+                      axisLine={{ stroke: "rgba(255,255,255,0.04)" }}
+                      interval="preserveStartEnd"
+                    />
+                    <YAxis
+                      stroke="#4A5268"
+                      tick={{ fill: "#4A5268", fontSize: 12 }}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={formatarMoeda}
+                    />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: "#131929", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "#fff" }}
+                      labelStyle={{ color: "#ffffff", fontWeight: 600 }}
+                      itemStyle={{ color: "#ffffff" }}
+                      labelFormatter={(label) => `Idade: ${label} anos`}
+                      formatter={(value: number) => fmtFull(value)}
+                    />
+                    <Legend
+                      verticalAlign="bottom"
+                      formatter={(value) => {
+                        if (value === "conservador") return `Conservador (${cenarioConservador}% a.a.)`
+                        if (value === "moderado") return `Moderado (${cenarioModerado}% a.a.)`
+                        if (value === "agressivo") return `Agressivo (${cenarioAgressivo}% a.a.)`
+                        return value
+                      }}
+                    />
+                    <Line type="monotone" dataKey="conservador" name="conservador" stroke="#22C787" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="moderado" name="moderado" stroke="#1E5CE6" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="agressivo" name="agressivo" stroke="#F5A623" strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </CardContent>
+        )}
+      </Card>
+
       {/* Card 4 — Modo de Cálculo */}
       <Card className="bg-card border-border">
         <CardHeader className="pb-4">
@@ -455,111 +680,6 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Card 6 — Calculadora PGBL */}
-      <Card className="bg-card border-border">
-        <CardHeader className="pb-4">
-          <CardTitle className="text-base font-medium text-foreground">Calculadora de Benefício Fiscal PGBL</CardTitle>
-          <CardDescription>Simule a economia de imposto de renda com investimento em PGBL</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="text-xs uppercase text-muted-foreground tracking-wide">Renda Bruta Anual (R$)</Label>
-              <Input value={formatCurrency(rendaBrutaAnual)}
-                onChange={e => setRendaBrutaAnual(parseCurrency(e.target.value))} placeholder="0"
-                className="bg-[#131929] border-white/10 text-foreground focus:border-primary" />
-              <p className="text-xs text-muted-foreground">Soma de todos os rendimentos tributáveis do ano</p>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs uppercase text-muted-foreground tracking-wide">Aporte em PGBL (R$)</Label>
-              <Input value={formatCurrency(aportePGBL)}
-                onChange={e => setAportePGBL(parseCurrency(e.target.value))} placeholder="0"
-                className="bg-[#131929] border-white/10 text-foreground focus:border-primary" />
-              <p className="text-xs text-muted-foreground">Valor investido em PGBL no ano (limite: 12% da renda bruta)</p>
-            </div>
-          </div>
-
-          {rendaBrutaAnual > 0 && (
-            <div className="flex items-center gap-2 p-3 bg-[#131929] rounded-lg border border-white/10">
-              <Info className="w-4 h-4 text-primary" />
-              <span className="text-sm text-foreground">
-                Limite de Dedução: <strong className="text-primary">{formatarMoedaCompleta(pgblCalcs.limiteDeducao)}</strong> (12% da renda bruta)
-              </span>
-            </div>
-          )}
-
-          {rendaBrutaAnual > 0 && aportePGBL > 0 && (
-            <div className="space-y-4">
-              {pgblCalcs.aporteAcimaLimite && (
-                <div className="flex items-center gap-2 p-3 bg-[#F5A623]/10 rounded-lg border border-[#F5A623]/30">
-                  <AlertTriangle className="w-4 h-4 text-[#F5A623]" />
-                  <span className="text-sm text-[#F5A623]">
-                    Aporte acima do limite — dedução limitada a {formatarMoedaCompleta(pgblCalcs.limiteDeducao)}
-                  </span>
-                </div>
-              )}
-              <div className="bg-[rgba(34,199,135,0.08)] border border-[#22C787]/30 rounded-xl p-5">
-                <p className="text-xs font-medium text-[#22C787] uppercase tracking-wide mb-2">Economia Fiscal Estimada</p>
-                <p className="text-3xl font-bold text-[#22C787]">{formatarMoedaCompleta(pgblCalcs.economiaFiscal)}</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Equivalente a {pgblCalcs.percentualEconomia.toFixed(1)}% da renda bruta anual
-                </p>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-[#131929] rounded-xl p-5 border border-white/10">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Sem PGBL</p>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Base de Cálculo</span>
-                      <span className="text-sm text-foreground">{formatarMoedaCompleta(pgblCalcs.baseCalculoSemPGBL)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Imposto Devido (27,5%)</span>
-                      <span className="text-sm text-foreground">{formatarMoedaCompleta(pgblCalcs.impostoSemPGBL)}</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-[#131929] rounded-xl p-5 border border-[#22C787]/30">
-                  <p className="text-xs font-medium text-[#22C787] uppercase tracking-wide mb-3">Com PGBL</p>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Base de Cálculo</span>
-                      <span className="text-sm text-foreground">{formatarMoedaCompleta(pgblCalcs.baseCalculoComPGBL)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Imposto Devido (27,5%)</span>
-                      <span className="text-sm text-[#22C787]">{formatarMoedaCompleta(pgblCalcs.impostoComPGBL)}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-[#0D1220] rounded-xl p-5 border border-white/5">
-                <p className="text-sm font-medium text-foreground mb-3">Observações Importantes</p>
-                <ul className="space-y-2 text-sm text-muted-foreground">
-                  {[
-                    ["Declaração Completa", "O benefício fiscal só se aplica para quem faz a declaração completa do IR"],
-                    ["Limite de 12%", "A dedução é limitada a 12% da renda bruta tributável anual"],
-                    ["Economia Imediata", "O benefício fiscal representa uma economia real no imposto a pagar"],
-                    ["Tributação no Resgate", "O valor total resgatado será tributado no futuro (principal + rendimentos)"],
-                    ["Tabela Regressiva", "Opte pela tabela regressiva para alíquota de 10% após 10 anos"],
-                    ["VGBL vs PGBL", "VGBL é indicado para quem faz declaração simplificada (sem benefício fiscal)"],
-                    ["Planejamento Sucessório", "Previdência privada não entra em inventário"],
-                  ].map(([titulo, texto]) => (
-                    <li key={titulo} className="flex items-start gap-2">
-                      <CheckCircle className="w-4 h-4 text-[#22C787] mt-0.5 flex-shrink-0" />
-                      <span><strong>{titulo}:</strong> {texto}</span>
-                    </li>
-                  ))}
-                </ul>
-                <p className="text-xs text-muted-foreground mt-4 italic">
-                  * Valores calculados com base na alíquota máxima de 27,5%. Consulte seu contador para análise personalizada.
-                </p>
-              </div>
-            </div>
-          )}
         </CardContent>
       </Card>
 
