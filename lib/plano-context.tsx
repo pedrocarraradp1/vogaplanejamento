@@ -144,9 +144,9 @@ const initialState: PlanoState = {
   premissas: emptyPremissas,
   sucessao: {
     plEditavel:     0,
-    itcmd:          0,
-    honorarios:     0,
-    cartoriais:     0,
+    itcmd:          4,
+    honorarios:     4,
+    cartoriais:     2,
     herdeiros:      0,
     regimeSucessao: "",
   },
