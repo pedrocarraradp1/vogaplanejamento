@@ -50,6 +50,14 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
     idadeAtual:   idadeAtualCalculada,
   }), [premissas, saldoInicialCalculado, aporteMensal, idadeAtualCalculada])
 
+  // Objetivos no formato da engine (usado na simulação e nos cenários)
+  const objetivosEngine = useMemo(() =>
+    objetivos.map(obj => ({
+      id: obj.id, descricao: obj.descricao, prazo: obj.prazo,
+      valor: obj.valor, recorrente: obj.recorrente, aCada: obj.aCada,
+    }))
+  , [objetivos])
+
   // ── Estado local ─────────────────────────────────────────────────────────
   const [displayMode, setDisplayMode] = useState<"nominal" | "real">("nominal")
   const [inflacaoDisplay, setInflacaoDisplay] = useState<number>(5)
@@ -204,14 +212,6 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
     addSerie("agressivo", projecaoAgressiva)
     return [...map.values()].sort((a, b) => a.idade - b.idade)
   }, [projecaoConservadora, projecaoModerada, projecaoAgressiva, displayMode, inflacaoDisplay, idadeAtualCalculada, premissas.idadeApos])
-
-  // ── Engine ───────────────────────────────────────────────────────────────
-  const objetivosEngine = useMemo(() =>
-    objetivos.map(obj => ({
-      id: obj.id, descricao: obj.descricao, prazo: obj.prazo,
-      valor: obj.valor, recorrente: obj.recorrente, aCada: obj.aCada,
-    }))
-  , [objetivos])
 
   const projecao = useMemo(() => {
     console.log("DEBUG premissasCompletas →", premissasCompletas)
