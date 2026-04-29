@@ -24,9 +24,6 @@ export interface CenariosInvestimentoProps {
   /** Se omitido, o componente mantém estado interno. */
   displayMode?: DisplayMode
   onDisplayModeChange?: (mode: DisplayMode) => void
-  /** Inflação % a.a. (usada para deflacionar quando displayMode="real"). */
-  inflacaoDisplay?: number
-  onInflacaoDisplayChange?: (value: number) => void
   /** Se false, exibe rentabilidades como texto (sem inputs). Default: true */
   editable?: boolean
 }
@@ -50,12 +47,10 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
   const cenarioAgressivo = premissas.rentabilidadeAgressivo ?? 13
 
   const [displayModeInternal, setDisplayModeInternal] = useState<DisplayMode>("nominal")
-  const [inflacaoInternal, setInflacaoInternal] = useState<number>(5)
 
   const displayMode = props.displayMode ?? displayModeInternal
   const setDisplayMode = props.onDisplayModeChange ?? setDisplayModeInternal
-  const inflacaoDisplay = props.inflacaoDisplay ?? inflacaoInternal
-  const setInflacaoDisplay = props.onInflacaoDisplayChange ?? setInflacaoInternal
+  const inflacaoGlobal = Number(premissas.inflacao) || 0
 
   const saldoInicialCalculado = useMemo(() => {
     const totalAtivos = (ativos ?? []).reduce((s, a) => s + (Number(a.valor) || 0), 0)
@@ -104,9 +99,9 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
   const retiradaLiquida = Math.max(0, retiradaDesejada - rendaApos)
 
   const deflatorAposentadoria = useMemo(() => {
-    const inf = (Number(inflacaoDisplay) || 0) / 100
+    const inf = inflacaoGlobal / 100
     return Math.pow(1 + inf, anosAteAposentadoria)
-  }, [inflacaoDisplay, anosAteAposentadoria])
+  }, [inflacaoGlobal, anosAteAposentadoria])
 
   const fmtFull = (v: number) =>
     new Intl.NumberFormat("pt-BR", {
@@ -228,7 +223,7 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
     if (displayMode === "nominal") return dadosLinhaCenarios
     const deflatorPorIdade = (idade: number) => {
       const anos = Math.max(0, idade - idadeAtualCalculada)
-      const inf = (Number(inflacaoDisplay) || 0) / 100
+      const inf = inflacaoGlobal / 100
       return Math.pow(1 + inf, anos)
     }
     return dadosLinhaCenarios.map((row) => {
@@ -240,7 +235,7 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
         agressivo: row.agressivo / d,
       }
     })
-  }, [dadosLinhaCenarios, displayMode, inflacaoDisplay, idadeAtualCalculada])
+  }, [dadosLinhaCenarios, displayMode, inflacaoGlobal, idadeAtualCalculada])
 
   const ToggleNominalReal = (
     <div className="flex items-center gap-3">
@@ -259,17 +254,8 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
         ))}
       </div>
 
-      <div className={`flex items-center gap-2 ${displayMode === "real" ? "" : "opacity-50 pointer-events-none"}`}>
-        <Label className="text-xs uppercase text-muted-foreground tracking-wide whitespace-nowrap">Inflação</Label>
-        <div className="relative w-[112px]">
-          <Input
-            type="number"
-            value={inflacaoDisplay}
-            onChange={(e) => setInflacaoDisplay(parseFloat(e.target.value) || 0)}
-            className="bg-[#131929] border-white/10 text-foreground focus:border-primary pr-10 h-9"
-          />
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
-        </div>
+      <div className={`text-xs font-medium uppercase tracking-wide ${displayMode === "real" ? "text-muted-foreground" : "text-muted-foreground/60"}`}>
+        INFLAÇÃO: <span className="text-foreground">{inflacaoGlobal}%</span>
       </div>
     </div>
   )

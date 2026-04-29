@@ -60,7 +60,6 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
 
   // ── Estado local ─────────────────────────────────────────────────────────
   const [displayMode, setDisplayMode] = useState<"nominal" | "real">("nominal")
-  const [inflacaoDisplay, setInflacaoDisplay] = useState<number>(5)
 
   // ── Formatadores ─────────────────────────────────────────────────────────
   const formatCurrency = (value: number) => {
@@ -81,7 +80,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
 
   const deflatorPorIdade = (idade: number) => {
     const anos = Math.max(0, idade - idadeAtualCalculada)
-    const inf = (Number(inflacaoDisplay) || 0) / 100
+    const inf = (Number(premissas.inflacao) || 0) / 100
     return Math.pow(1 + inf, anos)
   }
   // Cenários foram extraídos para `components/ui/cenarios-investimento.tsx`
@@ -103,7 +102,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
           ? p.saldoNominal
           : (Number(p.saldoNominal) || 0) / deflatorPorIdade(p.idade),
     }))
-  , [projecao, displayMode, inflacaoDisplay, idadeAtualCalculada])
+  , [projecao, displayMode, premissas.inflacao, idadeAtualCalculada])
 
   const ToggleNominalReal = (
     <div className="flex items-center gap-3">
@@ -120,17 +119,13 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
           </button>
         ))}
       </div>
-      {displayMode === "real" && (
-        <div className="flex items-center gap-2">
-          <Input
-            type="number"
-            value={inflacaoDisplay}
-            onChange={(e) => setInflacaoDisplay(parseFloat(e.target.value) || 0)}
-            className="h-9 w-24 bg-[#131929] border-white/10 text-foreground focus:border-primary"
-          />
-          <span className="text-xs text-muted-foreground whitespace-nowrap">% a.a.</span>
-        </div>
-      )}
+      <div
+        className={`text-xs font-medium uppercase tracking-wide ${
+          displayMode === "real" ? "text-muted-foreground" : "text-muted-foreground/60"
+        }`}
+      >
+        INFLAÇÃO: <span className="text-foreground">{Number(premissas.inflacao) || 0}%</span>
+      </div>
     </div>
   )
 
@@ -467,8 +462,6 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
       <CenariosInvestimento
         displayMode={displayMode}
         onDisplayModeChange={setDisplayMode}
-        inflacaoDisplay={inflacaoDisplay}
-        onInflacaoDisplayChange={setInflacaoDisplay}
         editable
       />
 
