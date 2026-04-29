@@ -112,6 +112,22 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       }))
   }, [state.ativos])
 
+  const distribuicaoPorDescricao = useMemo(() => {
+    const acc = new Map<string, number>()
+    for (const a of state.ativos) {
+      const k = a.descricao?.trim() || "Sem descrição"
+      acc.set(k, (acc.get(k) ?? 0) + Math.max(0, a.valor ?? 0))
+    }
+    return [...acc.entries()]
+      .filter(([, v]) => v > 0)
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, value], i) => ({
+        name,
+        value,
+        fill: CORES_DIST_ATIVOS[i % CORES_DIST_ATIVOS.length],
+      }))
+  }, [state.ativos])
+
   const projecaoDetalhada = useMemo(() =>
     projecao.filter((_, i) => i % 5 === 0)
   , [projecao])
@@ -273,70 +289,126 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               Cadastre ativos na seção Patrimônio para ver a distribuição por tipo.
             </p>
           ) : (
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={distribuicaoAtivos}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={56}
-                    outerRadius={112}
-                    paddingAngle={2}
-                    labelLine
-                    label={(props: {
-                      name?: string
-                      percent?: number
-                      x: number
-                      y: number
-                      textAnchor: string
-                    }) => {
-                      const { name, percent, x, y, textAnchor } = props
-                      return (
-                        <text
-                          x={x}
-                          y={y}
-                          textAnchor={textAnchor as "start" | "middle" | "end"}
-                          fill="#ffffff"
-                          fontSize={12}
-                        >
-                          {`${name} ${((percent ?? 0) * 100).toFixed(1)}%`}
-                        </text>
-                      )
-                    }}
-                  >
-                    <Label
-                      position="center"
-                      content={({ viewBox }) => {
-                        const cx = (viewBox as { cx?: number; cy?: number } | undefined)?.cx ?? 0
-                        const cy = (viewBox as { cx?: number; cy?: number } | undefined)?.cy ?? 0
-                        return (
-                          <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
-                            <tspan x={cx} dy="-0.5em" fontSize={12} fill="#9CA3AF">
-                              Patrimônio Líquido
-                            </tspan>
-                            <tspan x={cx} dy="1.35em" fontSize={20} fontWeight={700} fill="#ffffff">
-                              {fmtFull(patrimonioLiquidoCentro)}
-                            </tspan>
-                          </text>
-                        )
-                      }}
-                    />
-                    {distribuicaoAtivos.map((entry, i) => (
-                      <Cell key={`${entry.name}-${i}`} fill={entry.fill} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{ backgroundColor: "#131929", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px" }}
-                    labelStyle={{ color: "#ffffff", fontWeight: 600 }}
-                    itemStyle={{ color: "#ffffff" }}
-                    formatter={(v: number) => fmtFull(v)}
-                  />
-                  <Legend wrapperStyle={{ fontSize: 12, color: "#9CA3AF" }} />
-                </PieChart>
-              </ResponsiveContainer>
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-3">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Por Tipo</p>
+                <div className="h-[280px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={distribuicaoAtivos}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={56}
+                        outerRadius={112}
+                        paddingAngle={2}
+                        labelLine
+                        label={(props: {
+                          name?: string
+                          percent?: number
+                          x: number
+                          y: number
+                          textAnchor: string
+                        }) => {
+                          const { name, percent, x, y, textAnchor } = props
+                          return (
+                            <text
+                              x={x}
+                              y={y}
+                              textAnchor={textAnchor as "start" | "middle" | "end"}
+                              fill="#ffffff"
+                              fontSize={12}
+                            >
+                              {`${name} ${((percent ?? 0) * 100).toFixed(1)}%`}
+                            </text>
+                          )
+                        }}
+                      >
+                        <Label
+                          position="center"
+                          content={({ viewBox }) => {
+                            const cx = (viewBox as { cx?: number; cy?: number } | undefined)?.cx ?? 0
+                            const cy = (viewBox as { cx?: number; cy?: number } | undefined)?.cy ?? 0
+                            return (
+                              <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
+                                <tspan x={cx} dy="-0.5em" fontSize={12} fill="#9CA3AF">
+                                  Patrimônio Líquido
+                                </tspan>
+                                <tspan x={cx} dy="1.35em" fontSize={20} fontWeight={700} fill="#ffffff">
+                                  {fmtFull(patrimonioLiquidoCentro)}
+                                </tspan>
+                              </text>
+                            )
+                          }}
+                        />
+                        {distribuicaoAtivos.map((entry, i) => (
+                          <Cell key={`${entry.name}-${i}`} fill={entry.fill} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{ backgroundColor: "#131929", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px" }}
+                        labelStyle={{ color: "#ffffff", fontWeight: 600 }}
+                        itemStyle={{ color: "#ffffff" }}
+                        formatter={(v: number) => fmtFull(v)}
+                      />
+                      <Legend wrapperStyle={{ fontSize: 12, color: "#9CA3AF" }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Por Ativo</p>
+                <div className="h-[280px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={distribuicaoPorDescricao}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={112}
+                        paddingAngle={2}
+                        labelLine
+                        label={(props: {
+                          name?: string
+                          percent?: number
+                          x: number
+                          y: number
+                          textAnchor: string
+                        }) => {
+                          const { name, percent, x, y, textAnchor } = props
+                          return (
+                            <text
+                              x={x}
+                              y={y}
+                              textAnchor={textAnchor as "start" | "middle" | "end"}
+                              fill="#ffffff"
+                              fontSize={12}
+                            >
+                              {`${name} ${((percent ?? 0) * 100).toFixed(1)}%`}
+                            </text>
+                          )
+                        }}
+                      >
+                        {distribuicaoPorDescricao.map((entry, i) => (
+                          <Cell key={`${entry.name}-${i}`} fill={entry.fill} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{ backgroundColor: "#131929", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px" }}
+                        labelStyle={{ color: "#ffffff", fontWeight: 600 }}
+                        itemStyle={{ color: "#ffffff" }}
+                        formatter={(v: number) => fmtFull(v)}
+                      />
+                      <Legend wrapperStyle={{ fontSize: 12, color: "#9CA3AF" }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
             </div>
           )}
         </CardContent>
@@ -376,7 +448,23 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                   contentStyle={{ backgroundColor: "#131929", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px" }}
                   labelStyle={{ color: "#ffffff", fontWeight: 600 }}
                   itemStyle={{ color: "#ffffff" }}
-                  formatter={(v: number) => [fmtFull(v), viewMode === "nominal" ? "Patrimônio Nominal" : "Patrimônio Real"]}
+                  formatter={(value: number, _name: string, props: any) => {
+                    const entry = props?.payload
+                    const rendaMensal =
+                      viewMode === "nominal"
+                        ? ((Number(entry?.saldoNominal) || 0) * premissas.rendimento / 100) / 12
+                        : ((Number(entry?.saldoReal) || 0) * premissas.rendimento / 100) / 12
+
+                    return [
+                      <div className="space-y-1">
+                        <div>
+                          {viewMode === "nominal" ? "Patrimônio Nominal" : "Patrimônio Real"}: {fmtFull(value)}
+                        </div>
+                        <div>Renda Mensal Gerada: {fmtFull(rendaMensal)}</div>
+                      </div>,
+                      "",
+                    ]
+                  }}
                   labelFormatter={l => `Idade: ${l} anos`}
                 />
                 <ReferenceLine x={premissas.idadeApos} stroke="#F5A623" strokeDasharray="5 5"
