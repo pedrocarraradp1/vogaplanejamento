@@ -141,10 +141,11 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const fmtFull = (v: number) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v)
 
-  const patrimonioLiquidoCentro = useMemo(
-    () => getPatrimonioLiquido(),
-    [state.ativos, state.passivos]
-  )
+  const patrimonioTotalCentro = useMemo(() => {
+    const totalAtivos = state.ativos.reduce((s, a) => s + (a.valor || 0), 0)
+    const totalPassivos = state.passivos.reduce((s, p) => s + (p.valor || 0), 0)
+    return totalAtivos - totalPassivos
+  }, [state.ativos, state.passivos])
 
   // ── Exportar PDF ──────────────────────────────────────────────────────────
   const exportarPDF = async () => {
@@ -335,10 +336,10 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                             return (
                               <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
                                 <tspan x={cx} dy="-0.5em" fontSize={12} fill="#9CA3AF">
-                                  Patrimônio Líquido
+                                  Patrimônio Total
                                 </tspan>
                                 <tspan x={cx} dy="1.35em" fontSize={20} fontWeight={700} fill="#ffffff">
-                                  {fmtFull(patrimonioLiquidoCentro)}
+                                  {fmtFull(patrimonioTotalCentro)}
                                 </tspan>
                               </text>
                             )

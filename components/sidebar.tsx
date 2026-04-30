@@ -1,6 +1,7 @@
 "use client"
 
 import { cn } from "@/lib/utils"
+import { Shield } from "lucide-react"
 
 interface NavItem {
   id: string
@@ -76,6 +77,9 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
                       >
                         {item.number}
                       </span>
+                      {item.id === "protecao" && (
+                        <Shield className={cn("h-4 w-4", isActive ? "text-primary-foreground" : "text-muted-foreground")} />
+                      )}
                       {item.label}
                     </button>
                   </li>
