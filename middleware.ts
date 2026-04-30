@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
 const DASHBOARD = "/dashboard"
+const CLIENTES = "/clientes"
 const MEU_DIAGNOSTICO = "/meu-diagnostico"
 
 function isLoginPath(path: string) {
@@ -49,7 +50,7 @@ export async function middleware(request: NextRequest) {
     else role = "advisor"
   }
 
-  const homeForRole = role === "cliente" ? MEU_DIAGNOSTICO : DASHBOARD
+  const homeForRole = role === "cliente" ? MEU_DIAGNOSTICO : CLIENTES
 
   if (!user) {
     if (isLoginPath(path)) return supabaseResponse

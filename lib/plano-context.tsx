@@ -109,8 +109,15 @@ export interface PlanoState {
   protecaoResult: ProtecaoResult | null
 }
 
+export interface SimulacaoMeta {
+  simulacaoId: string | null
+  clienteId: string | null
+  nomeSimulacao: string | null
+}
+
 interface PlanoContextType {
   state: PlanoState
+  simulacaoMeta: SimulacaoMeta
   setDadosPessoais: (dados: Partial<DadosPessoais>) => void
   setAtivos: (ativos: Ativo[]) => void
   setPassivos: (passivos: Passivo[]) => void
@@ -118,6 +125,10 @@ interface PlanoContextType {
   setPremissas: (premissas: Partial<Premissas>) => void
   setSucessao: (sucessao: Partial<Sucessao>) => void
   setProtecao: (protecao: Partial<Protecao>) => void
+  /** Substitui o estado atual por um estado salvo (hidratando defaults) */
+  loadState: (state: unknown, meta?: Partial<SimulacaoMeta>) => void
+  /** Limpa meta de simulação (volta para "nova simulação") */
+  clearSimulacaoMeta: () => void
   getPatrimonioLiquido: () => number
   getAporteMensal: () => number
   getIdadeAtual: () => number
@@ -209,8 +220,44 @@ const initialState: PlanoState = {
 
 const PlanoContext = createContext<PlanoContextType | null>(null)
 
-export function PlanoProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<PlanoState>(initialState)
+export function PlanoProvider({
+  children,
+  initial,
+}: {
+  children: React.ReactNode
+  initial?: PlanoState
+}) {
+  const [state, setState] = useState<PlanoState>(initial ?? initialState)
+  const [simulacaoMeta, setSimulacaoMeta] = useState<SimulacaoMeta>({
+    simulacaoId: null,
+    clienteId: null,
+    nomeSimulacao: null,
+  })
+
+  const hydrateState = useCallback((raw: any): PlanoState => {
+    const merged: PlanoState = {
+      ...initialState,
+      ...(raw ?? {}),
+      dadosPessoais: { ...initialState.dadosPessoais, ...(raw?.dadosPessoais ?? {}) },
+      premissas: { ...initialState.premissas, ...(raw?.premissas ?? {}) },
+      sucessao: { ...initialState.sucessao, ...(raw?.sucessao ?? {}) },
+      protecao: { ...initialState.protecao, ...(raw?.protecao ?? {}) },
+      ativos: Array.isArray(raw?.ativos) ? raw.ativos : [],
+      passivos: Array.isArray(raw?.passivos) ? raw.passivos : [],
+      objetivos: Array.isArray(raw?.objetivos) ? raw.objetivos : [],
+      projecao: Array.isArray(raw?.projecao) ? raw.projecao : initialState.projecao,
+      kpis: raw?.kpis ?? null,
+      inventario: raw?.inventario ?? null,
+      protecaoResult: raw?.protecaoResult ?? null,
+    }
+
+    // Normaliza rendimento líquido derivado
+    const bruto = Number(merged.premissas.rendimentoBruto) || 0
+    const aliq = Number(merged.premissas.aliquotaImpostoRendimento) || 0
+    merged.premissas.rendimento = Math.max(0, bruto * (1 - Math.max(0, Math.min(1, aliq))))
+
+    return merged
+  }, [])
 
   // ── Helpers derivados ──────────────────────────────────────────────────────
 
@@ -274,6 +321,21 @@ export function PlanoProvider({ children }: { children: React.ReactNode }) {
 
   const setProtecao = useCallback((protecao: Partial<Protecao>) => {
     setState(prev => ({ ...prev, protecao: { ...prev.protecao, ...protecao } }))
+  }, [])
+
+  const loadState = useCallback((raw: unknown, meta?: Partial<SimulacaoMeta>) => {
+    setState(hydrateState(raw))
+    if (meta) {
+      setSimulacaoMeta((prev) => ({
+        simulacaoId: meta.simulacaoId ?? prev.simulacaoId,
+        clienteId: meta.clienteId ?? prev.clienteId,
+        nomeSimulacao: meta.nomeSimulacao ?? prev.nomeSimulacao,
+      }))
+    }
+  }, [hydrateState])
+
+  const clearSimulacaoMeta = useCallback(() => {
+    setSimulacaoMeta({ simulacaoId: null, clienteId: null, nomeSimulacao: null })
   }, [])
 
   // ── Cálculos ───────────────────────────────────────────────────────────────
@@ -391,8 +453,10 @@ export function PlanoProvider({ children }: { children: React.ReactNode }) {
   return (
     <PlanoContext.Provider value={{
       state,
+      simulacaoMeta,
       setDadosPessoais, setAtivos, setPassivos, setObjetivos,
       setPremissas, setSucessao, setProtecao,
+      loadState, clearSimulacaoMeta,
       getPatrimonioLiquido, getAporteMensal, getIdadeAtual,
       simulatePreview, calcular, salvarPlano,
     }}>
