@@ -152,11 +152,14 @@ export default function ClientesPage() {
 
   return (
     <div className="min-h-screen bg-[#080C18]">
-      <div className="mx-auto max-w-[1200px] px-6 py-6 space-y-6">
-        {/* Header */}
-        <header className="flex items-center justify-between">
+      {/* Header compacto */}
+      <header className="h-16 bg-[#080C18] border-b border-white/10">
+        <div className="mx-auto max-w-[1200px] h-full px-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Image src="/logo-voga.png" alt="Voga" width={96} height={32} className="h-auto w-auto" />
+            <span className="text-[14px] text-muted-foreground">
+              Planejamento Financeiro Pessoal
+            </span>
           </div>
           <Link href="/dashboard">
             <Button className="bg-[#1E5CE6] hover:bg-[#1E5CE6]/90 text-white">
@@ -164,7 +167,10 @@ export default function ClientesPage() {
               Nova Simulação
             </Button>
           </Link>
-        </header>
+        </div>
+      </header>
+
+      <div className="mx-auto max-w-[1200px] px-6 py-6 space-y-6">
 
         {/* KPIs */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
