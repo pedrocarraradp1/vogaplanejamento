@@ -101,7 +101,8 @@ export default function ClientesPage() {
       const profissao = String(latest?.dados?.dadosPessoais?.profissao ?? "—")
       const lastDate = latest?.updated_at ?? latest?.created_at ?? null
       const patrimonio = latest?.dados ? patrimonioTotalFromDados(latest.dados) : 0
-      return { key, nome, profissao, lastDate, patrimonio, simulacaoId: latest?.id ?? null }
+      const nomeSimulacao = String(latest?.nome_simulacao ?? "—")
+      return { key, nome, profissao, nomeSimulacao, lastDate, patrimonio, simulacaoId: latest?.id ?? null }
     })
     const filtered = term ? entries.filter((e) => e.nome.toLowerCase().includes(term)) : entries
     filtered.sort((a, b) => String(b.lastDate ?? "").localeCompare(String(a.lastDate ?? "")))
@@ -156,7 +157,7 @@ export default function ClientesPage() {
       <header className="h-16 bg-[#080C18] border-b border-white/10">
         <div className="mx-auto max-w-[1200px] h-full px-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Image src="/logo-voga.png" alt="Voga" width={96} height={32} className="h-auto w-auto" />
+            <Image src="/logo-voga.png" alt="Voga" width={96} height={32} className="h-8 w-auto" />
             <span className="text-[18px] font-medium text-white">
               Planejamento Financeiro Pessoal
             </span>
@@ -260,8 +261,7 @@ export default function ClientesPage() {
                         <p className="text-xs text-muted-foreground">{c.profissao}</p>
                         <p className="text-xs text-muted-foreground mt-2">
                           <span className="text-foreground/80">Simulação:</span>{" "}
-                          <span className="text-muted-foreground">{c.key === "(sem-nome)" ? "—" : ""}</span>
-                          <span className="text-muted-foreground">{/* placeholder */}</span>
+                          <span className="text-muted-foreground">{c.nomeSimulacao}</span>
                         </p>
                         <p className="text-xs text-muted-foreground">
                           <span className="text-foreground/80">Data:</span> {created}
