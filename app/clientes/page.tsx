@@ -157,7 +157,7 @@ export default function ClientesPage() {
         <div className="mx-auto max-w-[1200px] h-full px-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Image src="/logo-voga.png" alt="Voga" width={96} height={32} className="h-auto w-auto" />
-            <span className="text-[14px] text-muted-foreground">
+            <span className="text-[18px] font-medium text-white">
               Planejamento Financeiro Pessoal
             </span>
           </div>
