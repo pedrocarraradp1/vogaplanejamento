@@ -58,48 +58,35 @@ export function SalvarSimulacaoModal() {
       const { data: auth, error: authErr } = await supabase.auth.getUser()
       if (authErr || !auth?.user) throw new Error("Sessão inválida. Faça login novamente.")
 
-      // 1) Garante cliente (cria se não existir; se já existe no meta, atualiza nome/profissão)
-      let clienteId = simulacaoMeta.clienteId
-      if (clienteId) {
-        const { error } = await supabase
-          .from("clientes")
-          .update({ nome: nc, profissao: pc, updated_at: new Date().toISOString() })
-          .eq("id", clienteId)
-        if (error) throw new Error(error.message)
-      } else {
-        const { data, error } = await supabase
-          .from("clientes")
-          .insert({ nome: nc, profissao: pc, dados: null })
-          .select("id")
-          .single()
-        if (error) throw new Error(error.message)
-        clienteId = data?.id ?? null
+      const payloadState = {
+        ...state,
+        dadosPessoais: {
+          ...state.dadosPessoais,
+          nome: nc,
+          profissao: pc,
+        },
       }
 
-      if (!clienteId) throw new Error("Não foi possível determinar o cliente.")
-
-      // 2) Salva simulação
+      // Salva simulação (sem depender da tabela `clientes`)
       if (isUpdate && simulacaoMeta.simulacaoId) {
         const { error } = await supabase
           .from("simulacoes")
           .update({
-            cliente_id: clienteId,
             nome_simulacao: ns,
-            dados: state,
+            dados: payloadState,
             updated_at: new Date().toISOString(),
           })
           .eq("id", simulacaoMeta.simulacaoId)
         if (error) throw new Error(error.message)
 
         toast({ title: "Simulação atualizada", description: `“${ns}” salva com sucesso.` })
-        loadState(state, { clienteId, nomeSimulacao: ns })
+        loadState(payloadState, { nomeSimulacao: ns })
       } else {
         const { data, error } = await supabase
           .from("simulacoes")
           .insert({
-            cliente_id: clienteId,
             nome_simulacao: ns,
-            dados: state,
+            dados: payloadState,
           })
           .select("id")
           .single()
@@ -109,7 +96,7 @@ export function SalvarSimulacaoModal() {
           title: "Simulação salva",
           description: `“${ns}” salva com sucesso. Patrimônio: R$ ${new Intl.NumberFormat("pt-BR").format(patrimonioTotal)}`,
         })
-        loadState(state, { simulacaoId: data?.id ?? null, clienteId, nomeSimulacao: ns })
+        loadState(payloadState, { simulacaoId: data?.id ?? null, nomeSimulacao: ns })
       }
 
       setOpen(false)

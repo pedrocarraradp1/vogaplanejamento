@@ -9,14 +9,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Search, Plus, ArrowRight } from "lucide-react"
 
-type ClienteRow = {
-  id: string
-  nome: string | null
-  profissao: string | null
-  updated_at: string | null
-  created_at: string | null
-}
-
 type SimulacaoRow = {
   id: string
   cliente_id: string | null
@@ -41,7 +33,6 @@ export default function ClientesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const [clientes, setClientes] = useState<ClienteRow[]>([])
   const [simulacoes, setSimulacoes] = useState<SimulacaoRow[]>([])
 
   const [q, setQ] = useState("")
@@ -57,16 +48,14 @@ export default function ClientesPage() {
           return
         }
 
-        const [{ data: cRows, error: cErr }, { data: sRows, error: sErr }] = await Promise.all([
-          supabase.from("clientes").select("id,nome,profissao,created_at,updated_at").order("updated_at", { ascending: false }),
-          supabase.from("simulacoes").select("id,cliente_id,nome_simulacao,dados,created_at,updated_at").order("updated_at", { ascending: false }).limit(200),
-        ])
-
-        if (cErr) throw new Error(cErr.message)
+        const { data: sRows, error: sErr } = await supabase
+          .from("simulacoes")
+          .select("id,cliente_id,nome_simulacao,dados,created_at,updated_at")
+          .order("updated_at", { ascending: false })
+          .limit(200)
         if (sErr) throw new Error(sErr.message)
 
         if (!cancelled) {
-          setClientes((cRows as any[]) ?? [])
           setSimulacoes((sRows as any[]) ?? [])
         }
       } catch (e) {
@@ -81,11 +70,11 @@ export default function ClientesPage() {
   const simulacoesPorCliente = useMemo(() => {
     const map = new Map<string, SimulacaoRow[]>()
     for (const s of simulacoes) {
-      const cid = s.cliente_id
-      if (!cid) continue
-      const arr = map.get(cid) ?? []
+      const nome = String(s?.dados?.dadosPessoais?.nome ?? "").trim()
+      const key = nome ? nome.toLowerCase() : "(sem-nome)"
+      const arr = map.get(key) ?? []
       arr.push(s)
-      map.set(cid, arr)
+      map.set(key, arr)
     }
     for (const [, arr] of map) {
       arr.sort((a, b) => (b.updated_at ?? b.created_at ?? "").localeCompare(a.updated_at ?? a.created_at ?? ""))
@@ -94,23 +83,30 @@ export default function ClientesPage() {
   }, [simulacoes])
 
   const kpis = useMemo(() => {
-    const totalClientes = clientes.length
+    const totalClientes = simulacoesPorCliente.size
     const totalSimulacoes = simulacoes.length
-
-    // patrimônio total sob gestão: soma do patrimônio total da última simulação de cada cliente
     let pl = 0
-    for (const c of clientes) {
-      const latest = simulacoesPorCliente.get(c.id)?.[0]
+    for (const [, arr] of simulacoesPorCliente) {
+      const latest = arr[0]
       if (latest?.dados) pl += patrimonioTotalFromDados(latest.dados)
     }
     return { totalClientes, totalSimulacoes, patrimonioTotal: pl }
-  }, [clientes, simulacoes, simulacoesPorCliente])
+  }, [simulacoes, simulacoesPorCliente])
 
   const clientesFiltrados = useMemo(() => {
     const term = q.trim().toLowerCase()
-    if (!term) return clientes
-    return clientes.filter((c) => (c.nome ?? "").toLowerCase().includes(term))
-  }, [clientes, q])
+    const entries = Array.from(simulacoesPorCliente.entries()).map(([key, arr]) => {
+      const latest = arr[0]
+      const nome = String(latest?.dados?.dadosPessoais?.nome ?? "Sem nome")
+      const profissao = String(latest?.dados?.dadosPessoais?.profissao ?? "—")
+      const lastDate = latest?.updated_at ?? latest?.created_at ?? null
+      const patrimonio = latest?.dados ? patrimonioTotalFromDados(latest.dados) : 0
+      return { key, nome, profissao, lastDate, patrimonio, simulacaoId: latest?.id ?? null }
+    })
+    const filtered = term ? entries.filter((e) => e.nome.toLowerCase().includes(term)) : entries
+    filtered.sort((a, b) => String(b.lastDate ?? "").localeCompare(String(a.lastDate ?? "")))
+    return filtered
+  }, [simulacoesPorCliente, q])
 
   if (loading) {
     return (
@@ -176,19 +172,16 @@ export default function ClientesPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {clientesFiltrados.map((c) => {
-            const latest = simulacoesPorCliente.get(c.id)?.[0]
-            const lastDate = latest?.updated_at ?? latest?.created_at ?? c.updated_at ?? c.created_at
-            const patrimonio = latest?.dados ? patrimonioTotalFromDados(latest.dados) : 0
             return (
-              <Card key={c.id} className="bg-[#0D1220] border-[rgba(255,255,255,0.06)]">
+              <Card key={c.key} className="bg-[#0D1220] border-[rgba(255,255,255,0.06)]">
                 <CardContent className="p-5 space-y-3">
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <p className="text-sm font-semibold text-foreground">{c.nome || "Sem nome"}</p>
-                      <p className="text-xs text-muted-foreground">{c.profissao || "—"}</p>
+                      <p className="text-sm font-semibold text-foreground">{c.nome}</p>
+                      <p className="text-xs text-muted-foreground">{c.profissao}</p>
                     </div>
-                    {latest?.id ? (
-                      <Link href={`/simulacao/${latest.id}`}>
+                    {c.simulacaoId ? (
+                      <Link href={`/simulacao/${c.simulacaoId}`}>
                         <Button variant="outline" size="sm" className="border-white/10 text-muted-foreground hover:text-foreground">
                           Abrir <ArrowRight className="w-4 h-4 ml-2" />
                         </Button>
@@ -200,11 +193,11 @@ export default function ClientesPage() {
                   <div className="pt-1 border-t border-white/5 flex items-center justify-between">
                     <div>
                       <p className="text-xs text-muted-foreground">Última simulação</p>
-                      <p className="text-xs text-foreground">{lastDate ? new Date(lastDate).toLocaleDateString("pt-BR") : "—"}</p>
+                      <p className="text-xs text-foreground">{c.lastDate ? new Date(c.lastDate).toLocaleDateString("pt-BR") : "—"}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-muted-foreground">Patrimônio</p>
-                      <p className="text-sm font-semibold text-primary">{fmtFull(patrimonio)}</p>
+                      <p className="text-sm font-semibold text-primary">{fmtFull(c.patrimonio)}</p>
                     </div>
                   </div>
                 </CardContent>
