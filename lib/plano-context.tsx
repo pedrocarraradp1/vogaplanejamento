@@ -57,7 +57,12 @@ export interface Objetivo {
 }
 
 export interface Premissas {
+  /** Rendimento líquido (% a.a.) usado nas simulações. Derivado de bruto e alíquota. */
   rendimento: number
+  /** Rendimento bruto (% a.a.) informado pelo advisor. */
+  rendimentoBruto: number
+  /** Alíquota (0-1) aplicada sobre o rendimento para cálculo do líquido. Ex: 0.15 = 15%. */
+  aliquotaImpostoRendimento: number
   inflacao: number
   prazo: number
   idadeApos: number
@@ -68,6 +73,10 @@ export interface Premissas {
   rentabilidadeConservador: number
   rentabilidadeModerado: number
   rentabilidadeAgressivo: number
+  /** Modo de aporte mensal na simulação. */
+  aporteModo: "fixo" | "periodos"
+  /** Aporte mensal (em valor real de hoje) para cada bloco de 5 anos. */
+  aportePeriodosReal: number[]
 }
 
 export interface Sucessao {
@@ -122,6 +131,8 @@ interface PlanoContextType {
 
 const emptyPremissas: Premissas = {
   rendimento:     0,
+  rendimentoBruto: 10,
+  aliquotaImpostoRendimento: 0.15,
   inflacao:       0,
   prazo:          0,
   idadeApos:      0,
@@ -132,10 +143,14 @@ const emptyPremissas: Premissas = {
   rentabilidadeConservador: 7,
   rentabilidadeModerado: 10,
   rentabilidadeAgressivo: 13,
+  aporteModo: "fixo",
+  aportePeriodosReal: [],
 }
 
 const defaultPremissas: Premissas = {
-  rendimento: 9,
+  rendimento: 10 * (1 - 0.15),
+  rendimentoBruto: 10,
+  aliquotaImpostoRendimento: 0.15,
   inflacao: 4,
   prazo: 50,
   idadeApos: 65,
@@ -146,6 +161,8 @@ const defaultPremissas: Premissas = {
   rentabilidadeConservador: 7,
   rentabilidadeModerado: 10,
   rentabilidadeAgressivo: 13,
+  aporteModo: "fixo",
+  aportePeriodosReal: [],
 }
 
 const initialState: PlanoState = {
@@ -242,7 +259,13 @@ export function PlanoProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const setPremissas = useCallback((premissas: Partial<Premissas>) => {
-    setState(prev => ({ ...prev, premissas: { ...prev.premissas, ...premissas } }))
+    setState(prev => {
+      const merged = { ...prev.premissas, ...premissas }
+      const bruto = Number(merged.rendimentoBruto) || 0
+      const aliq = Number(merged.aliquotaImpostoRendimento) || 0
+      const liquido = Math.max(0, bruto * (1 - Math.max(0, Math.min(1, aliq))))
+      return { ...prev, premissas: { ...merged, rendimento: liquido } }
+    })
   }, [])
 
   const setSucessao = useCallback((sucessao: Partial<Sucessao>) => {

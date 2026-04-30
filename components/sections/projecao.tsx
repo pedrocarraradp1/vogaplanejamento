@@ -1,10 +1,11 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ArrowLeft, ArrowRight, TrendingUp, DollarSign, Clock, Info } from "lucide-react"
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -42,13 +43,51 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
 
   const aporteMensal = Math.max(0, dadosPessoais.renda - dadosPessoais.despesa)
 
+  const aporteModo = premissas.aporteModo ?? "fixo"
+  const blocosAporte = useMemo(() => {
+    const prazo = Math.max(0, Number(premissas.prazo) || 0)
+    const blocos = Math.max(1, Math.ceil(prazo / 5))
+    return Array.from({ length: blocos }, (_, i) => {
+      const inicio = i * 5
+      const fim = Math.min((i + 1) * 5, prazo)
+      return { i, inicio, fim }
+    })
+  }, [premissas.prazo])
+
+  // Mantém o array de aportes por bloco alinhado ao prazo (preserva valores existentes)
+  useEffect(() => {
+    if (aporteModo !== "periodos") return
+    const desired = blocosAporte.length
+    const cur = premissas.aportePeriodosReal ?? []
+    if (cur.length === desired) return
+    const next = Array.from({ length: desired }, (_, i) => (cur[i] ?? aporteMensal))
+    setPremissas({ aportePeriodosReal: next })
+  }, [aporteModo, blocosAporte.length, aporteMensal, premissas.aportePeriodosReal, setPremissas])
+
+  const aportePorAnoNominal = useMemo(() => {
+    if (aporteModo !== "periodos") return undefined
+    const prazo = Math.max(0, Number(premissas.prazo) || 0)
+    const inf = (Number(premissas.inflacao) || 0) / 100
+    const periodos = premissas.aportePeriodosReal ?? []
+    const byYear = Array.from({ length: prazo + 1 }, () => 0)
+
+    for (const b of blocosAporte) {
+      const real = Number(periodos[b.i] ?? aporteMensal) || 0
+      const nominalNoInicio = real * Math.pow(1 + inf, b.inicio)
+      for (let t = b.inicio; t < b.fim; t++) byYear[t] = nominalNoInicio
+    }
+    if (prazo > 0 && byYear[prazo] === 0) byYear[prazo] = byYear[prazo - 1] ?? 0
+    return byYear
+  }, [aporteModo, premissas.prazo, premissas.inflacao, premissas.aportePeriodosReal, blocosAporte, aporteMensal])
+
   // Premissas completas — junta os campos editáveis com os derivados
   const premissasCompletas = useMemo(() => ({
     ...premissas,
     saldoInicial: saldoInicialCalculado,
     aporteM:      aporteMensal,
+    ...(aportePorAnoNominal ? { aportePorAnoNominal } : {}),
     idadeAtual:   idadeAtualCalculada,
-  }), [premissas, saldoInicialCalculado, aporteMensal, idadeAtualCalculada])
+  }), [premissas, saldoInicialCalculado, aporteMensal, aportePorAnoNominal, idadeAtualCalculada])
 
   // Objetivos no formato da engine (usado na simulação e nos cenários)
   const objetivosEngine = useMemo(() =>
@@ -77,6 +116,12 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
   const formatarMoedaCompleta = (valor: number) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL",
       minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(valor)
+
+  const rendimentoLiquidoPct = useMemo(() => {
+    const bruto = Number(premissas.rendimentoBruto) || 0
+    const aliq = Number(premissas.aliquotaImpostoRendimento) || 0
+    return Math.max(0, bruto * (1 - Math.max(0, Math.min(1, aliq))))
+  }, [premissas.rendimentoBruto, premissas.aliquotaImpostoRendimento])
 
   const deflatorPorIdade = (idade: number) => {
     const anos = Math.max(0, idade - idadeAtualCalculada)
@@ -157,27 +202,47 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
               <p className="text-xs text-muted-foreground">Calculado automaticamente: Ativos − Passivos</p>
             </div>
             <div className="space-y-2">
-              <Label className="text-xs uppercase text-muted-foreground tracking-wide">Aporte Mensal (R$)</Label>
-              <Input value={formatCurrency(aporteMensal)} readOnly
-                className="bg-[#131929] border-white/10 text-foreground cursor-not-allowed opacity-70" />
-              <p className="text-xs text-muted-foreground">
-                Calculado automaticamente: Renda ({formatarMoedaCompleta(dadosPessoais.renda)}) − Despesa ({formatarMoedaCompleta(dadosPessoais.despesa)})
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs uppercase text-muted-foreground tracking-wide">Rendimento Anual (%)</Label>
-              <Input type="number" value={premissas.rendimento || ""}
-                onChange={e => setPremissas({ rendimento: parseFloat(e.target.value) || 0 })}
+              <Label className="text-xs uppercase text-muted-foreground tracking-wide">Rendimento Anual Bruto (%)</Label>
+              <Input
+                type="number"
+                value={premissas.rendimentoBruto ?? ""}
+                onChange={e => setPremissas({ rendimentoBruto: parseFloat(e.target.value) || 0 })}
                 className="bg-[#131929] border-white/10 text-foreground focus:border-primary" />
               <input
                 type="range"
                 min={0}
                 max={20}
                 step={0.5}
-                value={premissas.rendimento ?? 0}
-                onChange={(e) => setPremissas({ rendimento: parseFloat(e.target.value) || 0 })}
+                value={premissas.rendimentoBruto ?? 0}
+                onChange={(e) => setPremissas({ rendimentoBruto: parseFloat(e.target.value) || 0 })}
                 className="w-full accent-primary"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs uppercase text-muted-foreground tracking-wide">
+                Alíquota de Imposto sobre Rendimento
+              </Label>
+              <Select
+                value={String(premissas.aliquotaImpostoRendimento ?? 0.15)}
+                onValueChange={(v) => setPremissas({ aliquotaImpostoRendimento: parseFloat(v) || 0 })}
+              >
+                <SelectTrigger className="bg-[#131929] border-white/10 text-foreground focus:border-primary">
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent className="bg-card border-border">
+                  <SelectItem value="0.15">15% — renda fixa longo prazo</SelectItem>
+                  <SelectItem value="0.175">17,5% — renda fixa 2-4 anos</SelectItem>
+                  <SelectItem value="0.20">20% — renda fixa 1-2 anos</SelectItem>
+                  <SelectItem value="0.225">22,5% — renda fixa até 1 ano</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Rendimento líquido utilizado nas simulações:{" "}
+                <span className="text-foreground font-medium">
+                  {rendimentoLiquidoPct.toFixed(1).replace(".", ",")}% a.a.
+                </span>
+              </p>
             </div>
             <div className="space-y-2">
               <Label className="text-xs uppercase text-muted-foreground tracking-wide">Inflação Anual (%)</Label>
@@ -216,6 +281,87 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
               />
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Card — Aporte Mensal */}
+      <Card className="bg-card border-border">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-base font-medium text-foreground">Aporte Mensal</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="space-y-2">
+            <Label className="text-xs uppercase text-muted-foreground tracking-wide">Modo de Aporte</Label>
+            <Select
+              value={aporteModo}
+              onValueChange={(v) => setPremissas({ aporteModo: (v as "fixo" | "periodos") || "fixo" })}
+            >
+              <SelectTrigger className="bg-[#131929] border-white/10 text-foreground focus:border-primary">
+                <SelectValue placeholder="Selecione" />
+              </SelectTrigger>
+              <SelectContent className="bg-card border-border">
+                <SelectItem value="fixo">Aporte fixo</SelectItem>
+                <SelectItem value="periodos">Personalizado por período</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {aporteModo === "fixo" ? (
+            <div className="space-y-2">
+              <Label className="text-xs uppercase text-muted-foreground tracking-wide">Aporte Mensal (R$)</Label>
+              <Input
+                value={formatCurrency(aporteMensal)}
+                readOnly
+                className="bg-[#131929] border-white/10 text-foreground cursor-not-allowed opacity-70"
+              />
+              <p className="text-xs text-muted-foreground">
+                Calculado automaticamente: Renda ({formatarMoedaCompleta(dadosPessoais.renda)}) − Despesa ({formatarMoedaCompleta(dadosPessoais.despesa)})
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="rounded-lg bg-[#131929] border border-white/10 px-4 py-3">
+                <p className="text-sm text-foreground font-medium">Personalizado por período (blocos de 5 anos)</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Os valores são em poder de compra de hoje (reais). O sistema converte para nominal no início de cada período.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {blocosAporte.map((b) => {
+                  const real = Number((premissas.aportePeriodosReal ?? [])[b.i] ?? aporteMensal) || 0
+                  const inf = (Number(premissas.inflacao) || 0) / 100
+                  const nominalNoInicio = real * Math.pow(1 + inf, b.inicio)
+                  return (
+                    <div key={b.i} className="rounded-xl border border-[rgba(255,255,255,0.06)] bg-[#0D1220] p-4">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                        Ano {b.inicio} ao {b.fim}
+                      </p>
+                      <div className="mt-3 space-y-2">
+                        <Label className="text-xs uppercase text-muted-foreground tracking-wide">Aporte (R$)</Label>
+                        <Input
+                          value={formatCurrency(real)}
+                          onChange={(e) => {
+                            const v = parseCurrency(e.target.value)
+                            const cur = premissas.aportePeriodosReal ?? []
+                            const next = Array.from({ length: blocosAporte.length }, (_, i) => (cur[i] ?? aporteMensal))
+                            next[b.i] = v
+                            setPremissas({ aportePeriodosReal: next, aporteModo: "periodos" })
+                          }}
+                          placeholder="0"
+                          className="bg-[#131929] border-white/10 text-foreground focus:border-primary"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Equivalente a <span className="text-foreground">{formatarMoedaCompleta(nominalNoInicio)}</span>{" "}
+                          nominais no início do período
+                        </p>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

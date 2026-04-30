@@ -70,14 +70,35 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
 
   const aporteMensal = Math.max(0, (dadosPessoais.renda || 0) - (dadosPessoais.despesa || 0))
 
+  const aporteModo = premissas.aporteModo ?? "fixo"
+  const aportePorAnoNominal = useMemo(() => {
+    if (aporteModo !== "periodos") return undefined
+    const prazo = Math.max(0, Number(premissas.prazo) || 0)
+    const inf = (Number(premissas.inflacao) || 0) / 100
+    const blocos = Math.max(1, Math.ceil(prazo / 5))
+    const periodos = premissas.aportePeriodosReal ?? []
+
+    const byYear = Array.from({ length: prazo + 1 }, () => 0)
+    for (let i = 0; i < blocos; i++) {
+      const inicio = i * 5
+      const fim = Math.min((i + 1) * 5, prazo)
+      const real = Number(periodos[i] ?? aporteMensal) || 0
+      const nominalNoInicio = real * Math.pow(1 + inf, inicio)
+      for (let t = inicio; t < fim; t++) byYear[t] = nominalNoInicio
+    }
+    if (prazo > 0 && byYear[prazo] === 0) byYear[prazo] = byYear[prazo - 1] ?? 0
+    return byYear
+  }, [aporteModo, premissas.prazo, premissas.inflacao, premissas.aportePeriodosReal, aporteMensal])
+
   const premissasCompletas = useMemo(
     () => ({
       ...premissas,
       saldoInicial: saldoInicialCalculado,
       aporteM: aporteMensal,
+      ...(aportePorAnoNominal ? { aportePorAnoNominal } : {}),
       idadeAtual: idadeAtualCalculada,
     }),
-    [premissas, saldoInicialCalculado, aporteMensal, idadeAtualCalculada],
+    [premissas, saldoInicialCalculado, aporteMensal, aportePorAnoNominal, idadeAtualCalculada],
   )
 
   const objetivosEngine = useMemo(

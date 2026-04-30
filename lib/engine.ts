@@ -3,6 +3,8 @@
 export interface Premissas {
   saldoInicial: number       // calculado: ativos - passivos
   aporteM: number            // calculado: renda - despesa
+  /** Opcional: aporte mensal nominal por ano (t=0..prazo). Se presente, substitui `aporteM*(1+inf)^t`. */
+  aportePorAnoNominal?: number[]
   rendimento: number         // ex: 9 para 9% a.a.
   inflacao: number           // ex: 4 para 4% a.a.
   idadeAtual: number         // calculado: data de nascimento → hoje
@@ -186,6 +188,10 @@ export function calcularProjecao(
     const isAposentado = idade >= idadeApos
     const objetivosAno = saqueObjetivosAno(t, objetivos, inf)
     const dividasAno   = passivos.reduce((s, p) => s + pagamentoDividaAno(p, t), 0)
+    const aporteNominalAno =
+      (premissas.aportePorAnoNominal?.[t] ?? null) !== null
+        ? Number(premissas.aportePorAnoNominal?.[t]) || 0
+        : aporteM * fatorInf
 
     // Nova entrada: soma corrigida pela inflação no ano em que a idade bate
     const entradaAno =
@@ -194,11 +200,11 @@ export function calcularProjecao(
         : 0
 
     if (t === 0) {
-      saldo = saldoInicial + fvMensal(aporteM, r) - objetivosAno - dividasAno + entradaAno
+      saldo = saldoInicial + fvMensal(aporteNominalAno, r) - objetivosAno - dividasAno + entradaAno
     } else if (isAposentado) {
       saldo = saldo * (1 + r) - retiradaEfetiva * 12 * fatorInf + entradaAno
     } else {
-      saldo = saldo * (1 + r) + fvMensal(aporteM * fatorInf, r) - objetivosAno - dividasAno + entradaAno
+      saldo = saldo * (1 + r) + fvMensal(aporteNominalAno, r) - objetivosAno - dividasAno + entradaAno
     }
 
     const saldoReal       = saldo / fatorInf
