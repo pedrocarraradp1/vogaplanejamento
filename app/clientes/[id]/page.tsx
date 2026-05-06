@@ -95,10 +95,16 @@ export default function ClienteDetailPage() {
 
   async function duplicarCenario(row: SimulacaoRow) {
     const supabase = createClient()
+    const { data: { user }, error: authErr } = await supabase.auth.getUser()
+    if (authErr || !user) {
+      alert("Sessão inválida.")
+      return
+    }
     const nomeBase = (row.nome_cenario ?? row.nome_simulacao ?? "Cenário").trim()
     const nomeNovo = `Cópia de ${nomeBase}`
     const { error } = await supabase.from("simulacoes").insert({
       cliente_id: clienteId,
+      advisor_id: user.id,
       nome_simulacao: nomeNovo,
       nome_cenario: nomeNovo,
       dados: row.dados ?? {},

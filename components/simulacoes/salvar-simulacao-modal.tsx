@@ -74,32 +74,36 @@ export function SalvarSimulacaoModal() {
     setSaving(true)
     try {
       const supabase = createClient()
-      const { data: auth, error: authErr } = await supabase.auth.getUser()
-      if (authErr || !auth?.user) throw new Error("Sessão inválida. Faça login novamente.")
+      const { data: { user }, error: authErr } = await supabase.auth.getUser()
+      if (authErr || !user) throw new Error("Sessão inválida. Faça login novamente.")
 
-      // Busca cliente existente por nome (case-insensitive). Se não existir, cria.
       let clienteId = simulacaoMeta.clienteId
       if (!clienteId) {
-        const { data: existing, error: findErr } = await supabase
+        const { data: clienteExistente, error: findErr } = await supabase
           .from("clientes")
           .select("id")
-          .ilike("nome", nc)
-          .limit(1)
+          .eq("nome", nc)
+          .eq("advisor_id", user.id)
           .maybeSingle()
         if (findErr) throw new Error(findErr.message)
-        if (existing?.id) {
-          clienteId = existing.id
+        if (clienteExistente?.id) {
+          clienteId = clienteExistente.id
         } else {
-          const { data: created, error: createErr } = await supabase
+          const { data: novoCliente, error: createErr } = await supabase
             .from("clientes")
-            .insert({ nome: nc })
+            .insert({ nome: nc, advisor_id: user.id })
             .select("id")
             .single()
           if (createErr) throw new Error(createErr.message)
-          clienteId = created?.id ?? null
+          clienteId = novoCliente?.id ?? null
         }
       } else {
-        await supabase.from("clientes").update({ nome: nc }).eq("id", clienteId)
+        const { error: updErr } = await supabase
+          .from("clientes")
+          .update({ nome: nc })
+          .eq("id", clienteId)
+          .eq("advisor_id", user.id)
+        if (updErr) throw new Error(updErr.message)
       }
 
       const payloadState = {
@@ -118,6 +122,7 @@ export function SalvarSimulacaoModal() {
             nome_simulacao: ncx,
             nome_cenario: ncx,
             cliente_id: clienteId,
+            advisor_id: user.id,
             dados: payloadState,
             updated_at: new Date().toISOString(),
           })
@@ -133,6 +138,7 @@ export function SalvarSimulacaoModal() {
             nome_simulacao: ncx,
             nome_cenario: ncx,
             cliente_id: clienteId,
+            advisor_id: user.id,
             dados: payloadState,
           })
           .select("id")
