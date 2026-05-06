@@ -1,13 +1,14 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import Image from "next/image"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Search, Plus, ArrowRight, Users, FileText, TrendingUp } from "lucide-react"
+import { ClientesHeader } from "@/components/clientes/clientes-header"
+import { KpiStatCard } from "@/components/clientes/kpi-stat-card"
+import { fmtFull, patrimonioTotalFromDados } from "@/lib/clientes-utils"
 
 type SimulacaoRow = {
   id: string
@@ -18,22 +19,6 @@ type SimulacaoRow = {
   updated_at: string | null
   created_at: string | null
 }
-
-function patrimonioTotalFromDados(dados: any): number {
-  const ativos = Array.isArray(dados?.ativos) ? dados.ativos : []
-  const passivos = Array.isArray(dados?.passivos) ? dados.passivos : []
-  const totalAtivos = ativos.reduce((s: number, a: any) => s + (Number(a?.valor) || 0), 0)
-  const totalPassivos = passivos.reduce((s: number, p: any) => s + (Number(p?.valor) || 0), 0)
-  return totalAtivos - totalPassivos
-}
-
-const fmtFull = (moeda: "BRL" | "USD", v: number) =>
-  new Intl.NumberFormat(moeda === "USD" ? "en-US" : "pt-BR", {
-    style: "currency",
-    currency: moeda === "USD" ? "USD" : "BRL",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(v)
 
 export default function ClientesPage() {
   const [loading, setLoading] = useState(true)
@@ -153,21 +138,9 @@ export default function ClientesPage() {
       (error.toLowerCase().includes("could not find") || error.toLowerCase().includes("does not exist"))
 
     return (
-      <div className="min-h-screen bg-[#080C18] px-6 py-10">
-        <div className="mx-auto max-w-[1200px] space-y-4">
-          <header className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Image src="/logo-voga.png" alt="Voga" width={96} height={32} className="h-auto w-auto" />
-              <span className="text-sm text-muted-foreground">Clientes</span>
-            </div>
-            <Link href="/dashboard">
-              <Button className="bg-[#1E5CE6] hover:bg-[#1E5CE6]/90 text-white">
-                <Plus className="w-4 h-4 mr-2" />
-                Novo Cenário
-              </Button>
-            </Link>
-          </header>
-
+      <div className="min-h-screen bg-[#080C18]">
+        <ClientesHeader voltarHref="/dashboard" novoCenarioHref="/dashboard" />
+        <div className="mx-auto max-w-[1200px] px-6 py-10 space-y-4">
           <div className="rounded-xl border border-white/10 bg-[#131929] p-6">
             <p className="text-sm font-semibold text-destructive">Não foi possível carregar as simulações</p>
             <p className="text-sm text-muted-foreground mt-2">
@@ -183,69 +156,20 @@ export default function ClientesPage() {
 
   return (
     <div className="min-h-screen bg-[#080C18]">
-      {/* Header compacto */}
-      <header className="h-16 bg-[#080C18] border-b border-white/10">
-        <div className="mx-auto max-w-[1200px] h-full px-6 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Image src="/logo-voga.png" alt="Voga" width={96} height={32} className="h-8 w-auto" />
-            <span className="text-[18px] font-medium text-white">
-              Planejamento Financeiro Pessoal
-            </span>
-          </div>
-          <Link href="/dashboard">
-            <Button className="bg-[#1E5CE6] hover:bg-[#1E5CE6]/90 text-white">
-              <Plus className="w-4 h-4 mr-2" />
-              Novo Cenário
-            </Button>
-          </Link>
-        </div>
-      </header>
+      <ClientesHeader voltarHref="/dashboard" novoCenarioHref="/dashboard" />
 
       <div className="mx-auto max-w-[1200px] px-6 py-6 space-y-6">
 
         {/* KPIs */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="bg-[#131929] border border-white/10 rounded-xl">
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between">
-                <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total de Clientes</p>
-                  <p className="text-3xl font-bold text-foreground">{kpis.totalClientes}</p>
-                </div>
-                <div className="p-2 rounded-lg bg-white/5 border border-white/10">
-                  <Users className="w-5 h-5 text-muted-foreground" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-[#131929] border border-white/10 rounded-xl">
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between">
-                <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total de Simulações</p>
-                  <p className="text-3xl font-bold text-foreground">{kpis.totalSimulacoes}</p>
-                </div>
-                <div className="p-2 rounded-lg bg-white/5 border border-white/10">
-                  <FileText className="w-5 h-5 text-muted-foreground" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-[#131929] border border-white/10 rounded-xl">
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between">
-                <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Patrimônio Total sob Gestão</p>
-                  <p className="text-3xl font-bold text-[#1E5CE6]">{fmtFull("BRL", kpis.patrimonioTotal)}</p>
-                </div>
-                <div className="p-2 rounded-lg bg-[#1E5CE6]/10 border border-[#1E5CE6]/30">
-                  <TrendingUp className="w-5 h-5 text-[#1E5CE6]" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <KpiStatCard label="Total de Clientes" value={kpis.totalClientes} icon={Users} />
+          <KpiStatCard label="Total de Simulações" value={kpis.totalSimulacoes} icon={FileText} />
+          <KpiStatCard
+            label="Patrimônio Total sob Gestão"
+            value={fmtFull("BRL", kpis.patrimonioTotal)}
+            icon={TrendingUp}
+            iconVariant="accent"
+          />
         </div>
 
         {/* Busca */}

@@ -3,11 +3,17 @@
 import { useEffect, useMemo, useState } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
-import Image from "next/image"
 import { createClient } from "@/lib/supabase"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Trash2, Copy, ArrowRight, Plus, Layers } from "lucide-react"
+import { FileText, Plus, Users, TrendingUp } from "lucide-react"
+import { ClientesHeader } from "@/components/clientes/clientes-header"
+import { KpiStatCard } from "@/components/clientes/kpi-stat-card"
+import { CenarioCard } from "@/components/clientes/cenario-card"
+import {
+  fmtFull,
+  moedaFromDados,
+  patrimonioProjetadoFromDados,
+} from "@/lib/clientes-utils"
 
 type ClienteRow = {
   id: string
@@ -23,32 +29,6 @@ type SimulacaoRow = {
   dados: any
   created_at: string | null
   updated_at: string | null
-}
-
-function patrimonioTotalFromDados(dados: any): number {
-  const ativos = Array.isArray(dados?.ativos) ? dados.ativos : []
-  const passivos = Array.isArray(dados?.passivos) ? dados.passivos : []
-  const totalAtivos = ativos.reduce((s: number, a: any) => s + (Number(a?.valor) || 0), 0)
-  const totalPassivos = passivos.reduce((s: number, p: any) => s + (Number(p?.valor) || 0), 0)
-  return totalAtivos - totalPassivos
-}
-
-function patrimonioProjetadoFromDados(dados: any): number {
-  const k = dados?.kpis?.patrimonioApos
-  if (typeof k === "number") return k
-  const proj = Array.isArray(dados?.projecao) ? dados.projecao : []
-  const last = proj.length ? proj[proj.length - 1] : null
-  const v = last?.saldoNominal
-  return typeof v === "number" ? v : 0
-}
-
-function fmtFull(moeda: "BRL" | "USD", v: number) {
-  return new Intl.NumberFormat(moeda === "USD" ? "en-US" : "pt-BR", {
-    style: "currency",
-    currency: moeda === "USD" ? "USD" : "BRL",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(v)
 }
 
 export default function ClienteDetailPage() {
@@ -109,10 +89,9 @@ export default function ClienteDetailPage() {
   const kpis = useMemo(() => {
     const totalCenarios = cenarios.length
     const last = cenarios[0]
-    const lastDate = last?.updated_at ?? last?.created_at ?? null
-    const moeda = (last?.dados?.moeda === "USD" ? "USD" : "BRL") as "BRL" | "USD"
+    const moeda = moedaFromDados(last?.dados)
     const patrimonio = last?.dados ? patrimonioProjetadoFromDados(last.dados) : 0
-    return { totalCenarios, lastDate, moeda, patrimonio }
+    return { totalCenarios, moeda, patrimonio }
   }, [cenarios])
 
   async function duplicarCenario(row: SimulacaoRow) {
@@ -152,6 +131,8 @@ export default function ClienteDetailPage() {
     }
   }
 
+  const novoCenarioHref = `/dashboard?clienteId=${clienteId}`
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#080C18] text-muted-foreground text-sm">
@@ -162,171 +143,79 @@ export default function ClienteDetailPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#080C18] text-destructive text-sm px-6">
-        {error}
+      <div className="min-h-screen bg-[#080C18]">
+        <ClientesHeader voltarHref="/clientes" novoCenarioHref={novoCenarioHref} />
+        <div className="mx-auto max-w-[1200px] px-6 py-10 text-destructive text-sm">{error}</div>
       </div>
     )
   }
 
   return (
     <div className="min-h-screen bg-[#080C18]">
-      <header className="h-16 bg-[#080C18] border-b border-white/10">
-        <div className="mx-auto max-w-[1200px] h-full px-6 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Image src="/logo-voga.png" alt="Voga" width={96} height={32} className="h-8 w-auto" />
-            <span className="text-[18px] font-medium text-white">Cliente</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link href="/clientes">
-              <Button variant="outline" className="h-9 border-white/10 bg-[#131929] text-muted-foreground hover:text-foreground hover:bg-white/5">
-                ← Voltar
-              </Button>
-            </Link>
-            <Link href={`/dashboard?clienteId=${clienteId}`}>
-              <Button className="h-9 bg-[#1E5CE6] hover:bg-[#1E5CE6]/90 text-white">
-                <Plus className="w-4 h-4 mr-2" />
-                Novo Cenário
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </header>
+      <ClientesHeader voltarHref="/clientes" novoCenarioHref={novoCenarioHref} />
 
       <div className="mx-auto max-w-[1200px] px-6 py-6 space-y-6">
-        <div className="space-y-1">
-          <p className="text-sm text-muted-foreground">Cliente</p>
-          <h1 className="text-2xl font-semibold text-foreground">
-            {cliente?.nome || "Sem nome"}{" "}
-            <span className="text-muted-foreground font-normal text-base">
-              · {cliente?.profissao || "—"}
-            </span>
-          </h1>
-        </div>
-
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="bg-[#131929] border border-white/10 rounded-xl">
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between">
-                <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total de Cenários</p>
-                  <p className="text-3xl font-bold text-foreground">{kpis.totalCenarios}</p>
-                </div>
-                <div className="p-2 rounded-lg bg-white/5 border border-white/10">
-                  <Layers className="w-5 h-5 text-muted-foreground" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-[#131929] border border-white/10 rounded-xl">
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between">
-                <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Patrimônio (último cenário)</p>
-                  <p className="text-3xl font-bold text-[#1E5CE6]">{fmtFull(kpis.moeda, kpis.patrimonio)}</p>
-                </div>
-                <div className="p-2 rounded-lg bg-[#1E5CE6]/10 border border-[#1E5CE6]/30">
-                  <ArrowRight className="w-5 h-5 text-[#1E5CE6]" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-[#131929] border border-white/10 rounded-xl">
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between">
-                <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Última atualização</p>
-                  <p className="text-3xl font-bold text-foreground">
-                    {kpis.lastDate ? new Date(kpis.lastDate).toLocaleDateString("pt-BR") : "—"}
-                  </p>
-                </div>
-                <div className="p-2 rounded-lg bg-white/5 border border-white/10">
-                  <ArrowRight className="w-5 h-5 text-muted-foreground" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <KpiStatCard
+            label="Nome do cliente"
+            value={cliente?.nome?.trim() || "—"}
+            icon={Users}
+          />
+          <KpiStatCard label="Total de cenários" value={kpis.totalCenarios} icon={FileText} />
+          <KpiStatCard
+            label="Patrimônio do último cenário"
+            value={fmtFull(kpis.moeda, kpis.patrimonio)}
+            icon={TrendingUp}
+            iconVariant="accent"
+          />
         </div>
 
-        <Card className="bg-[#131929] border border-white/10 rounded-xl">
-          <CardHeader>
-            <CardTitle className="text-sm font-semibold text-foreground">Cenários</CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {cenarios.length === 0 ? (
+          <div className="rounded-xl border border-white/10 bg-[#131929] p-10 text-center">
+            <div className="mx-auto w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
+              <FileText className="w-5 h-5 text-muted-foreground" />
+            </div>
+            <p className="text-sm font-semibold text-foreground mt-4">Nenhum cenário salvo</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Crie um novo cenário para começar o planejamento deste cliente.
+            </p>
+            <div className="mt-6 flex justify-center">
+              <Link href={novoCenarioHref}>
+                <Button className="bg-[#1E5CE6] hover:bg-[#1E5CE6]/90 text-white">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Novo Cenário
+                </Button>
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {cenarios.map((s) => {
               const nome = (s.nome_cenario ?? s.nome_simulacao ?? "Cenário Principal").trim()
               const created = s.created_at ? new Date(s.created_at).toLocaleDateString("pt-BR") : "—"
-              const moeda = (s?.dados?.moeda === "USD" ? "USD" : "BRL") as "BRL" | "USD"
-              const patrimonioTotal = s.dados ? patrimonioTotalFromDados(s.dados) : null
-              const patrimonio = patrimonioProjetadoFromDados(s.dados)
+              const moeda = moedaFromDados(s.dados)
+              const proj = patrimonioProjetadoFromDados(s.dados)
               return (
-                <div key={s.id} className="bg-[#0D1220] border border-white/10 rounded-xl p-5">
-                  <div className="space-y-1">
-                    <p className="text-sm font-semibold text-foreground">{nome}</p>
-                    <p className="text-xs text-muted-foreground">Criado em {created}</p>
-                    {typeof patrimonioTotal === "number" && (
-                      <p className="text-xs text-muted-foreground mt-2">
-                        <span className="text-foreground/80">Patrimônio total:</span>{" "}
-                        <span className="text-[#1E5CE6] font-medium">{fmtFull(moeda, patrimonioTotal)}</span>
-                      </p>
-                    )}
-                    <p className="text-xs text-muted-foreground mt-2">
-                      <span className="text-foreground/80">Patrimônio projetado:</span>{" "}
-                      <span className="text-[#1E5CE6] font-medium">{fmtFull(moeda, patrimonio)}</span>
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2 mt-4">
-                    <Link href={`/simulacao/${s.id}`} className="flex-1">
-                      <Button className="w-full bg-[#1E5CE6] hover:bg-[#1E5CE6]/90 text-white">
-                        Abrir
-                      </Button>
-                    </Link>
-                    <Button
-                      variant="outline"
-                      onClick={() => duplicarCenario(s)}
-                      className="h-10 w-10 p-0 border-white/10 bg-[#131929] text-muted-foreground hover:text-foreground hover:bg-white/5"
-                      title="Duplicar"
-                    >
-                      <Copy className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => excluirCenario(s)}
-                      className="h-10 w-10 p-0 border-white/10 bg-[#131929] text-muted-foreground hover:text-destructive hover:bg-white/5"
-                      title="Excluir"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
+                <CenarioCard
+                  key={s.id}
+                  nomeCenario={nome}
+                  sublinha={`Criado em ${created}`}
+                  patrimonioProjetadoLabel={fmtFull(moeda, proj)}
+                  abrirHref={`/simulacao/${s.id}`}
+                  onDuplicar={(e) => {
+                    e.preventDefault()
+                    void duplicarCenario(s)
+                  }}
+                  onExcluir={(e) => {
+                    e.preventDefault()
+                    void excluirCenario(s)
+                  }}
+                />
               )
             })}
-
-            {cenarios.length === 0 && (
-              <div className="col-span-full rounded-xl border border-white/10 bg-[#0D1220] p-10 text-center">
-                <div className="mx-auto w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
-                  <Layers className="w-5 h-5 text-muted-foreground" />
-                </div>
-                <p className="text-sm font-semibold text-foreground mt-4">Nenhum cenário salvo</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Crie um novo cenário para começar o planejamento deste cliente.
-                </p>
-                <div className="mt-6 flex justify-center">
-                  <Link href={`/dashboard?clienteId=${clienteId}`}>
-                    <Button className="bg-[#1E5CE6] hover:bg-[#1E5CE6]/90 text-white">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Novo Cenário
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          </div>
+        )}
       </div>
     </div>
   )
 }
-

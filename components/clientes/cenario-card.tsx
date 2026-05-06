@@ -1,0 +1,68 @@
+import type { MouseEvent } from "react"
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { ArrowRight, Copy, Trash2 } from "lucide-react"
+
+type CenarioCardProps = {
+  nomeCenario: string
+  /** Texto da linha cinza (ex.: data de criação). */
+  sublinha: string
+  patrimonioProjetadoLabel: string
+  abrirHref: string
+  onDuplicar: (e: MouseEvent) => void
+  onExcluir: (e: MouseEvent) => void
+}
+
+/** Mesmo layout visual dos cards da lista em /clientes; ações à direita. */
+export function CenarioCard({
+  nomeCenario,
+  sublinha,
+  patrimonioProjetadoLabel,
+  abrirHref,
+  onDuplicar,
+  onExcluir,
+}: CenarioCardProps) {
+  return (
+    <div className="bg-[#131929] border border-white/10 rounded-xl p-5 transition-colors hover:border-[#1E5CE6]/60">
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-1 min-w-0 flex-1">
+          <p className="text-sm font-semibold text-foreground">{nomeCenario}</p>
+          <p className="text-xs text-muted-foreground">{sublinha}</p>
+          <p className="text-xs text-muted-foreground mt-2">
+            <span className="text-foreground/80">Patrimônio projetado:</span>{" "}
+            <span className="text-[#1E5CE6] font-medium">{patrimonioProjetadoLabel}</span>
+          </p>
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={onDuplicar}
+            className="h-9 w-9 border-white/10 bg-transparent text-muted-foreground hover:text-foreground hover:bg-white/5"
+            title="Duplicar"
+          >
+            <Copy className="w-4 h-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={onExcluir}
+            className="h-9 w-9 border-white/10 bg-transparent text-destructive hover:text-destructive hover:bg-destructive/10"
+            title="Excluir"
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+          <Link
+            href={abrirHref}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground hover:translate-x-0.5"
+            title="Abrir cenário"
+          >
+            <ArrowRight className="w-5 h-5" />
+          </Link>
+        </div>
+      </div>
+    </div>
+  )
+}
