@@ -60,18 +60,21 @@ function ClienteBootstrap() {
         const supabase = createClient()
         const { data, error } = await supabase
           .from("clientes")
-          .select("id, nome, profissao")
+          .select("id, nome, dados")
           .eq("id", clienteId)
           .maybeSingle()
         if (error) throw new Error(error.message)
         if (!data?.id) return
+
+        const dadosCliente = data.dados as { dadosPessoais?: { profissao?: string } } | null | undefined
+        const profissaoFromDados = String(dadosCliente?.dadosPessoais?.profissao ?? "").trim()
 
         if (!cancelled) {
           // Planejamento em branco, mas vinculado ao cliente
           loadState(
             {
               moeda: "BRL",
-              dadosPessoais: { nome: data.nome ?? "", profissao: data.profissao ?? "" },
+              dadosPessoais: { nome: data.nome ?? "", profissao: profissaoFromDados },
               ativos: [],
               passivos: [],
               objetivos: [],

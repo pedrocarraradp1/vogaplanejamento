@@ -18,7 +18,6 @@ import {
 type ClienteRow = {
   id: string
   nome: string | null
-  profissao: string | null
 }
 
 type SimulacaoRow = {
@@ -61,7 +60,7 @@ export default function ClienteDetailPage() {
         if (authErr || !auth?.user) throw new Error("Sessão inválida.")
 
         const [{ data: c, error: cErr }, { data: s, error: sErr }] = await Promise.all([
-          supabase.from("clientes").select("id,nome,profissao").eq("id", clienteId).maybeSingle(),
+          supabase.from("clientes").select("id,nome").eq("id", clienteId).maybeSingle(),
           supabase
             .from("simulacoes")
             .select("*")
@@ -116,19 +115,14 @@ export default function ClienteDetailPage() {
   }
 
   async function excluirCenario(row: SimulacaoRow) {
-    const nomeBase = (row.nome_cenario ?? row.nome_simulacao ?? "Cenário").trim()
-    if (!confirm(`Excluir o cenário “${nomeBase}”? Essa ação não pode ser desfeita.`)) return
+    if (!confirm("Tem certeza?")) return
     const supabase = createClient()
     const { error } = await supabase.from("simulacoes").delete().eq("id", row.id)
     if (error) {
       alert(error.message)
       return
     }
-    try {
-      await refresh()
-    } catch (e) {
-      alert(e instanceof Error ? e.message : "Erro ao recarregar cenários.")
-    }
+    setCenarios((prev) => prev.filter((c) => c.id !== row.id))
   }
 
   const novoCenarioHref = `/dashboard?clienteId=${clienteId}`

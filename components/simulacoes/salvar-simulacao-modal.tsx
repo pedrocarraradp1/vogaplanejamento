@@ -34,10 +34,9 @@ export function SalvarSimulacaoModal() {
 
   const [nomeCenario, setNomeCenario] = useState(simulacaoMeta.nomeCenario ?? "Cenário Principal")
   const [nomeCliente, setNomeCliente] = useState(state.dadosPessoais.nome ?? "")
-  const [profissaoCliente, setProfissaoCliente] = useState(state.dadosPessoais.profissao ?? "")
 
   const isUpdate = Boolean(simulacaoMeta.simulacaoId)
-  /** Só pede nome/profissão no modal na primeira gravação, sem cliente na URL/meta. */
+  /** Só pede nome do cliente no modal na primeira gravação, sem cliente na URL/meta (sem campo profissão — só vínculo pelo nome). */
   const pedirNomeClienteNoModal = !simulacaoMeta.simulacaoId && !simulacaoMeta.clienteId
 
   const patrimonioTotal = useMemo(() => patrimonioTotalFromState(state), [state])
@@ -46,9 +45,7 @@ export function SalvarSimulacaoModal() {
     const ncx = nomeCenario.trim()
     const temClienteVinculado = Boolean(simulacaoMeta.clienteId)
     const nomeFromState = String(state.dadosPessoais.nome ?? "").trim()
-    const profFromState = String(state.dadosPessoais.profissao ?? "").trim()
     const nc = pedirNomeClienteNoModal ? nomeCliente.trim() : nomeFromState
-    const pc = pedirNomeClienteNoModal ? profissaoCliente.trim() : profFromState
     if (!ncx) {
       toast({
         variant: "destructive",
@@ -95,22 +92,21 @@ export function SalvarSimulacaoModal() {
         } else {
           const { data: created, error: createErr } = await supabase
             .from("clientes")
-            .insert({ nome: nc, profissao: pc })
+            .insert({ nome: nc })
             .select("id")
             .single()
           if (createErr) throw new Error(createErr.message)
           clienteId = created?.id ?? null
         }
       } else {
-        // Mantém cadastro do cliente atualizado
-        await supabase.from("clientes").update({ nome: nc, profissao: pc }).eq("id", clienteId)
+        await supabase.from("clientes").update({ nome: nc }).eq("id", clienteId)
       }
 
       const payloadState = {
         ...state,
         dadosPessoais: {
           ...state.dadosPessoais,
-          ...(!temClienteVinculado ? { nome: nc, profissao: pc } : {}),
+          ...(!temClienteVinculado ? { nome: nc } : {}),
         },
       }
 
@@ -194,25 +190,14 @@ export function SalvarSimulacaoModal() {
           </div>
 
           {pedirNomeClienteNoModal && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-xs uppercase text-muted-foreground tracking-wide">Nome do cliente</Label>
-                <Input
-                  value={nomeCliente}
-                  onChange={(e) => setNomeCliente(e.target.value)}
-                  placeholder="Ex: João Silva"
-                  className="bg-[#131929] border-white/10 text-foreground focus:border-primary"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs uppercase text-muted-foreground tracking-wide">Profissão</Label>
-                <Input
-                  value={profissaoCliente}
-                  onChange={(e) => setProfissaoCliente(e.target.value)}
-                  placeholder="Ex: Médico"
-                  className="bg-[#131929] border-white/10 text-foreground focus:border-primary"
-                />
-              </div>
+            <div className="space-y-2">
+              <Label className="text-xs uppercase text-muted-foreground tracking-wide">Nome do cliente</Label>
+              <Input
+                value={nomeCliente}
+                onChange={(e) => setNomeCliente(e.target.value)}
+                placeholder="Ex: João Silva"
+                className="bg-[#131929] border-white/10 text-foreground focus:border-primary"
+              />
             </div>
           )}
 
