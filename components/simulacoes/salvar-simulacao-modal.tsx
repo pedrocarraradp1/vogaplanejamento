@@ -42,13 +42,16 @@ export function SalvarSimulacaoModal() {
 
   async function onConfirm() {
     const ncx = nomeCenario.trim()
-    const nc = nomeCliente.trim()
-    const pc = profissaoCliente.trim()
-    if (!ncx || !nc) {
+    const temClienteVinculado = Boolean(simulacaoMeta.clienteId)
+    const nc = temClienteVinculado ? String(state.dadosPessoais.nome ?? "").trim() : nomeCliente.trim()
+    const pc = temClienteVinculado ? String(state.dadosPessoais.profissao ?? "").trim() : profissaoCliente.trim()
+    if (!ncx || (!temClienteVinculado && !nc)) {
       toast({
         variant: "destructive",
         title: "Campos obrigatórios",
-        description: "Informe o nome do cenário e o nome do cliente.",
+        description: temClienteVinculado
+          ? "Informe o nome do cenário."
+          : "Informe o nome do cenário e o nome do cliente.",
       })
       return
     }
@@ -89,8 +92,7 @@ export function SalvarSimulacaoModal() {
         ...state,
         dadosPessoais: {
           ...state.dadosPessoais,
-          nome: nc,
-          profissao: pc,
+          ...(!temClienteVinculado ? { nome: nc, profissao: pc } : {}),
         },
       }
 
@@ -173,26 +175,28 @@ export function SalvarSimulacaoModal() {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="text-xs uppercase text-muted-foreground tracking-wide">Nome do cliente</Label>
-              <Input
-                value={nomeCliente}
-                onChange={(e) => setNomeCliente(e.target.value)}
-                placeholder="Ex: João Silva"
-                className="bg-[#131929] border-white/10 text-foreground focus:border-primary"
-              />
+          {!simulacaoMeta.clienteId && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-xs uppercase text-muted-foreground tracking-wide">Nome do cliente</Label>
+                <Input
+                  value={nomeCliente}
+                  onChange={(e) => setNomeCliente(e.target.value)}
+                  placeholder="Ex: João Silva"
+                  className="bg-[#131929] border-white/10 text-foreground focus:border-primary"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs uppercase text-muted-foreground tracking-wide">Profissão</Label>
+                <Input
+                  value={profissaoCliente}
+                  onChange={(e) => setProfissaoCliente(e.target.value)}
+                  placeholder="Ex: Médico"
+                  className="bg-[#131929] border-white/10 text-foreground focus:border-primary"
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label className="text-xs uppercase text-muted-foreground tracking-wide">Profissão</Label>
-              <Input
-                value={profissaoCliente}
-                onChange={(e) => setProfissaoCliente(e.target.value)}
-                placeholder="Ex: Médico"
-                className="bg-[#131929] border-white/10 text-foreground focus:border-primary"
-              />
-            </div>
-          </div>
+          )}
 
           <div className="flex items-center justify-end gap-3 pt-2">
             <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>

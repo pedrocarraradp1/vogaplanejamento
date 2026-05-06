@@ -25,6 +25,14 @@ type SimulacaoRow = {
   updated_at: string | null
 }
 
+function patrimonioTotalFromDados(dados: any): number {
+  const ativos = Array.isArray(dados?.ativos) ? dados.ativos : []
+  const passivos = Array.isArray(dados?.passivos) ? dados.passivos : []
+  const totalAtivos = ativos.reduce((s: number, a: any) => s + (Number(a?.valor) || 0), 0)
+  const totalPassivos = passivos.reduce((s: number, p: any) => s + (Number(p?.valor) || 0), 0)
+  return totalAtivos - totalPassivos
+}
+
 function patrimonioProjetadoFromDados(dados: any): number {
   const k = dados?.kpis?.patrimonioApos
   if (typeof k === "number") return k
@@ -59,7 +67,7 @@ export default function ClienteDetailPage() {
       .from("simulacoes")
       .select("id,cliente_id,nome_cenario,nome_simulacao,dados,created_at,updated_at")
       .eq("cliente_id", clienteId)
-      .order("updated_at", { ascending: false })
+      .order("created_at", { ascending: false })
       .limit(200)
     if (sErr) throw new Error(sErr.message)
     setCenarios(((s as any[]) ?? []) as SimulacaoRow[])
@@ -79,7 +87,7 @@ export default function ClienteDetailPage() {
             .from("simulacoes")
             .select("id,cliente_id,nome_cenario,nome_simulacao,dados,created_at,updated_at")
             .eq("cliente_id", clienteId)
-            .order("updated_at", { ascending: false })
+            .order("created_at", { ascending: false })
             .limit(200),
         ])
         if (cErr) throw new Error(cErr.message)
@@ -253,12 +261,19 @@ export default function ClienteDetailPage() {
               const nome = (s.nome_cenario ?? s.nome_simulacao ?? "Cenário Principal").trim()
               const created = s.created_at ? new Date(s.created_at).toLocaleDateString("pt-BR") : "—"
               const moeda = (s?.dados?.moeda === "USD" ? "USD" : "BRL") as "BRL" | "USD"
+              const patrimonioTotal = s.dados ? patrimonioTotalFromDados(s.dados) : null
               const patrimonio = patrimonioProjetadoFromDados(s.dados)
               return (
                 <div key={s.id} className="bg-[#0D1220] border border-white/10 rounded-xl p-5">
                   <div className="space-y-1">
                     <p className="text-sm font-semibold text-foreground">{nome}</p>
                     <p className="text-xs text-muted-foreground">Criado em {created}</p>
+                    {typeof patrimonioTotal === "number" && (
+                      <p className="text-xs text-muted-foreground mt-2">
+                        <span className="text-foreground/80">Patrimônio total:</span>{" "}
+                        <span className="text-[#1E5CE6] font-medium">{fmtFull(moeda, patrimonioTotal)}</span>
+                      </p>
+                    )}
                     <p className="text-xs text-muted-foreground mt-2">
                       <span className="text-foreground/80">Patrimônio projetado:</span>{" "}
                       <span className="text-[#1E5CE6] font-medium">{fmtFull(moeda, patrimonio)}</span>
@@ -293,8 +308,22 @@ export default function ClienteDetailPage() {
             })}
 
             {cenarios.length === 0 && (
-              <div className="text-sm text-muted-foreground">
-                Nenhum cenário salvo ainda.
+              <div className="col-span-full rounded-xl border border-white/10 bg-[#0D1220] p-10 text-center">
+                <div className="mx-auto w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
+                  <Layers className="w-5 h-5 text-muted-foreground" />
+                </div>
+                <p className="text-sm font-semibold text-foreground mt-4">Nenhum cenário salvo</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Crie um novo cenário para começar o planejamento deste cliente.
+                </p>
+                <div className="mt-6 flex justify-center">
+                  <Link href={`/dashboard?clienteId=${clienteId}`}>
+                    <Button className="bg-[#1E5CE6] hover:bg-[#1E5CE6]/90 text-white">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Novo Cenário
+                    </Button>
+                  </Link>
+                </div>
               </div>
             )}
           </CardContent>
