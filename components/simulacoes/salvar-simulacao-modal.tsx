@@ -158,9 +158,9 @@ export function SalvarSimulacaoModal() {
       </DialogTrigger>
       <DialogContent className="bg-[#0D1220] border border-[rgba(255,255,255,0.08)] text-foreground">
         <DialogHeader>
-          <DialogTitle>{isUpdate ? "Atualizar simulação" : "Salvar simulação"}</DialogTitle>
+          <DialogTitle>{isUpdate ? "Atualizar cenário" : "Salvar cenário"}</DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            Salva o estado atual do planejamento no Supabase.
+            Salva o estado atual do planejamento como cenário no Supabase.
           </DialogDescription>
         </DialogHeader>
 

@@ -7,7 +7,7 @@ import Image from "next/image"
 import { createClient } from "@/lib/supabase"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Trash2, Copy, ArrowLeft, ArrowRight, Plus, Layers } from "lucide-react"
+import { Trash2, Copy, ArrowRight, Plus, Layers } from "lucide-react"
 
 type ClienteRow = {
   id: string
@@ -65,10 +65,9 @@ export default function ClienteDetailPage() {
     const supabase = createClient()
     const { data: s, error: sErr } = await supabase
       .from("simulacoes")
-      .select("id,cliente_id,nome_cenario,nome_simulacao,dados,created_at,updated_at")
+      .select("*")
       .eq("cliente_id", clienteId)
       .order("created_at", { ascending: false })
-      .limit(200)
     if (sErr) throw new Error(sErr.message)
     setCenarios(((s as any[]) ?? []) as SimulacaoRow[])
   }
@@ -85,10 +84,9 @@ export default function ClienteDetailPage() {
           supabase.from("clientes").select("id,nome,profissao").eq("id", clienteId).maybeSingle(),
           supabase
             .from("simulacoes")
-            .select("id,cliente_id,nome_cenario,nome_simulacao,dados,created_at,updated_at")
+            .select("*")
             .eq("cliente_id", clienteId)
-            .order("created_at", { ascending: false })
-            .limit(200),
+            .order("created_at", { ascending: false }),
         ])
         if (cErr) throw new Error(cErr.message)
         if (sErr) throw new Error(sErr.message)
@@ -181,8 +179,7 @@ export default function ClienteDetailPage() {
           <div className="flex items-center gap-2">
             <Link href="/clientes">
               <Button variant="outline" className="h-9 border-white/10 bg-[#131929] text-muted-foreground hover:text-foreground hover:bg-white/5">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Voltar
+                ← Voltar
               </Button>
             </Link>
             <Link href={`/dashboard?clienteId=${clienteId}`}>
