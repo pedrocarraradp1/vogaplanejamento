@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase"
@@ -101,7 +101,9 @@ export default function DashboardPage() {
   return (
     <PlanoProvider>
       <div className="min-h-screen bg-background">
-        <ClienteBootstrap />
+        <Suspense fallback={null}>
+          <ClienteBootstrap />
+        </Suspense>
         <div className="fixed top-6 right-[200px] z-50 flex items-center gap-2">
           <Link href="/clientes">
             <Button
