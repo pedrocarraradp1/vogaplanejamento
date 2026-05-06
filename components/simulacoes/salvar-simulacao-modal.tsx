@@ -37,21 +37,39 @@ export function SalvarSimulacaoModal() {
   const [profissaoCliente, setProfissaoCliente] = useState(state.dadosPessoais.profissao ?? "")
 
   const isUpdate = Boolean(simulacaoMeta.simulacaoId)
+  /** Só pede nome/profissão no modal na primeira gravação, sem cliente na URL/meta. */
+  const pedirNomeClienteNoModal = !simulacaoMeta.simulacaoId && !simulacaoMeta.clienteId
 
   const patrimonioTotal = useMemo(() => patrimonioTotalFromState(state), [state])
 
   async function onConfirm() {
     const ncx = nomeCenario.trim()
     const temClienteVinculado = Boolean(simulacaoMeta.clienteId)
-    const nc = temClienteVinculado ? String(state.dadosPessoais.nome ?? "").trim() : nomeCliente.trim()
-    const pc = temClienteVinculado ? String(state.dadosPessoais.profissao ?? "").trim() : profissaoCliente.trim()
-    if (!ncx || (!temClienteVinculado && !nc)) {
+    const nomeFromState = String(state.dadosPessoais.nome ?? "").trim()
+    const profFromState = String(state.dadosPessoais.profissao ?? "").trim()
+    const nc = pedirNomeClienteNoModal ? nomeCliente.trim() : nomeFromState
+    const pc = pedirNomeClienteNoModal ? profissaoCliente.trim() : profFromState
+    if (!ncx) {
       toast({
         variant: "destructive",
         title: "Campos obrigatórios",
-        description: temClienteVinculado
-          ? "Informe o nome do cenário."
-          : "Informe o nome do cenário e o nome do cliente.",
+        description: "Informe o nome do cenário.",
+      })
+      return
+    }
+    if (pedirNomeClienteNoModal && !nc) {
+      toast({
+        variant: "destructive",
+        title: "Campos obrigatórios",
+        description: "Informe o nome do cenário e o nome do cliente.",
+      })
+      return
+    }
+    if (!pedirNomeClienteNoModal && !temClienteVinculado && !nc) {
+      toast({
+        variant: "destructive",
+        title: "Nome do cliente ausente",
+        description: "Preencha o nome em Dados Pessoais para vincular o cenário ao cadastro.",
       })
       return
     }
@@ -175,7 +193,7 @@ export function SalvarSimulacaoModal() {
             />
           </div>
 
-          {!simulacaoMeta.clienteId && (
+          {pedirNomeClienteNoModal && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="text-xs uppercase text-muted-foreground tracking-wide">Nome do cliente</Label>

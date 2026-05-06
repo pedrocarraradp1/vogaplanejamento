@@ -61,8 +61,28 @@ export default function ClientesPage() {
           .limit(200)
         if (sErr) throw new Error(sErr.message)
 
+        const rows = ((sRows as SimulacaoRow[]) ?? []).map((r) => ({ ...r }))
+        // Cenários antigos podem ter cliente_id nulo; vincula ao cadastro existente pelo nome (Dados Pessoais).
+        for (const r of rows) {
+          if (r.cliente_id) continue
+          const nomePlano = String(r?.dados?.dadosPessoais?.nome ?? "").trim()
+          if (!nomePlano) continue
+          const { data: existing, error: findErr } = await supabase
+            .from("clientes")
+            .select("id")
+            .ilike("nome", nomePlano)
+            .limit(1)
+            .maybeSingle()
+          if (findErr || !existing?.id) continue
+          const { error: upErr } = await supabase
+            .from("simulacoes")
+            .update({ cliente_id: existing.id })
+            .eq("id", r.id)
+          if (!upErr) r.cliente_id = existing.id
+        }
+
         if (!cancelled) {
-          setSimulacoes((sRows as any[]) ?? [])
+          setSimulacoes(rows)
         }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Erro ao carregar.")
@@ -111,7 +131,8 @@ export default function ClientesPage() {
       const nomeSimulacao = String(latest?.nome_simulacao ?? "—")
       const clienteId = latest?.cliente_id ?? null
       const totalCenarios = arr.length
-      return { key, nome, profissao, nomeSimulacao, lastDate, patrimonio, simulacaoId: latest?.id ?? null, clienteId, totalCenarios }
+      const moeda = (latest?.dados?.moeda === "USD" ? "USD" : "BRL") as "BRL" | "USD"
+      return { key, nome, profissao, nomeSimulacao, lastDate, patrimonio, simulacaoId: latest?.id ?? null, clienteId, totalCenarios, moeda }
     })
     const filtered = term ? entries.filter((e) => e.nome.toLowerCase().includes(term)) : entries
     filtered.sort((a, b) => String(b.lastDate ?? "").localeCompare(String(a.lastDate ?? "")))
@@ -282,7 +303,7 @@ export default function ClientesPage() {
                         </p>
                         <p className="text-xs text-muted-foreground">
                           <span className="text-foreground/80">Patrimônio:</span>{" "}
-                          <span className="text-[#1E5CE6] font-medium">{fmtFull((c as any)?.dados?.moeda === "USD" ? "USD" : "BRL", c.patrimonio)}</span>
+                          <span className="text-[#1E5CE6] font-medium">{fmtFull(c.moeda, c.patrimonio)}</span>
                         </p>
                       </div>
                       <ArrowRight className="w-5 h-5 text-muted-foreground transition-transform group-hover:translate-x-0.5" />

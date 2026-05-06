@@ -388,11 +388,12 @@ export function PlanoProvider({
   const loadState = useCallback((raw: unknown, meta?: Partial<SimulacaoMeta>) => {
     setState(hydrateState(raw))
     if (meta) {
+      // Usar !== undefined para respeitar `null` vindo do Supabase (ex.: cliente_id ainda não vinculado).
       setSimulacaoMeta((prev) => ({
-        simulacaoId: meta.simulacaoId ?? prev.simulacaoId,
-        clienteId: meta.clienteId ?? prev.clienteId,
-        nomeSimulacao: meta.nomeSimulacao ?? prev.nomeSimulacao,
-        nomeCenario: meta.nomeCenario ?? prev.nomeCenario,
+        simulacaoId: meta.simulacaoId !== undefined ? meta.simulacaoId : prev.simulacaoId,
+        clienteId: meta.clienteId !== undefined ? meta.clienteId : prev.clienteId,
+        nomeSimulacao: meta.nomeSimulacao !== undefined ? meta.nomeSimulacao : prev.nomeSimulacao,
+        nomeCenario: meta.nomeCenario !== undefined ? meta.nomeCenario : prev.nomeCenario,
       }))
     }
   }, [hydrateState])

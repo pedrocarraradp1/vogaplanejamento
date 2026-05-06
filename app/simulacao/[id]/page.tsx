@@ -45,10 +45,27 @@ function Loader({ simulacaoId }: { simulacaoId: string }) {
         if (error) throw new Error(error.message)
         if (!data?.dados) throw new Error("Simulação não encontrada.")
 
+        let clienteId: string | null = data.cliente_id ?? null
+        if (!clienteId) {
+          const nomePlano = String((data.dados as any)?.dadosPessoais?.nome ?? "").trim()
+          if (nomePlano) {
+            const { data: cli } = await supabase
+              .from("clientes")
+              .select("id")
+              .ilike("nome", nomePlano)
+              .limit(1)
+              .maybeSingle()
+            if (cli?.id) {
+              clienteId = cli.id
+              await supabase.from("simulacoes").update({ cliente_id: clienteId }).eq("id", simulacaoId)
+            }
+          }
+        }
+
         if (!cancelled) {
           loadState(data.dados, {
             simulacaoId: data.id,
-            clienteId: data.cliente_id,
+            clienteId,
             nomeSimulacao: data.nome_simulacao,
             nomeCenario: data.nome_cenario ?? data.nome_simulacao ?? null,
           })
