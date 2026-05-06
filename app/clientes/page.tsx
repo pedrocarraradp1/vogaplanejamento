@@ -13,6 +13,7 @@ type SimulacaoRow = {
   id: string
   cliente_id: string | null
   nome_simulacao: string | null
+  nome_cenario?: string | null
   dados: any
   updated_at: string | null
   created_at: string | null
@@ -26,8 +27,13 @@ function patrimonioTotalFromDados(dados: any): number {
   return totalAtivos - totalPassivos
 }
 
-const fmtFull = (v: number) =>
-  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v)
+const fmtFull = (moeda: "BRL" | "USD", v: number) =>
+  new Intl.NumberFormat(moeda === "USD" ? "en-US" : "pt-BR", {
+    style: "currency",
+    currency: moeda === "USD" ? "USD" : "BRL",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(v)
 
 export default function ClientesPage() {
   const [loading, setLoading] = useState(true)
@@ -50,7 +56,7 @@ export default function ClientesPage() {
 
         const { data: sRows, error: sErr } = await supabase
           .from("simulacoes")
-          .select("id,cliente_id,nome_simulacao,dados,created_at,updated_at")
+          .select("id,cliente_id,nome_simulacao,nome_cenario,dados,created_at,updated_at")
           .order("updated_at", { ascending: false })
           .limit(200)
         if (sErr) throw new Error(sErr.message)
@@ -70,8 +76,9 @@ export default function ClientesPage() {
   const simulacoesPorCliente = useMemo(() => {
     const map = new Map<string, SimulacaoRow[]>()
     for (const s of simulacoes) {
-      const nome = String(s?.dados?.dadosPessoais?.nome ?? "").trim()
-      const key = nome ? nome.toLowerCase() : "(sem-nome)"
+      const cid = String(s?.cliente_id ?? "").trim()
+      const fallbackNome = String(s?.dados?.dadosPessoais?.nome ?? "").trim().toLowerCase() || "(sem-nome)"
+      const key = cid || `name:${fallbackNome}`
       const arr = map.get(key) ?? []
       arr.push(s)
       map.set(key, arr)
@@ -102,7 +109,9 @@ export default function ClientesPage() {
       const lastDate = latest?.updated_at ?? latest?.created_at ?? null
       const patrimonio = latest?.dados ? patrimonioTotalFromDados(latest.dados) : 0
       const nomeSimulacao = String(latest?.nome_simulacao ?? "—")
-      return { key, nome, profissao, nomeSimulacao, lastDate, patrimonio, simulacaoId: latest?.id ?? null }
+      const clienteId = latest?.cliente_id ?? null
+      const totalCenarios = arr.length
+      return { key, nome, profissao, nomeSimulacao, lastDate, patrimonio, simulacaoId: latest?.id ?? null, clienteId, totalCenarios }
     })
     const filtered = term ? entries.filter((e) => e.nome.toLowerCase().includes(term)) : entries
     filtered.sort((a, b) => String(b.lastDate ?? "").localeCompare(String(a.lastDate ?? "")))
@@ -133,7 +142,7 @@ export default function ClientesPage() {
             <Link href="/dashboard">
               <Button className="bg-[#1E5CE6] hover:bg-[#1E5CE6]/90 text-white">
                 <Plus className="w-4 h-4 mr-2" />
-                Nova Simulação
+                Novo Cenário
               </Button>
             </Link>
           </header>
@@ -165,7 +174,7 @@ export default function ClientesPage() {
           <Link href="/dashboard">
             <Button className="bg-[#1E5CE6] hover:bg-[#1E5CE6]/90 text-white">
               <Plus className="w-4 h-4 mr-2" />
-              Nova Simulação
+              Novo Cenário
             </Button>
           </Link>
         </div>
@@ -208,7 +217,7 @@ export default function ClientesPage() {
               <div className="flex items-start justify-between">
                 <div className="space-y-2">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Patrimônio Total sob Gestão</p>
-                  <p className="text-3xl font-bold text-[#1E5CE6]">{fmtFull(kpis.patrimonioTotal)}</p>
+                  <p className="text-3xl font-bold text-[#1E5CE6]">{fmtFull("BRL", kpis.patrimonioTotal)}</p>
                 </div>
                 <div className="p-2 rounded-lg bg-[#1E5CE6]/10 border border-[#1E5CE6]/30">
                   <TrendingUp className="w-5 h-5 text-[#1E5CE6]" />
@@ -243,7 +252,7 @@ export default function ClientesPage() {
               <Link href="/dashboard">
                 <Button className="bg-[#1E5CE6] hover:bg-[#1E5CE6]/90 text-white">
                   <Plus className="w-4 h-4 mr-2" />
-                  Nova Simulação
+                  Novo Cenário
                 </Button>
               </Link>
             </div>
@@ -252,13 +261,18 @@ export default function ClientesPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {clientesFiltrados.map((c) => {
               const created = c.lastDate ? new Date(c.lastDate).toLocaleDateString("pt-BR") : "—"
+              const href = c.clienteId ? `/clientes/${c.clienteId}` : (c.simulacaoId ? `/simulacao/${c.simulacaoId}` : "/dashboard")
               return (
-                <Link key={c.key} href={c.simulacaoId ? `/simulacao/${c.simulacaoId}` : "/dashboard"} className="group">
+                <Link key={c.key} href={href} className="group">
                   <div className="bg-[#131929] border border-white/10 rounded-xl p-5 transition-colors group-hover:border-[#1E5CE6]/60">
                     <div className="flex items-start justify-between gap-4">
                       <div className="space-y-1">
                         <p className="text-sm font-semibold text-foreground">{c.nome}</p>
                         <p className="text-xs text-muted-foreground">{c.profissao}</p>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          <span className="text-foreground/80">{c.totalCenarios}</span>{" "}
+                          {c.totalCenarios === 1 ? "cenário" : "cenários"}
+                        </p>
                         <p className="text-xs text-muted-foreground mt-2">
                           <span className="text-foreground/80">Simulação:</span>{" "}
                           <span className="text-muted-foreground">{c.nomeSimulacao}</span>
@@ -268,7 +282,7 @@ export default function ClientesPage() {
                         </p>
                         <p className="text-xs text-muted-foreground">
                           <span className="text-foreground/80">Patrimônio:</span>{" "}
-                          <span className="text-[#1E5CE6] font-medium">{fmtFull(c.patrimonio)}</span>
+                          <span className="text-[#1E5CE6] font-medium">{fmtFull((c as any)?.dados?.moeda === "USD" ? "USD" : "BRL", c.patrimonio)}</span>
                         </p>
                       </div>
                       <ArrowRight className="w-5 h-5 text-muted-foreground transition-transform group-hover:translate-x-0.5" />

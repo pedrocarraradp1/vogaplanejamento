@@ -3,27 +3,28 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { PlanoState } from "@/lib/plano-context"
 
-function fmtCurrency(v: number) {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(v)
-}
-
-function fmtK(v: number) {
-  if (Math.abs(v) >= 1_000_000) return `R$ ${(v / 1_000_000).toFixed(1)}M`
-  if (Math.abs(v) >= 1_000) return `R$ ${(v / 1_000).toFixed(0)}K`
-  return `R$ ${v.toFixed(0)}`
-}
-
 interface MeuDiagnosticoViewProps {
   state: PlanoState
 }
 
 export function MeuDiagnosticoView({ state }: MeuDiagnosticoViewProps) {
   const { dadosPessoais, premissas, kpis, sucessao, protecao } = state
+  const moeda = state.moeda ?? "BRL"
+
+  const fmtCurrency = (v: number) =>
+    new Intl.NumberFormat(moeda === "USD" ? "en-US" : "pt-BR", {
+      style: "currency",
+      currency: moeda === "USD" ? "USD" : "BRL",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(v)
+
+  const fmtK = (v: number) => {
+    const prefix = moeda === "USD" ? "US$ " : "R$ "
+    if (Math.abs(v) >= 1_000_000) return `${prefix}${(v / 1_000_000).toFixed(1)}M`
+    if (Math.abs(v) >= 1_000) return `${prefix}${(v / 1_000).toFixed(0)}K`
+    return `${prefix}${v.toFixed(0)}`
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">

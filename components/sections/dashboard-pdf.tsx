@@ -23,20 +23,23 @@ interface DashboardPDFProps {
   premissas: { rendimento: number; inflacao: number; idadeApos: number; retiradaMensal: number }
   idadeAtual: number
   aporteM: number
+  moeda: "BRL" | "USD"
 }
 
-const f = (v: number) =>
-  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v)
+const f = (moeda: "BRL" | "USD", v: number) =>
+  new Intl.NumberFormat(moeda === "USD" ? "en-US" : "pt-BR", { style: "currency", currency: moeda === "USD" ? "USD" : "BRL", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v)
 
-const fk = (v: number) => {
-  if (Math.abs(v) >= 1_000_000) return `R$ ${(v / 1_000_000).toFixed(1)}M`
-  if (Math.abs(v) >= 1_000)     return `R$ ${(v / 1_000).toFixed(0)}K`
-  return `R$ ${v.toFixed(0)}`
+const fk = (moeda: "BRL" | "USD", v: number) => {
+  const prefix = moeda === "USD" ? "US$ " : "R$ "
+  if (Math.abs(v) >= 1_000_000) return `${prefix}${(v / 1_000_000).toFixed(1)}M`
+  if (Math.abs(v) >= 1_000)     return `${prefix}${(v / 1_000).toFixed(0)}K`
+  return `${prefix}${v.toFixed(0)}`
 }
 
 export function DashboardPDF({
   dadosPessoais, kpis, inventario, sucessao, protecao,
   capitalSeguravel, projecaoDetalhada, projecaoCompleta, premissas, idadeAtual, aporteM,
+  moeda,
 }: DashboardPDFProps) {
   const bg    = "#080C18"
   const bg2   = "#0D1220"
@@ -101,10 +104,10 @@ export function DashboardPDF({
       {/* KPIs */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>
         {[
-          { l: "PATRIMÔNIO NA APOSENTADORIA", v: fk(kpis.patrimonioApos), sub: `${fk(kpis.patrimonioAposReal)} em valor real`, c: blue, bg: "rgba(30,92,230,0.08)", b: "1px solid rgba(30,92,230,0.3)" },
-          { l: "RENDA MENSAL REAL",            v: f(kpis.rendaMensalReal),  sub: `Com ${premissas.rendimento}% a.a.`,              c: green, bg: "rgba(34,199,135,0.08)", b: "1px solid rgba(34,199,135,0.3)" },
+          { l: "PATRIMÔNIO NA APOSENTADORIA", v: fk(moeda, kpis.patrimonioApos), sub: `${fk(moeda, kpis.patrimonioAposReal)} em valor real`, c: blue, bg: "rgba(30,92,230,0.08)", b: "1px solid rgba(30,92,230,0.3)" },
+          { l: "RENDA MENSAL REAL",            v: f(moeda, kpis.rendaMensalReal),  sub: `Com ${premissas.rendimento}% a.a.`,              c: green, bg: "rgba(34,199,135,0.08)", b: "1px solid rgba(34,199,135,0.3)" },
           { l: "LIBERDADE FINANCEIRA",         v: kpis.idadeLF ? `${kpis.idadeLF} anos` : "—", sub: kpis.idadeLF ? `Em ${kpis.idadeLF - idadeAtual} anos` : "—", c: amber, bg: bg2, b: border },
-          { l: "TAXA DE POUPANÇA",             v: `${kpis.taxaPoupanca}%`,  sub: `${f(aporteM)} / mês`,                            c: white, bg: bg2, b: border },
+          { l: "TAXA DE POUPANÇA",             v: `${kpis.taxaPoupanca}%`,  sub: `${f(moeda, aporteM)} / mês`,                            c: white, bg: bg2, b: border },
         ].map(kpi => (
           <div key={kpi.l} style={{ backgroundColor: kpi.bg, border: kpi.b, borderRadius: 10, padding: 16 }}>
             <div style={{ fontSize: 9, fontWeight: 600, color: muted, textTransform: "uppercase" as const, letterSpacing: "0.08em", marginBottom: 6 }}>{kpi.l}</div>
@@ -121,7 +124,7 @@ export function DashboardPDF({
           {yLabels.map(({ v, y }) => (
             <g key={y}>
               <line x1={padL} y1={y} x2={svgW - padR} y2={y} stroke="rgba(255,255,255,0.04)" strokeWidth={1} />
-              <text x={padL - 6} y={y + 4} textAnchor="end" fontSize={9} fill={muted}>{fk(v)}</text>
+              <text x={padL - 6} y={y + 4} textAnchor="end" fontSize={9} fill={muted}>{fk(moeda, v)}</text>
             </g>
           ))}
           {pontos.map((p, i) => (
@@ -150,18 +153,18 @@ export function DashboardPDF({
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
           <div>
             <div style={{ fontSize: 10, fontWeight: 600, color: muted, textTransform: "uppercase" as const, marginBottom: 10 }}>Distribuição Patrimonial</div>
-            {rowItem("Patrimônio (simulação)", f(sucessao.plEditavel))}
-            {rowItem("Meação (cônjuge)", f(inventario.meacao))}
-            {rowItem("Valor da Herança", f(inventario.heranca))}
+            {rowItem("Patrimônio (simulação)", f(moeda, sucessao.plEditavel))}
+            {rowItem("Meação (cônjuge)", f(moeda, inventario.meacao))}
+            {rowItem("Valor da Herança", f(moeda, inventario.heranca))}
             {rowItem("Herdeiros", String(sucessao.herdeiros))}
-            {rowItem("Por Herdeiro", f(inventario.porHerdeiro), green)}
+            {rowItem("Por Herdeiro", f(moeda, inventario.porHerdeiro), green)}
           </div>
           <div>
             <div style={{ fontSize: 10, fontWeight: 600, color: muted, textTransform: "uppercase" as const, marginBottom: 10 }}>Custos do Inventário</div>
-            {rowItem(`ITCMD (${sucessao.itcmd}%)`, f(inventario.custoITCMD))}
-            {rowItem(`Honorários (${sucessao.honorarios}%)`, f(inventario.custoHon))}
-            {rowItem(`Cartório (${sucessao.cartoriais}%)`, f(inventario.custoCart))}
-            {rowItem("Custo Total", f(inventario.custoTotal), red)}
+            {rowItem(`ITCMD (${sucessao.itcmd}%)`, f(moeda, inventario.custoITCMD))}
+            {rowItem(`Honorários (${sucessao.honorarios}%)`, f(moeda, inventario.custoHon))}
+            {rowItem(`Cartório (${sucessao.cartoriais}%)`, f(moeda, inventario.custoCart))}
+            {rowItem("Custo Total", f(moeda, inventario.custoTotal), red)}
             <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0" }}>
               <span style={{ fontSize: 12, color: muted }}>% do Patrimônio</span>
               <span style={{ fontSize: 11, fontWeight: 600, backgroundColor: "rgba(245,165,36,0.15)", color: amber, padding: "2px 8px", borderRadius: 4 }}>{inventario.percentualCusto}%</span>
@@ -170,9 +173,9 @@ export function DashboardPDF({
         </div>
         <div style={{ backgroundColor: "rgba(30,92,230,0.1)", border: "1px solid rgba(30,92,230,0.3)", borderRadius: 10, padding: 16, marginTop: 16 }}>
           <div style={{ fontSize: 10, fontWeight: 600, color: blue, textTransform: "uppercase" as const, marginBottom: 6 }}>Capital Segurável Recomendado</div>
-          <div style={{ fontSize: 24, fontWeight: 800, color: white, marginBottom: 4 }}>{f(capitalSeguravel)}</div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: white, marginBottom: 4 }}>{f(moeda, capitalSeguravel)}</div>
           <div style={{ fontSize: 11, color: muted }}>
-            {protecao.anosCob} anos de custo de vida ({f(protecao.custoVida * 12 * protecao.anosCob)}) + Educação ({f(protecao.eduFilhos)}) + Dívidas ({f(protecao.dividasPend)})
+            {protecao.anosCob} anos de custo de vida ({f(moeda, protecao.custoVida * 12 * protecao.anosCob)}) + Educação ({f(moeda, protecao.eduFilhos)}) + Dívidas ({f(moeda, protecao.dividasPend)})
           </div>
         </div>
       </>)}
@@ -192,9 +195,9 @@ export function DashboardPDF({
             {projecaoDetalhada.map(r => (
               <tr key={r.idade} style={{ borderBottom: border }}>
                 <td style={{ padding: "8px 10px", fontSize: 15, fontWeight: 700, color: white }}>{r.idade}</td>
-                <td style={{ padding: "8px 10px", textAlign: "right", fontSize: 12, fontWeight: 600, color: r.saldoNominal >= 0 ? green : red }}>{f(r.saldoNominal)}</td>
-                <td style={{ padding: "8px 10px", textAlign: "right", fontSize: 12, fontWeight: 600, color: r.saldoReal >= 0 ? green : red }}>{f(r.saldoReal)}</td>
-                <td style={{ padding: "8px 10px", textAlign: "right", fontSize: 12, color: muted }}>{r.rendaMensalReal > 0 ? f(r.rendaMensalReal) : "—"}</td>
+                <td style={{ padding: "8px 10px", textAlign: "right", fontSize: 12, fontWeight: 600, color: r.saldoNominal >= 0 ? green : red }}>{f(moeda, r.saldoNominal)}</td>
+                <td style={{ padding: "8px 10px", textAlign: "right", fontSize: 12, fontWeight: 600, color: r.saldoReal >= 0 ? green : red }}>{f(moeda, r.saldoReal)}</td>
+                <td style={{ padding: "8px 10px", textAlign: "right", fontSize: 12, color: muted }}>{r.rendaMensalReal > 0 ? f(moeda, r.rendaMensalReal) : "—"}</td>
                 <td style={{ padding: "8px 10px", textAlign: "center" }}>
                   <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 20, backgroundColor: r.isAposentado ? "rgba(245,165,36,0.15)" : "rgba(34,199,135,0.15)", color: r.isAposentado ? amber : green }}>
                     {r.isAposentado ? "Aposentadoria" : "Acumulação"}

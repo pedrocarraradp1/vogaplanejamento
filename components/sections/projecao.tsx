@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, ArrowRight, TrendingUp, DollarSign, Clock, Info } from "lucide-react"
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ReferenceLine, Cell,
+  ResponsiveContainer, ReferenceLine, Cell, Line, LineChart, Legend,
 } from "recharts"
 import { usePlano } from "@/lib/plano-context"
 import { calcularProjecao, calcularKPIs, type ProjecaoAno } from "@/lib/engine"
@@ -22,13 +22,16 @@ interface ProjecaoProps {
 export function Projecao({ onNavigate }: ProjecaoProps) {
   const { state, setPremissas } = usePlano()
   const { premissas, objetivos, dadosPessoais, ativos, passivos } = state
+  const moeda = state.moeda ?? "BRL"
 
   // ── Derivados automáticos ────────────────────────────────────────────────
-  // Padronização pedida: patrimônio líquido total = (ativos líquidos + imobilizado + participações + outros) − passivos
+  // Saldo inicial usado na simulação: Ativos Líquidos (categoria "Líquido") − Passivos
   const saldoInicialCalculado = useMemo(() => {
-    const totalAtivos = (ativos ?? []).reduce((s, a) => s + (Number(a.valor) || 0), 0)
+    const ativosLiquidos = (ativos ?? [])
+      .filter((a) => (a.tipo ?? "").trim() === "Líquido")
+      .reduce((s, a) => s + (Number(a.valor) || 0), 0)
     const totalPassivos = (passivos ?? []).reduce((s, p) => s + (Number(p.valor) || 0), 0)
-    return totalAtivos - totalPassivos
+    return ativosLiquidos - totalPassivos
   }, [ativos, passivos])
 
   const idadeAtualCalculada = useMemo(() => {
@@ -92,8 +95,14 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
   // Objetivos no formato da engine (usado na simulação e nos cenários)
   const objetivosEngine = useMemo(() =>
     objetivos.map(obj => ({
-      id: obj.id, descricao: obj.descricao, prazo: obj.prazo,
-      valor: obj.valor, recorrente: obj.recorrente, aCada: obj.aCada,
+      id: obj.id,
+      descricao: obj.descricao,
+      prazoAnos: obj.prazoAnos,
+      valor: obj.valor,
+      recorrente: obj.recorrente,
+      frequenciaAnos: obj.frequenciaAnos,
+      duracaoTipo: obj.duracaoTipo,
+      duracaoAnos: obj.duracaoAnos,
     }))
   , [objetivos])
 
@@ -103,18 +112,19 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
   // ── Formatadores ─────────────────────────────────────────────────────────
   const formatCurrency = (value: number) => {
     if (!value) return ""
-    return new Intl.NumberFormat("pt-BR").format(value)
+    return new Intl.NumberFormat(moeda === "USD" ? "en-US" : "pt-BR").format(value)
   }
   const parseCurrency = (value: string) => parseInt(value.replace(/\D/g, ""), 10) || 0
 
   const formatarMoeda = (valor: number) => {
-    if (Math.abs(valor) >= 1_000_000) return `R$ ${(valor / 1_000_000).toFixed(1)}M`
-    if (Math.abs(valor) >= 1_000)     return `R$ ${(valor / 1_000).toFixed(0)}K`
-    return `R$ ${valor.toFixed(0)}`
+    const prefix = moeda === "USD" ? "US$ " : "R$ "
+    if (Math.abs(valor) >= 1_000_000) return `${prefix}${(valor / 1_000_000).toFixed(1)}M`
+    if (Math.abs(valor) >= 1_000)     return `${prefix}${(valor / 1_000).toFixed(0)}K`
+    return `${prefix}${valor.toFixed(0)}`
   }
 
   const formatarMoedaCompleta = (valor: number) =>
-    new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL",
+    new Intl.NumberFormat(moeda === "USD" ? "en-US" : "pt-BR", { style: "currency", currency: moeda === "USD" ? "USD" : "BRL",
       minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(valor)
 
   const rendimentoLiquidoPct = useMemo(() => {
@@ -128,6 +138,12 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
     const inf = (Number(premissas.inflacao) || 0) / 100
     return Math.pow(1 + inf, anos)
   }
+
+  const taxaNominalAnual = Math.max(0, (Number(premissas.rendimento) || 0) / 100)
+  const inflacaoAnual = Math.max(0, (Number(premissas.inflacao) || 0) / 100)
+  const taxaNominalMensal = Math.pow(1 + taxaNominalAnual, 1 / 12) - 1
+  const taxaReal = (1 + taxaNominalAnual) / (1 + inflacaoAnual) - 1
+  const taxaRealMensal = Math.pow(1 + taxaReal, 1 / 12) - 1
   // Cenários foram extraídos para `components/ui/cenarios-investimento.tsx`
 
   const projecao = useMemo(() => {
@@ -142,12 +158,32 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
   const dadosGrafico = useMemo(() =>
     projecao.map(p => ({
       ...p,
+      valorNominal: Number(p.saldoNominal) || 0,
+      poderCompraHoje: (Number(p.saldoNominal) || 0) / deflatorPorIdade(p.idade),
       valor:
         displayMode === "nominal"
-          ? p.saldoNominal
+          ? (Number(p.saldoNominal) || 0)
           : (Number(p.saldoNominal) || 0) / deflatorPorIdade(p.idade),
     }))
   , [projecao, displayMode, premissas.inflacao, idadeAtualCalculada])
+
+  const dadosRenda = useMemo(() => {
+    return projecao.map(p => {
+      const idade = Number(p.idade) || idadeAtualCalculada
+      const nominal = Number(p.saldoNominal) || 0
+      const realHoje = nominal / deflatorPorIdade(idade)
+      const rendaNominal = Math.max(0, nominal * taxaNominalMensal)
+      const rendaPoderCompra = rendaNominal / deflatorPorIdade(idade)
+      const rendaReal = Math.max(0, realHoje * taxaRealMensal)
+      return {
+        idade,
+        rendaNominal,
+        rendaPoderCompra,
+        rendaReal,
+        rendaDisplay: displayMode === "nominal" ? rendaNominal : rendaReal,
+      }
+    })
+  }, [projecao, idadeAtualCalculada, displayMode, premissas.inflacao, taxaNominalMensal, taxaRealMensal])
 
   const ToggleNominalReal = (
     <div className="flex items-center gap-3">
@@ -199,7 +235,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
               <Label className="text-xs uppercase text-muted-foreground tracking-wide">Saldo Inicial Líquido (R$)</Label>
               <Input value={formatCurrency(saldoInicialCalculado)} readOnly
                 className="bg-[#131929] border-white/10 text-foreground cursor-not-allowed opacity-70" />
-              <p className="text-xs text-muted-foreground">Calculado automaticamente: Ativos − Passivos</p>
+              <p className="text-xs text-muted-foreground">Calculado automaticamente: Ativos Líquidos − Passivos</p>
             </div>
             <div className="space-y-2">
               <Label className="text-xs uppercase text-muted-foreground tracking-wide">Rendimento Anual Bruto (%)</Label>
@@ -530,9 +566,35 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
             <div className="bg-[rgba(34,199,135,0.08)] border border-[#22C787]/30 rounded-xl p-4">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Renda Mensal Real</p>
-                  <p className="text-2xl font-bold text-[#22C787] mt-1">{formatarMoedaCompleta(kpis.rendaMensalReal)}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Com {premissas.rendimento}% a.a.</p>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Renda Mensal na Aposentadoria</p>
+                  {(() => {
+                    const anos = Math.max(0, (Number(premissas.idadeApos) || 0) - idadeAtualCalculada)
+                    const patrimonioNominalApos = Number(kpis.patrimonioApos) || 0
+                    const patrimonioRealApos = Number(kpis.patrimonioAposReal) || 0
+                    const rendaNominalApos = Math.max(0, patrimonioNominalApos * taxaNominalMensal)
+                    const rendaHojeEq = rendaNominalApos / Math.pow(1 + inflacaoAnual, anos)
+                    const rendaRealApos = Math.max(0, patrimonioRealApos * taxaRealMensal)
+
+                    if (displayMode === "nominal") {
+                      return (
+                        <>
+                          <p className="text-2xl font-bold text-[#22C787] mt-1">{formatarMoedaCompleta(rendaNominalApos)}</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            ({formatarMoedaCompleta(rendaHojeEq)} hoje)
+                          </p>
+                        </>
+                      )
+                    }
+
+                    return (
+                      <>
+                        <p className="text-2xl font-bold text-[#22C787] mt-1">{formatarMoedaCompleta(rendaRealApos)}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Taxa real (Fisher): {(taxaReal * 100).toFixed(1).replace(".", ",")}% a.a.
+                        </p>
+                      </>
+                    )
+                  })()}
                 </div>
                 <DollarSign className="w-5 h-5 text-[#22C787]" />
               </div>
@@ -572,18 +634,22 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
                     const idade = Number(entry?.idade) || idadeAtualCalculada
                     const d = displayMode === "real" ? deflatorPorIdade(idade) : 1
                     const saldoNominal = Number(entry?.saldoNominal) || 0
-                    const saldoReal = saldoNominal / d
-                    const rendaMensal =
-                      displayMode === "nominal"
-                        ? (saldoNominal * premissas.rendimento / 100) / 12
-                        : (saldoReal * premissas.rendimento / 100) / 12
+                    const saldoRealHoje = saldoNominal / deflatorPorIdade(idade)
+                    const poderCompraHoje = saldoNominal / deflatorPorIdade(idade)
+                    const rendaNominal = Math.max(0, saldoNominal * taxaNominalMensal)
+                    const rendaReal = Math.max(0, saldoRealHoje * taxaRealMensal)
 
                     return [
                       <div className="space-y-1">
                         <div>
-                          {displayMode === "nominal" ? "Patrimônio Nominal" : "Patrimônio Real"}: {formatarMoedaCompleta(value)}
+                          {displayMode === "nominal" ? "Nominal" : "Real"}: {formatarMoedaCompleta(value)}
                         </div>
-                        <div>Renda Mensal Gerada: {formatarMoedaCompleta(rendaMensal)}</div>
+                        {displayMode === "nominal" && (
+                          <div>Poder de compra hoje: {formatarMoedaCompleta(poderCompraHoje)}</div>
+                        )}
+                        <div>
+                          Renda Mensal Gerada: {formatarMoedaCompleta(displayMode === "nominal" ? rendaNominal : rendaReal)}
+                        </div>
                       </div>,
                       "",
                     ]
@@ -598,7 +664,60 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
                       fill={entry.valor >= 0 ? "rgba(30,92,230,0.35)" : "rgba(240,75,75,0.2)"} />
                   ))}
                 </Bar>
+                {displayMode === "nominal" && (
+                  <Line
+                    type="monotone"
+                    dataKey="poderCompraHoje"
+                    stroke="rgba(255,255,255,0.65)"
+                    strokeWidth={2}
+                    strokeDasharray="6 4"
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                )}
               </BarChart>
+            </ResponsiveContainer>
+          </div>
+          {displayMode === "nominal" && (
+            <p className="text-xs text-muted-foreground">
+              Valores nominais — a linha tracejada mostra o equivalente em poder de compra de hoje considerando inflação de{" "}
+              <span className="text-foreground font-medium">{Number(premissas.inflacao) || 0}% a.a.</span>
+              .
+            </p>
+          )}
+
+          {/* Gráfico — Renda Mensal */}
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={dadosRenda} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                <XAxis dataKey="idade" stroke="#4A5268" tick={{ fill: "#4A5268", fontSize: 12 }} tickLine={false}
+                  axisLine={{ stroke: "rgba(255,255,255,0.04)" }} interval="preserveStartEnd" />
+                <YAxis stroke="#4A5268" tick={{ fill: "#4A5268", fontSize: 12 }} tickLine={false} axisLine={false}
+                  tickFormatter={formatarMoeda} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: "#131929", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "#fff" }}
+                  labelStyle={{ color: "#ffffff", fontWeight: 600 }}
+                  itemStyle={{ color: "#ffffff" }}
+                  formatter={(v: number, name: string) => {
+                    if (displayMode === "nominal") {
+                      if (name === "rendaNominal") return [formatarMoedaCompleta(v), "Nominal"]
+                      if (name === "rendaPoderCompra") return [formatarMoedaCompleta(v), "Poder de compra hoje"]
+                    }
+                    return [formatarMoedaCompleta(v), "Renda real"]
+                  }}
+                  labelFormatter={(label) => `Idade: ${label} anos`}
+                />
+                <Legend />
+                {displayMode === "nominal" ? (
+                  <>
+                    <Line type="monotone" dataKey="rendaNominal" name="Nominal" stroke="rgba(34,199,135,0.75)" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="rendaPoderCompra" name="Poder de compra hoje" stroke="rgba(255,255,255,0.65)" strokeWidth={2} strokeDasharray="6 4" dot={false} />
+                  </>
+                ) : (
+                  <Line type="monotone" dataKey="rendaReal" name="Renda real (Fisher)" stroke="rgba(34,199,135,0.75)" strokeWidth={2} dot={false} />
+                )}
+              </LineChart>
             </ResponsiveContainer>
           </div>
         </CardContent>

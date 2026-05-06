@@ -14,12 +14,18 @@ interface SucessorioProps {
   onNavigate: (section: string) => void
 }
 
-const fmt = (v: number) =>
-  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v)
-
 export function Sucessorio({ onNavigate }: SucessorioProps) {
   const { state, setSucessao, getPatrimonioLiquido } = usePlano()
   const { sucessao, dadosPessoais, ativos, passivos } = state
+  const moeda = state.moeda ?? "BRL"
+
+  const fmt = (v: number) =>
+    new Intl.NumberFormat(moeda === "USD" ? "en-US" : "pt-BR", {
+      style: "currency",
+      currency: moeda === "USD" ? "USD" : "BRL",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(v)
 
   const totalPassivosInv = useMemo(
     () => passivos.reduce((s, p) => s + (p.valor || 0), 0),

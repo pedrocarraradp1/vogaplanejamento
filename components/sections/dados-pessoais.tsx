@@ -15,6 +15,7 @@ interface DadosPessoaisProps {
 export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
   const { state, setDadosPessoais } = usePlano()
   const { dadosPessoais } = state
+  const moeda = state.moeda ?? "BRL"
 
   const PROFISSOES_PRINCIPAIS = useMemo(
     () => [
@@ -43,7 +44,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
 
   const formatCurrency = (value: number) => {
     if (value === 0) return ""
-    return value.toLocaleString("pt-BR", {
+    return value.toLocaleString(moeda === "USD" ? "en-US" : "pt-BR", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     })
@@ -253,8 +254,18 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
                 id="filhos"
                 type="number"
                 min={0}
-                value={dadosPessoais.filhos || ""}
-                onChange={(e) => setDadosPessoais({ filhos: parseInt(e.target.value) || 0 })}
+                value={(dadosPessoais.filhos?.length ?? 0) || ""}
+                onChange={(e) => {
+                  const nextCount = Math.max(0, parseInt(e.target.value) || 0)
+                  const cur = Array.isArray(dadosPessoais.filhos) ? dadosPessoais.filhos : []
+                  if (nextCount === cur.length) return
+                  if (nextCount > cur.length) {
+                    const added = Array.from({ length: nextCount - cur.length }, () => ({ nome: "", dataNascimento: "" }))
+                    setDadosPessoais({ filhos: [...cur, ...added] })
+                    return
+                  }
+                  setDadosPessoais({ filhos: cur.slice(0, nextCount) })
+                }}
                 placeholder="0"
                 className="h-11 bg-[#131929] border-[rgba(255,255,255,0.14)] text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
               />
@@ -262,6 +273,64 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
           </div>
         </div>
       </div>
+
+      {/* Filhos — detalhes (dinâmico) */}
+      {(dadosPessoais.filhos?.length ?? 0) > 0 && (
+        <div className="space-y-4">
+          <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            Filhos
+          </span>
+          <div className="rounded-xl bg-card border border-border p-6 space-y-6">
+            {(dadosPessoais.filhos ?? []).map((filho, idx) => (
+              <div key={idx} className="space-y-4">
+                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                  Filho {idx + 1}
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor={`filho-nome-${idx}`}
+                      className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground"
+                    >
+                      Nome Completo
+                    </Label>
+                    <Input
+                      id={`filho-nome-${idx}`}
+                      value={filho?.nome ?? ""}
+                      onChange={(e) => {
+                        const cur = Array.isArray(dadosPessoais.filhos) ? [...dadosPessoais.filhos] : []
+                        cur[idx] = { ...(cur[idx] ?? { nome: "", dataNascimento: "" }), nome: e.target.value }
+                        setDadosPessoais({ filhos: cur })
+                      }}
+                      placeholder="Nome do filho"
+                      className="h-11 bg-[#131929] border-[rgba(255,255,255,0.14)] text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor={`filho-nasc-${idx}`}
+                      className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground"
+                    >
+                      Data de Nascimento
+                    </Label>
+                    <Input
+                      id={`filho-nasc-${idx}`}
+                      type="date"
+                      value={filho?.dataNascimento ?? ""}
+                      onChange={(e) => {
+                        const cur = Array.isArray(dadosPessoais.filhos) ? [...dadosPessoais.filhos] : []
+                        cur[idx] = { ...(cur[idx] ?? { nome: "", dataNascimento: "" }), dataNascimento: e.target.value }
+                        setDadosPessoais({ filhos: cur })
+                      }}
+                      className="h-11 bg-[#131929] border-[rgba(255,255,255,0.14)] text-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Card 2 - Fluxo de Caixa Mensal */}
       <div className="space-y-4">
@@ -320,7 +389,8 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
             <p className="text-emerald-400 text-sm font-medium">
               Capacidade de poupança mensal:{" "}
               <span className="font-semibold">
-                R$ {capacidadePoupanca.valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                {moeda === "USD" ? "US$" : "R$"}{" "}
+                {capacidadePoupanca.valor.toLocaleString(moeda === "USD" ? "en-US" : "pt-BR", { minimumFractionDigits: 2 })}
               </span>{" "}
               <span className="text-emerald-400/80">
                 ({capacidadePoupanca.percentual.toFixed(0)}% da renda)

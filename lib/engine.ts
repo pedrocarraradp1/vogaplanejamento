@@ -19,10 +19,16 @@ export interface Premissas {
 export interface Objetivo {
   id: string
   descricao: string
-  prazo: number              // anos a partir de hoje (0 = ano atual)
+  /** Ano (t) a partir de hoje em que o objetivo começa (0 = ano atual). */
+  prazoAnos: number
   valor: number              // valor em R$ de hoje
   recorrente: boolean
-  aCada: number
+  /** Repetir a cada X anos (apenas quando recorrente). */
+  frequenciaAnos: number
+  /** Janela de vigência da recorrência (a partir de `prazoAnos`). */
+  duracaoTipo?: "total" | "personalizado"
+  /** Quantos anos de vigência (apenas quando `duracaoTipo` = "personalizado"). */
+  duracaoAnos?: number
 }
 
 export interface Passivo {
@@ -95,16 +101,28 @@ function fvMensal(pmt: number, r: number): number {
  * Não recorrente: SE(t = prazo; valor*(1+inf)^t; 0)
  * Recorrente:     SE(MOD(t - prazo; aCada) = 0; valor*(1+inf)^t; 0)
  */
-function saqueObjetivosAno(t: number, objetivos: Objetivo[], inf: number): number {
+function saqueObjetivosAno(t: number, objetivos: Objetivo[], inf: number, prazoTotal: number): number {
   let total = 0
   const fatorInf = Math.pow(1 + inf, t)
   for (const obj of objetivos) {
     if (obj.valor <= 0) continue
     if (!obj.recorrente) {
-      if (t === obj.prazo) total += obj.valor * fatorInf
+      if (t === (Number(obj.prazoAnos) || 0)) total += obj.valor * fatorInf
     } else {
-      if (obj.aCada > 0 && (t - obj.prazo) % obj.aCada === 0) {
-        total += obj.valor * fatorInf
+      const prazoAnos = Number(obj.prazoAnos) || 0
+      const freq = Number(obj.frequenciaAnos) || 0
+      if (freq <= 0) continue
+      if (t < prazoAnos) continue
+
+      const duracaoTipo = obj.duracaoTipo ?? "total"
+      const duracaoAnos = Number(obj.duracaoAnos) || 0
+      const anoFimExclusive =
+        duracaoTipo === "total"
+          ? (Number(prazoTotal) || 0) + 1
+          : prazoAnos + Math.max(0, duracaoAnos)
+
+      if (t >= prazoAnos && t < anoFimExclusive) {
+        if ((t - prazoAnos) % freq === 0) total += obj.valor * fatorInf
       }
     }
   }
@@ -186,7 +204,7 @@ export function calcularProjecao(
     const idade        = idadeAtual + t
     const fatorInf     = Math.pow(1 + inf, t)
     const isAposentado = idade >= idadeApos
-    const objetivosAno = saqueObjetivosAno(t, objetivos, inf)
+    const objetivosAno = saqueObjetivosAno(t, objetivos, inf, prazo)
     const dividasAno   = passivos.reduce((s, p) => s + pagamentoDividaAno(p, t), 0)
     const aporteNominalAno =
       (premissas.aportePorAnoNominal?.[t] ?? null) !== null
@@ -208,10 +226,12 @@ export function calcularProjecao(
     }
 
     const saldoReal       = saldo / fatorInf
-    const taxaReal        = r - inf
+    // Taxa real correta (Fisher) e conversão para mensal
+    const taxaReal = (1 + r) / (1 + inf) - 1
+    const taxaRealMensal = Math.pow(1 + taxaReal, 1 / 12) - 1
     const rendaMensalReal = isAposentado
       ? retiradaEfetiva
-      : Math.max(0, saldoReal * taxaReal / 12)
+      : Math.max(0, saldoReal * taxaRealMensal)
 
     resultado.push({
       t,

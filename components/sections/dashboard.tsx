@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { ArrowLeft, Download, TrendingUp, DollarSign, Clock, PiggyBank } from "lucide-react"
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ReferenceLine, Cell, PieChart, Pie, Legend, Label,
+  ResponsiveContainer, ReferenceLine, Cell, PieChart, Pie, Legend, Label, Line, LineChart,
 } from "recharts"
 import { usePlano } from "@/lib/plano-context"
 import { CenariosInvestimento } from "@/components/ui/cenarios-investimento"
@@ -28,6 +28,7 @@ const CORES_DIST_ATIVOS = [
 export function Dashboard({ onNavigate }: DashboardProps) {
   const { state, getPatrimonioLiquido, getAporteMensal, getIdadeAtual } = usePlano()
   const { dadosPessoais, objetivos, premissas, sucessao, protecao } = state
+  const moeda = state.moeda ?? "BRL"
 
   const [viewMode, setViewMode] = useState<"nominal" | "real">("nominal")
   const [exportando, setExportando] = useState(false)
@@ -42,7 +43,16 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   }), [premissas, saldoInicial, aporteM, idadeAtual])
 
   const objetivosEngine = useMemo(() =>
-    objetivos.map(o => ({ id: o.id, descricao: o.descricao, prazo: o.prazo, valor: o.valor, recorrente: o.recorrente, aCada: o.aCada }))
+    objetivos.map(o => ({
+      id: o.id,
+      descricao: o.descricao,
+      prazoAnos: o.prazoAnos,
+      valor: o.valor,
+      recorrente: o.recorrente,
+      frequenciaAnos: o.frequenciaAnos,
+      duracaoTipo: o.duracaoTipo,
+      duracaoAnos: o.duracaoAnos,
+    }))
   , [objetivos])
 
   const projecao = useMemo(() =>
@@ -90,12 +100,47 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     calcularProtecao(protecao.custoVida, protecao.anosCob, protecao.eduFilhos, protecao.dividasPend, saldoInicial, premissas.rendimento)
   , [protecao, saldoInicial, premissas.rendimento])
 
-  const dadosGrafico = useMemo(() =>
-    projecao.map(p => ({
-      ...p,
-      valor: viewMode === "nominal" ? p.saldoNominal : p.saldoReal,
-    }))
-  , [projecao, viewMode])
+  const deflatorPorT = (t: number) => {
+    const inf = (Number(premissas.inflacao) || 0) / 100
+    return Math.pow(1 + inf, Math.max(0, t))
+  }
+
+  const taxaNominalAnual = Math.max(0, (Number(premissas.rendimento) || 0) / 100)
+  const inflacaoAnual = Math.max(0, (Number(premissas.inflacao) || 0) / 100)
+  const taxaNominalMensal = Math.pow(1 + taxaNominalAnual, 1 / 12) - 1
+  const taxaReal = (1 + taxaNominalAnual) / (1 + inflacaoAnual) - 1
+  const taxaRealMensal = Math.pow(1 + taxaReal, 1 / 12) - 1
+
+  const dadosGraficoPatrimonio = useMemo(() => {
+    return projecao.map((p) => {
+      const t = Number(p.t) || 0
+      const nominal = Number(p.saldoNominal) || 0
+      const poderCompraHoje = nominal / deflatorPorT(t)
+      return {
+        ...p,
+        valorNominal: nominal,
+        poderCompraHoje,
+        valor: viewMode === "nominal" ? nominal : poderCompraHoje,
+      }
+    })
+  }, [projecao, viewMode, premissas.inflacao])
+
+  const dadosRenda = useMemo(() => {
+    return projecao.map((p) => {
+      const t = Number(p.t) || 0
+      const nominal = Number(p.saldoNominal) || 0
+      const realHoje = nominal / deflatorPorT(t)
+      const rendaNominal = Math.max(0, nominal * taxaNominalMensal)
+      const rendaPoderCompra = rendaNominal / deflatorPorT(t)
+      const rendaReal = Math.max(0, realHoje * taxaRealMensal)
+      return {
+        idade: p.idade,
+        rendaNominal,
+        rendaPoderCompra,
+        rendaReal,
+      }
+    })
+  }, [projecao, premissas.inflacao, taxaNominalMensal, taxaRealMensal])
 
   const distribuicaoAtivos = useMemo(() => {
     const acc = new Map<string, number>()
@@ -134,12 +179,13 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   , [projecao])
 
   const fmt = (v: number) => {
-    if (Math.abs(v) >= 1_000_000) return `R$ ${(v / 1_000_000).toFixed(1)}M`
-    if (Math.abs(v) >= 1_000)     return `R$ ${(v / 1_000).toFixed(0)}K`
-    return `R$ ${v.toFixed(0)}`
+    const prefix = moeda === "USD" ? "US$ " : "R$ "
+    if (Math.abs(v) >= 1_000_000) return `${prefix}${(v / 1_000_000).toFixed(1)}M`
+    if (Math.abs(v) >= 1_000)     return `${prefix}${(v / 1_000).toFixed(0)}K`
+    return `${prefix}${v.toFixed(0)}`
   }
   const fmtFull = (v: number) =>
-    new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v)
+    new Intl.NumberFormat(moeda === "USD" ? "en-US" : "pt-BR", { style: "currency", currency: moeda === "USD" ? "USD" : "BRL", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v)
 
   const patrimonioTotalCentro = useMemo(() => {
     const totalAtivos = state.ativos.reduce((s, a) => s + (a.valor || 0), 0)
@@ -171,6 +217,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           premissas={premissas}
           idadeAtual={idadeAtual}
           aporteM={aporteM}
+          moeda={moeda}
         />
       )
 
@@ -215,7 +262,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       }
 
       const nome = dadosPessoais.nome?.replace(/\s+/g, "_") || "cliente"
-      const data = new Date().toLocaleDateString("pt-BR").replace(/\//g, "-")
+      const data = new Date().toLocaleDateString(moeda === "USD" ? "en-US" : "pt-BR").replace(/\//g, "-")
       pdf.save(`Diagnostico_${nome}_${data}.pdf`)
 
     } catch (err) {
@@ -231,7 +278,18 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   // ── KPI cards ─────────────────────────────────────────────────────────────
   const kpiCards = [
     { label: "PATRIMÔNIO NA APOSENTADORIA", valor: fmt(kpis.patrimonioApos), subtexto: `${fmt(kpis.patrimonioAposReal)} em valor real`, icon: TrendingUp, cor: "blue" },
-    { label: "RENDA MENSAL REAL",           valor: fmtFull(kpis.rendaMensalReal), subtexto: `Com ${premissas.rendimento}% a.a.`, icon: DollarSign, cor: "green" },
+    (() => {
+      const anos = Math.max(0, (Number(premissas.idadeApos) || 0) - idadeAtual)
+      const patrimonioNominalApos = Number(kpis.patrimonioApos) || 0
+      const patrimonioRealApos = Number(kpis.patrimonioAposReal) || 0
+      const rendaNominalApos = Math.max(0, patrimonioNominalApos * taxaNominalMensal)
+      const rendaHojeEq = rendaNominalApos / Math.pow(1 + inflacaoAnual, anos)
+      const rendaRealApos = Math.max(0, patrimonioRealApos * taxaRealMensal)
+
+      return viewMode === "nominal"
+        ? { label: "RENDA MENSAL NA APOSENTADORIA", valor: fmtFull(rendaNominalApos), subtexto: `(${fmtFull(rendaHojeEq)} hoje)`, icon: DollarSign, cor: "green" }
+        : { label: "RENDA MENSAL NA APOSENTADORIA", valor: fmtFull(rendaRealApos), subtexto: `Taxa real (Fisher): ${(taxaReal * 100).toFixed(1)}% a.a.`, icon: DollarSign, cor: "green" }
+    })(),
     { label: "LIBERDADE FINANCEIRA",        valor: kpis.idadeLF ? `${kpis.idadeLF} anos` : "Não atingida", subtexto: kpis.idadeLF ? `Em ${kpis.idadeLF - idadeAtual} anos` : "Ajuste as premissas", icon: Clock, cor: "yellow" },
     { label: "TAXA DE POUPANÇA",            valor: `${kpis.taxaPoupanca}%`, subtexto: `${fmtFull(aporteM)} / mês`, icon: PiggyBank, cor: "neutral" },
   ]
@@ -253,7 +311,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           Diagnóstico <span className="text-[#1E5CE6]">{dadosPessoais.nome || "do Cliente"}</span>
         </h1>
         <p className="text-sm text-muted-foreground">
-          Gerado em {new Date().toLocaleDateString("pt-BR")} · Projeção Padrão
+          Gerado em {new Date().toLocaleDateString(moeda === "USD" ? "en-US" : "pt-BR")} · Projeção Padrão
         </p>
       </div>
 
@@ -434,7 +492,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         <CardContent>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={dadosGrafico} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+              <BarChart data={dadosGraficoPatrimonio} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
                 <XAxis
                   dataKey="idade"
@@ -452,17 +510,21 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                   itemStyle={{ color: "#ffffff" }}
                   formatter={(value: number, _name: string, props: any) => {
                     const entry = props?.payload
-                    const rendaMensal =
-                      viewMode === "nominal"
-                        ? ((Number(entry?.saldoNominal) || 0) * premissas.rendimento / 100) / 12
-                        : ((Number(entry?.saldoReal) || 0) * premissas.rendimento / 100) / 12
+                    const t = Number(entry?.t) || 0
+                    const saldoNominal = Number(entry?.saldoNominal) || 0
+                    const poderCompraHoje = saldoNominal / deflatorPorT(t)
+                    const rendaNominal = Math.max(0, saldoNominal * taxaNominalMensal)
+                    const rendaReal = Math.max(0, poderCompraHoje * taxaRealMensal)
 
                     return [
                       <div className="space-y-1">
                         <div>
-                          {viewMode === "nominal" ? "Patrimônio Nominal" : "Patrimônio Real"}: {fmtFull(value)}
+                          {viewMode === "nominal" ? "Nominal" : "Real"}: {fmtFull(value)}
                         </div>
-                        <div>Renda Mensal Gerada: {fmtFull(rendaMensal)}</div>
+                        {viewMode === "nominal" && (
+                          <div>Poder de compra hoje: {fmtFull(poderCompraHoje)}</div>
+                        )}
+                        <div>Renda Mensal Gerada: {fmtFull(viewMode === "nominal" ? rendaNominal : rendaReal)}</div>
                       </div>,
                       "",
                     ]
@@ -472,11 +534,71 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 <ReferenceLine x={premissas.idadeApos} stroke="#F5A623" strokeDasharray="5 5"
                   label={{ value: "Aposentadoria", position: "top", fill: "#F5A623", fontSize: 12 }} />
                 <Bar dataKey="valor" radius={[2, 2, 0, 0]}>
-                  {dadosGrafico.map((entry: ProjecaoAno & { valor: number }, i: number) => (
+                  {dadosGraficoPatrimonio.map((entry: any, i: number) => (
                     <Cell key={`cell-${i}`} fill={entry.valor >= 0 ? "rgba(30,92,230,0.45)" : "rgba(240,75,75,0.35)"} />
                   ))}
                 </Bar>
+                {viewMode === "nominal" && (
+                  <Line
+                    type="monotone"
+                    dataKey="poderCompraHoje"
+                    stroke="rgba(255,255,255,0.65)"
+                    strokeWidth={2}
+                    strokeDasharray="6 4"
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                )}
               </BarChart>
+            </ResponsiveContainer>
+          </div>
+          {viewMode === "nominal" && (
+            <p className="text-xs text-muted-foreground mt-3">
+              Valores nominais — a linha tracejada mostra o equivalente em poder de compra de hoje considerando inflação de{" "}
+              <span className="text-foreground font-medium">{Number(premissas.inflacao) || 0}% a.a.</span>
+              .
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Gráfico — Renda Mensal */}
+      <Card className="bg-[#0D1220] border-[rgba(255,255,255,0.06)]">
+        <CardHeader>
+          <CardTitle className="text-foreground text-lg font-medium">Renda Mensal (gerada pelo patrimônio)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={dadosRenda} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                <XAxis dataKey="idade" stroke="#4A5268" tick={{ fill: "#4A5268", fontSize: 12 }} tickLine={false}
+                  axisLine={{ stroke: "rgba(255,255,255,0.04)" }} interval="preserveStartEnd" />
+                <YAxis stroke="#4A5268" tick={{ fill: "#4A5268", fontSize: 12 }} tickLine={false} axisLine={false}
+                  tickFormatter={fmt} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: "#131929", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px" }}
+                  labelStyle={{ color: "#ffffff", fontWeight: 600 }}
+                  itemStyle={{ color: "#ffffff" }}
+                  formatter={(v: number, name: string) => {
+                    if (viewMode === "nominal") {
+                      if (name === "rendaNominal") return [fmtFull(v), "Nominal"]
+                      if (name === "rendaPoderCompra") return [fmtFull(v), "Poder de compra hoje"]
+                    }
+                    return [fmtFull(v), "Renda real"]
+                  }}
+                  labelFormatter={l => `Idade: ${l} anos`}
+                />
+                <Legend />
+                {viewMode === "nominal" ? (
+                  <>
+                    <Line type="monotone" dataKey="rendaNominal" name="Nominal" stroke="rgba(34,199,135,0.75)" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="rendaPoderCompra" name="Poder de compra hoje" stroke="rgba(255,255,255,0.65)" strokeWidth={2} strokeDasharray="6 4" dot={false} />
+                  </>
+                ) : (
+                  <Line type="monotone" dataKey="rendaReal" name="Renda real (Fisher)" stroke="rgba(34,199,135,0.75)" strokeWidth={2} dot={false} />
+                )}
+              </LineChart>
             </ResponsiveContainer>
           </div>
         </CardContent>

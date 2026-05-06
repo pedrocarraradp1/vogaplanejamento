@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Dialog,
   DialogContent,
@@ -13,7 +14,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Plus, X, ArrowLeft, ArrowRight, Pencil, Star } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { Plus, X, ArrowLeft, ArrowRight, Pencil, Star, StickyNote } from "lucide-react"
 import { usePlano, type Objetivo } from "@/lib/plano-context"
 
 interface ObjetivosProps {
@@ -38,24 +40,29 @@ const OBJETIVOS_PREDEFINIDOS = [
 
 export function Objetivos({ onNavigate }: ObjetivosProps) {
   const { state, setObjetivos } = usePlano()
-  const { objetivos } = state
+  const { objetivos, premissas } = state
+  const moeda = state.moeda ?? "BRL"
+  const prazoTotal = Math.max(0, Number(premissas.prazo) || 0)
 
   // Modal state
   const [modalOpen, setModalOpen] = useState(false)
   const [editingObjetivo, setEditingObjetivo] = useState<Objetivo | null>(null)
   const [form, setForm] = useState<Omit<Objetivo, "id">>({
     descricao: "",
-    prazo: 0,
+    prazoAnos: 0,
     valor: 0,
     recorrente: false,
-    aCada: 0,
+    frequenciaAnos: 0,
+    duracaoTipo: "total",
+    duracaoAnos: 0,
+    observacoes: "",
   })
 
   const formatCurrency = (value: number) => {
     if (!value) return ""
-    return new Intl.NumberFormat("pt-BR", {
+    return new Intl.NumberFormat(moeda === "USD" ? "en-US" : "pt-BR", {
       style: "currency",
-      currency: "BRL",
+      currency: moeda === "USD" ? "USD" : "BRL",
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(value)
@@ -70,10 +77,13 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
     setEditingObjetivo(null)
     setForm({
       descricao: "",
-      prazo: 0,
+      prazoAnos: 0,
       valor: 0,
       recorrente: false,
-      aCada: 0,
+      frequenciaAnos: 0,
+      duracaoTipo: "total",
+      duracaoAnos: 0,
+      observacoes: "",
     })
     setModalOpen(true)
   }
@@ -82,10 +92,13 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
     setEditingObjetivo(objetivo)
     setForm({
       descricao: objetivo.descricao,
-      prazo: objetivo.prazo,
+      prazoAnos: objetivo.prazoAnos,
       valor: objetivo.valor,
       recorrente: objetivo.recorrente,
-      aCada: objetivo.aCada,
+      frequenciaAnos: objetivo.frequenciaAnos,
+      duracaoTipo: objetivo.duracaoTipo ?? "total",
+      duracaoAnos: objetivo.duracaoTipo === "personalizado" ? (objetivo.duracaoAnos || 1) : 0,
+      observacoes: objetivo.observacoes ?? "",
     })
     setModalOpen(true)
   }
@@ -115,8 +128,40 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
     setForm({
       ...form,
       recorrente: isRecorrente,
-      aCada: isRecorrente ? form.aCada || 1 : 0,
+      frequenciaAnos: isRecorrente ? form.frequenciaAnos || 1 : 0,
+      duracaoTipo: isRecorrente ? (form.duracaoTipo ?? "total") : "total",
+      duracaoAnos: isRecorrente
+        ? (form.duracaoTipo === "personalizado" ? (form.duracaoAnos || 1) : 0)
+        : 0,
     })
+  }
+
+  const totalEstimadoObjetivo = (o: Objetivo) => {
+    const prazoAnos = Math.max(0, Number(o.prazoAnos) || 0)
+    const valor = Math.max(0, Number(o.valor) || 0)
+    if (valor === 0) return 0
+
+    // Se começa depois do fim da simulação, não impacta
+    if (prazoAnos > prazoTotal) return 0
+
+    if (!o.recorrente) return valor
+
+    const freq = Math.max(0, Number(o.frequenciaAnos) || 0)
+    if (freq === 0) return 0
+
+    const duracaoTipo = o.duracaoTipo ?? "total"
+    const duracaoAnos = Math.max(0, Number(o.duracaoAnos) || 0)
+    const anoFimExclusive =
+      duracaoTipo === "total"
+        ? prazoTotal + 1
+        : prazoAnos + duracaoAnos
+
+    const fim = Math.min(prazoTotal + 1, anoFimExclusive)
+    if (fim <= prazoAnos) return 0
+
+    let count = 0
+    for (let t = prazoAnos; t < fim; t += freq) count++
+    return count * valor
   }
 
   return (
@@ -163,9 +208,17 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
               <div className="flex-1 min-w-0">
                 <p className="text-foreground font-medium truncate">{objetivo.descricao || "Sem descrição"}</p>
                 <p className="text-sm text-muted-foreground">
-                  Em {objetivo.prazo} {objetivo.prazo === 1 ? "ano" : "anos"}
-                  {objetivo.recorrente && objetivo.aCada > 0 && (
-                    <> · Recorrente a cada {objetivo.aCada} {objetivo.aCada === 1 ? "ano" : "anos"}</>
+                  Em {objetivo.prazoAnos} {objetivo.prazoAnos === 1 ? "ano" : "anos"}
+                  {objetivo.recorrente && objetivo.frequenciaAnos > 0 && (
+                    <>
+                      {" "}
+                      · Recorrente · A cada {objetivo.frequenciaAnos} {objetivo.frequenciaAnos === 1 ? "ano" : "anos"}
+                      {objetivo.duracaoTipo === "personalizado" && (
+                        <> · Dura {objetivo.duracaoAnos} {objetivo.duracaoAnos === 1 ? "ano" : "anos"}</>
+                      )}
+                      {" "}
+                      · Total estimado: {formatCurrency(totalEstimadoObjetivo(objetivo))}
+                    </>
                   )}
                 </p>
               </div>
@@ -174,6 +227,24 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
               <p className="text-emerald-400 font-semibold text-right shrink-0">
                 {formatCurrency(objetivo.valor)}
               </p>
+
+              {/* Nota (quando preenchido) */}
+              {!!(objetivo.observacoes ?? "").trim() && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="h-8 w-8 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-white/5"
+                      aria-label="Ver observações"
+                    >
+                      <StickyNote className="w-4 h-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent sideOffset={8} className="max-w-[320px] whitespace-pre-wrap">
+                    {(objetivo.observacoes ?? "").trim()}
+                  </TooltipContent>
+                </Tooltip>
+              )}
               
               {/* Ações */}
               <div className="flex items-center gap-1 shrink-0">
@@ -292,8 +363,8 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                 </label>
                 <Input
                   type="number"
-                  value={form.prazo || ""}
-                  onChange={(e) => setForm({ ...form, prazo: parseInt(e.target.value) || 0 })}
+                  value={form.prazoAnos || ""}
+                  onChange={(e) => setForm({ ...form, prazoAnos: parseInt(e.target.value) || 0 })}
                   placeholder="0"
                   className="bg-[#0D1220] border-white/10 text-foreground placeholder:text-muted-foreground"
                 />
@@ -343,10 +414,77 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
               </label>
               <Input
                 type="number"
-                value={form.aCada || ""}
-                onChange={(e) => setForm({ ...form, aCada: parseInt(e.target.value) || 0 })}
+                value={form.frequenciaAnos || ""}
+                onChange={(e) => setForm({ ...form, frequenciaAnos: parseInt(e.target.value) || 0 })}
                 placeholder="1"
                 className="bg-[#0D1220] border-white/10 text-foreground placeholder:text-muted-foreground"
+              />
+            </div>
+
+            {/* Campos de duração (somente recorrente) */}
+            <div
+              className={`space-y-4 transition-all duration-300 ease-in-out ${
+                form.recorrente
+                  ? "opacity-100 max-h-96 translate-y-0"
+                  : "opacity-0 max-h-0 -translate-y-2 overflow-hidden"
+              }`}
+            >
+              <div className="space-y-2">
+                <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+                  Duração
+                </label>
+                <Select
+                  value={form.duracaoTipo}
+                  onValueChange={(v) => {
+                    const duracaoTipo = (v === "personalizado" ? "personalizado" : "total") as "total" | "personalizado"
+                    setForm((prev) => ({
+                      ...prev,
+                      duracaoTipo,
+                      duracaoAnos: duracaoTipo === "personalizado" ? (prev.duracaoAnos || 1) : 0,
+                    }))
+                  }}
+                >
+                  <SelectTrigger className="bg-[#0D1220] border-white/10 text-foreground">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#131929] border-white/10">
+                    <SelectItem value="total">Todo o período</SelectItem>
+                    <SelectItem value="personalizado">Personalizado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div
+                className={`space-y-2 transition-all duration-300 ease-in-out ${
+                  form.recorrente && form.duracaoTipo === "personalizado"
+                    ? "opacity-100 max-h-24 translate-y-0"
+                    : "opacity-0 max-h-0 -translate-y-2 overflow-hidden"
+                }`}
+              >
+                <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+                  Por quantos anos?
+                </label>
+                <Input
+                  type="number"
+                  value={form.duracaoAnos || ""}
+                  onChange={(e) => setForm({ ...form, duracaoAnos: parseInt(e.target.value) || 0 })}
+                  placeholder="Ex: 4"
+                  className="bg-[#0D1220] border-white/10 text-foreground placeholder:text-muted-foreground"
+                />
+              </div>
+            </div>
+
+            {/* Observações */}
+            <div className="space-y-2 pt-2">
+              <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+                Observações
+              </label>
+              <Textarea
+                rows={3}
+                value={form.observacoes ?? ""}
+                onChange={(e) => setForm({ ...form, observacoes: e.target.value })}
+                placeholder="Descreva detalhes do objetivo, premissas, prioridade..."
+                className="bg-[#0D1220] border-white/10 text-foreground placeholder:text-muted-foreground resize-y"
               />
             </div>
           </div>

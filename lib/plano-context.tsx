@@ -22,7 +22,7 @@ export interface DadosPessoais {
   nascimento: string
   estadoCivil: string
   regime: string
-  filhos: number
+  filhos: Array<{ nome: string; dataNascimento: string }>
   renda: number
   despesa: number
 }
@@ -50,10 +50,17 @@ export interface Passivo {
 export interface Objetivo {
   id: string
   descricao: string
-  prazo: number
+  /** Quando o objetivo começa (anos a partir de hoje). */
+  prazoAnos: number
   valor: number
   recorrente: boolean
-  aCada: number
+  /** Repetir a cada X anos (quando recorrente). */
+  frequenciaAnos: number
+  /** Janela de vigência da recorrência (a partir do prazo). */
+  duracaoTipo: "total" | "personalizado"
+  /** Só se `duracaoTipo` = "personalizado". */
+  duracaoAnos: number
+  observacoes: string
 }
 
 export interface Premissas {
@@ -96,6 +103,7 @@ export interface Protecao {
 }
 
 export interface PlanoState {
+  moeda: "BRL" | "USD"
   dadosPessoais: DadosPessoais
   ativos: Ativo[]
   passivos: Passivo[]
@@ -113,11 +121,14 @@ export interface SimulacaoMeta {
   simulacaoId: string | null
   clienteId: string | null
   nomeSimulacao: string | null
+  nomeCenario: string | null
 }
 
 interface PlanoContextType {
   state: PlanoState
   simulacaoMeta: SimulacaoMeta
+  setMoeda: (moeda: PlanoState["moeda"]) => void
+  setSimulacaoMeta: (meta: Partial<SimulacaoMeta>) => void
   setDadosPessoais: (dados: Partial<DadosPessoais>) => void
   setAtivos: (ativos: Ativo[]) => void
   setPassivos: (passivos: Passivo[]) => void
@@ -177,6 +188,7 @@ const defaultPremissas: Premissas = {
 }
 
 const initialState: PlanoState = {
+  moeda: "BRL",
   dadosPessoais: {
     nome:        "",
     conjuge:     "",
@@ -184,7 +196,7 @@ const initialState: PlanoState = {
     nascimento:  "",
     estadoCivil: "",
     regime:      "",
-    filhos:      0,
+    filhos:      [],
     renda:       0,
     despesa:     0,
   },
@@ -232,12 +244,14 @@ export function PlanoProvider({
     simulacaoId: null,
     clienteId: null,
     nomeSimulacao: null,
+    nomeCenario: null,
   })
 
   const hydrateState = useCallback((raw: any): PlanoState => {
     const merged: PlanoState = {
       ...initialState,
       ...(raw ?? {}),
+      moeda: (raw?.moeda === "USD" ? "USD" : "BRL"),
       dadosPessoais: { ...initialState.dadosPessoais, ...(raw?.dadosPessoais ?? {}) },
       premissas: { ...initialState.premissas, ...(raw?.premissas ?? {}) },
       sucessao: { ...initialState.sucessao, ...(raw?.sucessao ?? {}) },
@@ -251,6 +265,43 @@ export function PlanoProvider({
       protecaoResult: raw?.protecaoResult ?? null,
     }
 
+    // Normaliza filhos (compatibilidade: modelos antigos tinham `filhos` como número)
+    const rawFilhos = (merged.dadosPessoais as any)?.filhos
+    if (typeof rawFilhos === "number") {
+      merged.dadosPessoais.filhos = Array.from({ length: Math.max(0, rawFilhos) }, () => ({
+        nome: "",
+        dataNascimento: "",
+      }))
+    } else if (Array.isArray(rawFilhos)) {
+      merged.dadosPessoais.filhos = rawFilhos.map((f: any) => ({
+        nome: String(f?.nome ?? ""),
+        dataNascimento: String(f?.dataNascimento ?? ""),
+      }))
+    } else {
+      merged.dadosPessoais.filhos = []
+    }
+
+    // Normaliza objetivos (compatibilidade com modelos antigos: prazo/aCada)
+    merged.objetivos = (merged.objetivos ?? []).map((o: any) => {
+      const prazoAnos = Number(o?.prazoAnos ?? o?.prazo) || 0
+      const recorrente = Boolean(o?.recorrente)
+      const frequenciaAnos = recorrente ? (Number(o?.frequenciaAnos ?? o?.aCada) || 1) : 0
+      const duracaoTipo = (o?.duracaoTipo === "personalizado" ? "personalizado" : "total") as
+        | "total"
+        | "personalizado"
+      const duracaoAnos = duracaoTipo === "personalizado" ? (Number(o?.duracaoAnos) || 1) : 0
+      const observacoes = String(o?.observacoes ?? "").trim()
+      return {
+        ...o,
+        prazoAnos,
+        recorrente,
+        frequenciaAnos,
+        duracaoTipo,
+        duracaoAnos,
+        observacoes,
+      }
+    })
+
     // Normaliza rendimento líquido derivado
     const bruto = Number(merged.premissas.rendimentoBruto) || 0
     const aliq = Number(merged.premissas.aliquotaImpostoRendimento) || 0
@@ -261,13 +312,20 @@ export function PlanoProvider({
 
   // ── Helpers derivados ──────────────────────────────────────────────────────
 
+  const getAtivosLiquidos = useCallback(() => {
+    return (state.ativos ?? [])
+      .filter(a => (a.tipo ?? "").trim() === "Líquido")
+      .reduce((s, a) => s + (Number(a.valor) || 0), 0)
+  }, [state.ativos])
+
+  const getTotalPassivos = useCallback(() => {
+    return (state.passivos ?? []).reduce((s, p) => s + (Number(p.valor) || 0), 0)
+  }, [state.passivos])
+
   const getPatrimonioLiquido = useCallback(() => {
-    const ta = state.ativos
-    .filter(a => a.tipo === "Líquido")
-    .reduce((s, a) => s + (a.valor || 0), 0)
-    const tp = state.passivos.reduce((s, p) => s + (p.valor || 0), 0)
-    return ta - tp
-  }, [state.ativos, state.passivos])
+    // Patrimônio Líquido Financeiro = Ativos Líquidos (categoria "Líquido") − Passivos
+    return getAtivosLiquidos() - getTotalPassivos()
+  }, [getAtivosLiquidos, getTotalPassivos])
 
   const getAporteMensal = useCallback(() => {
     return Math.max(0, state.dadosPessoais.renda - state.dadosPessoais.despesa)
@@ -285,6 +343,10 @@ export function PlanoProvider({
   }, [state.dadosPessoais.nascimento])
 
   // ── Setters ────────────────────────────────────────────────────────────────
+
+  const setMoeda = useCallback((moeda: PlanoState["moeda"]) => {
+    setState(prev => ({ ...prev, moeda }))
+  }, [])
 
   const setDadosPessoais = useCallback((dados: Partial<DadosPessoais>) => {
     setState(prev => ({ ...prev, dadosPessoais: { ...prev.dadosPessoais, ...dados } }))
@@ -330,19 +392,23 @@ export function PlanoProvider({
         simulacaoId: meta.simulacaoId ?? prev.simulacaoId,
         clienteId: meta.clienteId ?? prev.clienteId,
         nomeSimulacao: meta.nomeSimulacao ?? prev.nomeSimulacao,
+        nomeCenario: meta.nomeCenario ?? prev.nomeCenario,
       }))
     }
   }, [hydrateState])
 
   const clearSimulacaoMeta = useCallback(() => {
-    setSimulacaoMeta({ simulacaoId: null, clienteId: null, nomeSimulacao: null })
+    setSimulacaoMeta({ simulacaoId: null, clienteId: null, nomeSimulacao: null, nomeCenario: null })
+  }, [])
+
+  const setSimulacaoMetaPartial = useCallback((meta: Partial<SimulacaoMeta>) => {
+    setSimulacaoMeta((prev) => ({ ...prev, ...meta }))
   }, [])
 
   // ── Cálculos ───────────────────────────────────────────────────────────────
 
   const simulatePreview = useCallback(() => {
-    const saldoInicial = state.ativos.reduce((s, a) => s + (a.valor || 0), 0)
-                       - state.passivos.reduce((s, p) => s + (p.valor || 0), 0)
+    const saldoInicial = getAtivosLiquidos() - getTotalPassivos()
     const aporteM    = Math.max(0, state.dadosPessoais.renda - state.dadosPessoais.despesa)
     const idadeAtual = (() => {
       const nasc = state.dadosPessoais.nascimento
@@ -361,11 +427,10 @@ export function PlanoProvider({
       state.passivos
     )
     setState(prev => ({ ...prev, projecao }))
-  }, [state.premissas, state.objetivos, state.ativos, state.passivos, state.dadosPessoais])
+  }, [state.premissas, state.objetivos, state.passivos, state.dadosPessoais, getAtivosLiquidos, getTotalPassivos])
 
   const calcular = useCallback(() => {
-    const saldoInicial = state.ativos.reduce((s, a) => s + (a.valor || 0), 0)
-                       - state.passivos.reduce((s, p) => s + (p.valor || 0), 0)
+    const saldoInicial = getAtivosLiquidos() - getTotalPassivos()
     const aporteM    = Math.max(0, state.dadosPessoais.renda - state.dadosPessoais.despesa)
     const idadeAtual = (() => {
       const nasc = state.dadosPessoais.nascimento
@@ -421,7 +486,7 @@ export function PlanoProvider({
     )
 
     setState(prev => ({ ...prev, projecao, kpis, inventario, protecaoResult }))
-  }, [state])
+  }, [state, getAtivosLiquidos, getTotalPassivos])
 
   const salvarPlano = useCallback(async (): Promise<{ error: string | null }> => {
     try {
@@ -454,6 +519,8 @@ export function PlanoProvider({
     <PlanoContext.Provider value={{
       state,
       simulacaoMeta,
+      setMoeda,
+      setSimulacaoMeta: setSimulacaoMetaPartial,
       setDadosPessoais, setAtivos, setPassivos, setObjetivos,
       setPremissas, setSucessao, setProtecao,
       loadState, clearSimulacaoMeta,

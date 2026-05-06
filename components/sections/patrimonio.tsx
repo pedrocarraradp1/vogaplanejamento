@@ -22,7 +22,7 @@ interface PatrimonioProps {
 
 export function Patrimonio({ onNavigate }: PatrimonioProps) {
   const { state, setAtivos, setPassivos } = usePlano()
-  const { ativos, passivos } = state
+  const { ativos, passivos, moeda } = state
 
   // Modal Ativo
   const [ativoModalOpen, setAtivoModalOpen] = useState(false)
@@ -50,9 +50,9 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
   })
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("pt-BR", {
+    return new Intl.NumberFormat(moeda === "USD" ? "en-US" : "pt-BR", {
       style: "currency",
-      currency: "BRL",
+      currency: moeda === "USD" ? "USD" : "BRL",
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(value)

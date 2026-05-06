@@ -11,6 +11,20 @@ import { SalvarSimulacaoModal } from "@/components/simulacoes/salvar-simulacao-m
 import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
 
+function Breadcrumb() {
+  const { simulacaoMeta, state } = usePlano()
+  if (!simulacaoMeta.clienteId || !simulacaoMeta.nomeCenario) return null
+  const nome = state.dadosPessoais.nome?.trim() || "Cliente"
+  return (
+    <Link
+      href={`/clientes/${simulacaoMeta.clienteId}`}
+      className="text-xs font-medium text-muted-foreground hover:text-foreground px-3 py-2 rounded-md bg-[#131929] border border-white/10"
+    >
+      ← {nome} · {simulacaoMeta.nomeCenario}
+    </Link>
+  )
+}
+
 function Loader({ simulacaoId }: { simulacaoId: string }) {
   const { loadState } = usePlano()
   const [error, setError] = useState<string | null>(null)
@@ -25,7 +39,7 @@ function Loader({ simulacaoId }: { simulacaoId: string }) {
 
         const { data, error } = await supabase
           .from("simulacoes")
-          .select("id, cliente_id, nome_simulacao, dados")
+          .select("id, cliente_id, nome_simulacao, nome_cenario, dados")
           .eq("id", simulacaoId)
           .maybeSingle()
         if (error) throw new Error(error.message)
@@ -36,6 +50,7 @@ function Loader({ simulacaoId }: { simulacaoId: string }) {
             simulacaoId: data.id,
             clienteId: data.cliente_id,
             nomeSimulacao: data.nome_simulacao,
+            nomeCenario: data.nome_cenario ?? data.nome_simulacao ?? null,
           })
         }
       } catch (e) {
@@ -75,6 +90,7 @@ export default function SimulacaoPage() {
               Voltar
             </Button>
           </Link>
+          <Breadcrumb />
           <SalvarSimulacaoModal />
         </div>
         <Sidebar activeSection={activeSection} onSectionChange={setActiveSection} />

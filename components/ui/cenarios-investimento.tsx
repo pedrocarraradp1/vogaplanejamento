@@ -38,6 +38,7 @@ type LinhaCenarios = {
 export function CenariosInvestimento(props: CenariosInvestimentoProps) {
   const { state, setPremissas } = usePlano()
   const { premissas, objetivos, dadosPessoais, ativos, passivos } = state
+  const moeda = state.moeda ?? "BRL"
 
   const [showCenarios, setShowCenarios] = useState(true)
   const editable = props.editable ?? true
@@ -53,9 +54,11 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
   const inflacaoGlobal = Number(premissas.inflacao) || 0
 
   const saldoInicialCalculado = useMemo(() => {
-    const totalAtivos = (ativos ?? []).reduce((s, a) => s + (Number(a.valor) || 0), 0)
+    const ativosLiquidos = (ativos ?? [])
+      .filter((a) => (a.tipo ?? "").trim() === "Líquido")
+      .reduce((s, a) => s + (Number(a.valor) || 0), 0)
     const totalPassivos = (passivos ?? []).reduce((s, p) => s + (Number(p.valor) || 0), 0)
-    return totalAtivos - totalPassivos
+    return ativosLiquidos - totalPassivos
   }, [ativos, passivos])
 
   const idadeAtualCalculada = useMemo(() => {
@@ -106,10 +109,12 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
       objetivos.map((obj) => ({
         id: obj.id,
         descricao: obj.descricao,
-        prazo: obj.prazo,
+        prazoAnos: obj.prazoAnos,
         valor: obj.valor,
         recorrente: obj.recorrente,
-        aCada: obj.aCada,
+        frequenciaAnos: obj.frequenciaAnos,
+        duracaoTipo: obj.duracaoTipo,
+        duracaoAnos: obj.duracaoAnos,
       })),
     [objetivos],
   )
@@ -125,17 +130,18 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
   }, [inflacaoGlobal, anosAteAposentadoria])
 
   const fmtFull = (v: number) =>
-    new Intl.NumberFormat("pt-BR", {
+    new Intl.NumberFormat(moeda === "USD" ? "en-US" : "pt-BR", {
       style: "currency",
-      currency: "BRL",
+      currency: moeda === "USD" ? "USD" : "BRL",
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(v)
 
   const formatarMoeda = (valor: number) => {
-    if (Math.abs(valor) >= 1_000_000) return `R$ ${(valor / 1_000_000).toFixed(1)}M`
-    if (Math.abs(valor) >= 1_000) return `R$ ${(valor / 1_000).toFixed(0)}K`
-    return `R$ ${valor.toFixed(0)}`
+    const prefix = moeda === "USD" ? "US$ " : "R$ "
+    if (Math.abs(valor) >= 1_000_000) return `${prefix}${(valor / 1_000_000).toFixed(1)}M`
+    if (Math.abs(valor) >= 1_000) return `${prefix}${(valor / 1_000).toFixed(0)}K`
+    return `${prefix}${valor.toFixed(0)}`
   }
 
   const objetivoPatrimonioParaTaxa = (taxaAnualPct: number) => {

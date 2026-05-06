@@ -27,11 +27,12 @@ function patrimonioTotalFromState(state: any): number {
 export function SalvarSimulacaoModal() {
   const { state, simulacaoMeta, loadState } = usePlano()
   const { toast } = useToast()
+  const moeda = state.moeda ?? "BRL"
 
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  const [nomeSimulacao, setNomeSimulacao] = useState(simulacaoMeta.nomeSimulacao ?? "")
+  const [nomeCenario, setNomeCenario] = useState(simulacaoMeta.nomeCenario ?? "Cenário Principal")
   const [nomeCliente, setNomeCliente] = useState(state.dadosPessoais.nome ?? "")
   const [profissaoCliente, setProfissaoCliente] = useState(state.dadosPessoais.profissao ?? "")
 
@@ -40,14 +41,14 @@ export function SalvarSimulacaoModal() {
   const patrimonioTotal = useMemo(() => patrimonioTotalFromState(state), [state])
 
   async function onConfirm() {
-    const ns = nomeSimulacao.trim()
+    const ncx = nomeCenario.trim()
     const nc = nomeCliente.trim()
     const pc = profissaoCliente.trim()
-    if (!ns || !nc) {
+    if (!ncx || !nc) {
       toast({
         variant: "destructive",
         title: "Campos obrigatórios",
-        description: "Informe o nome da simulação e o nome do cliente.",
+        description: "Informe o nome do cenário e o nome do cliente.",
       })
       return
     }
@@ -57,6 +58,32 @@ export function SalvarSimulacaoModal() {
       const supabase = createClient()
       const { data: auth, error: authErr } = await supabase.auth.getUser()
       if (authErr || !auth?.user) throw new Error("Sessão inválida. Faça login novamente.")
+
+      // Busca cliente existente por nome (case-insensitive). Se não existir, cria.
+      let clienteId = simulacaoMeta.clienteId
+      if (!clienteId) {
+        const { data: existing, error: findErr } = await supabase
+          .from("clientes")
+          .select("id")
+          .ilike("nome", nc)
+          .limit(1)
+          .maybeSingle()
+        if (findErr) throw new Error(findErr.message)
+        if (existing?.id) {
+          clienteId = existing.id
+        } else {
+          const { data: created, error: createErr } = await supabase
+            .from("clientes")
+            .insert({ nome: nc, profissao: pc })
+            .select("id")
+            .single()
+          if (createErr) throw new Error(createErr.message)
+          clienteId = created?.id ?? null
+        }
+      } else {
+        // Mantém cadastro do cliente atualizado
+        await supabase.from("clientes").update({ nome: nc, profissao: pc }).eq("id", clienteId)
+      }
 
       const payloadState = {
         ...state,
@@ -72,20 +99,24 @@ export function SalvarSimulacaoModal() {
         const { error } = await supabase
           .from("simulacoes")
           .update({
-            nome_simulacao: ns,
+            nome_simulacao: ncx,
+            nome_cenario: ncx,
+            cliente_id: clienteId,
             dados: payloadState,
             updated_at: new Date().toISOString(),
           })
           .eq("id", simulacaoMeta.simulacaoId)
         if (error) throw new Error(error.message)
 
-        toast({ title: "Simulação atualizada", description: `“${ns}” salva com sucesso.` })
-        loadState(payloadState, { nomeSimulacao: ns })
+        toast({ title: "Cenário atualizado", description: `“${ncx}” salvo com sucesso.` })
+        loadState(payloadState, { nomeSimulacao: ncx, nomeCenario: ncx, clienteId })
       } else {
         const { data, error } = await supabase
           .from("simulacoes")
           .insert({
-            nome_simulacao: ns,
+            nome_simulacao: ncx,
+            nome_cenario: ncx,
+            cliente_id: clienteId,
             dados: payloadState,
           })
           .select("id")
@@ -93,10 +124,15 @@ export function SalvarSimulacaoModal() {
         if (error) throw new Error(error.message)
 
         toast({
-          title: "Simulação salva",
-          description: `“${ns}” salva com sucesso. Patrimônio: R$ ${new Intl.NumberFormat("pt-BR").format(patrimonioTotal)}`,
+          title: "Cenário salvo",
+          description: `“${ncx}” salvo com sucesso. Patrimônio: ${new Intl.NumberFormat(moeda === "USD" ? "en-US" : "pt-BR", {
+            style: "currency",
+            currency: moeda === "USD" ? "USD" : "BRL",
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
+          }).format(patrimonioTotal)}`,
         })
-        loadState(payloadState, { simulacaoId: data?.id ?? null, nomeSimulacao: ns })
+        loadState(payloadState, { simulacaoId: data?.id ?? null, nomeSimulacao: ncx, nomeCenario: ncx, clienteId })
       }
 
       setOpen(false)
@@ -115,7 +151,7 @@ export function SalvarSimulacaoModal() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button className="bg-primary hover:bg-primary/90 text-primary-foreground h-9">
-          {isUpdate ? "Atualizar Simulação" : "Salvar Simulação"}
+          {isUpdate ? "Atualizar Cenário" : "Salvar Cenário"}
         </Button>
       </DialogTrigger>
       <DialogContent className="bg-[#0D1220] border border-[rgba(255,255,255,0.08)] text-foreground">
@@ -128,11 +164,11 @@ export function SalvarSimulacaoModal() {
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label className="text-xs uppercase text-muted-foreground tracking-wide">Nome da simulação</Label>
+            <Label className="text-xs uppercase text-muted-foreground tracking-wide">Nome do cenário</Label>
             <Input
-              value={nomeSimulacao}
-              onChange={(e) => setNomeSimulacao(e.target.value)}
-              placeholder="Ex: Planejamento 2026"
+              value={nomeCenario}
+              onChange={(e) => setNomeCenario(e.target.value)}
+              placeholder="Ex: Conservador, Agressivo, Aposentadoria aos 55"
               className="bg-[#131929] border-white/10 text-foreground focus:border-primary"
             />
           </div>
