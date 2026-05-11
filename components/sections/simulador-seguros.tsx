@@ -60,6 +60,10 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
   const { dadosPessoais, projecao, premissas } = state
   const moeda = state.moeda ?? "BRL"
 
+  /** Aliases alinhados ao modelo de dados (globais: `nascimento`, `renda`). */
+  const dataNascimento = dadosPessoais.nascimento
+  const rendaMensal = dadosPessoais.renda
+
   const fmt = (v: number) =>
     new Intl.NumberFormat(moeda === "USD" ? "en-US" : "pt-BR", {
       style: "currency",
@@ -87,7 +91,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
   const isWholeLife = produtoSelecionado.startsWith("WL")
 
   const buscarPremio = useCallback(async () => {
-    if (!dadosPessoais.nascimento || capitalSegurado <= 0) {
+    if (!dataNascimento || capitalSegurado <= 0) {
       const fb = calcularFallback(capitalSegurado, idade || 35, produtoSelecionado)
       setPremioMensal(fb)
       setPremioAnual(fb * 12)
@@ -101,16 +105,26 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          dataNascimento: dadosPessoais.nascimento,
-          sexoId: dadosPessoais.sexo === "F" ? 2 : 1,
-          renda: dadosPessoais.renda,
+          dataNascimento,
+          sexoId: dadosPessoais.sexo === "M" ? 1 : 2,
+          renda: rendaMensal,
           uf: dadosPessoais.uf || "SP",
           codigoModeloProposta: produtoSelecionado,
           capitalSegurado,
           anospag: getAnospag(produtoSelecionado),
         }),
       })
-      const data = (await res.json()) as { premioMensal?: number; premioAnual?: number; error?: string }
+
+      let data: { premioMensal?: number; premioAnual?: number; error?: string }
+      try {
+        data = (await res.json()) as typeof data
+      } catch {
+        const fb = calcularFallback(capitalSegurado, idade || 35, produtoSelecionado)
+        setPremioMensal(fb)
+        setPremioAnual(fb * 12)
+        setFonte("estimativa")
+        return
+      }
 
       if (res.ok && typeof data.premioMensal === "number") {
         setPremioMensal(data.premioMensal)
@@ -135,8 +149,8 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
     }
   }, [
     capitalSegurado,
-    dadosPessoais.nascimento,
-    dadosPessoais.renda,
+    dataNascimento,
+    rendaMensal,
     dadosPessoais.sexo,
     dadosPessoais.uf,
     idade,
@@ -180,8 +194,8 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
     })
   }, [projecao, pm, inflacaoPct, capitalSegurado, isWholeLife, anospag])
 
-  const formatNasc = dadosPessoais.nascimento
-    ? new Date(dadosPessoais.nascimento + "T12:00:00").toLocaleDateString("pt-BR")
+  const formatNasc = dataNascimento
+    ? new Date(dataNascimento + "T12:00:00").toLocaleDateString("pt-BR")
     : "—"
 
   return (
@@ -220,7 +234,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
             </div>
             <div>
               <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Renda mensal</p>
-              <p className="font-medium text-foreground tabular-nums">{fmt(dadosPessoais.renda || 0)}</p>
+              <p className="font-medium text-foreground tabular-nums">{fmt(rendaMensal || 0)}</p>
             </div>
           </div>
         </CardContent>

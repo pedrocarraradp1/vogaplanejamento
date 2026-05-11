@@ -29,13 +29,13 @@ const navGroups: NavGroup[] = [
       { id: "projecao", number: 4, label: "Projeção" },
       { id: "sucessorio", number: 5, label: "Sucessório" },
       { id: "protecao", number: 6, label: "Proteção Financeira" },
-      { id: "simulador-seguros", number: 7, label: "Simulador de Seguros" },
+      { id: "simulador-seguros", number: 8, label: "Simulador de Seguros" },
     ],
   },
   {
     title: "Resultado",
     items: [
-      { id: "dashboard", number: 8, label: "Dashboard" },
+      { id: "dashboard", number: 9, label: "Dashboard" },
     ],
   },
 ]
