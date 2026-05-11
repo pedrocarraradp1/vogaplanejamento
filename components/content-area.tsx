@@ -6,6 +6,7 @@ import { Objetivos } from "./sections/objetivos"
 import { Projecao } from "./sections/projecao"
 import { Sucessorio } from "./sections/sucessorio"
 import { ProtecaoFinanceira } from "./sections/protecao-financeira"
+import { SimuladorSeguros } from "./sections/simulador-seguros"
 import { Dashboard } from "./sections/dashboard"
 
 interface ContentAreaProps {
@@ -28,6 +29,8 @@ export function ContentArea({ activeSection, onNavigate }: ContentAreaProps) {
         return <Sucessorio onNavigate={onNavigate} />
       case "protecao":
         return <ProtecaoFinanceira onNavigate={onNavigate} />
+      case "simulador-seguros":
+        return <SimuladorSeguros onNavigate={onNavigate} />
       case "dashboard":
         return <Dashboard onNavigate={onNavigate} />
       default:

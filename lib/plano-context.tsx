@@ -25,6 +25,10 @@ export interface DadosPessoais {
   filhos: Array<{ nome: string; dataNascimento: string }>
   renda: number
   despesa: number
+  /** Sexo para cotações (ex.: MAG API): M ou F */
+  sexo?: "M" | "F" | ""
+  /** UF (2 letras) para simulações de seguro */
+  uf?: string
 }
 
 export interface Ativo {
@@ -199,6 +203,8 @@ const initialState: PlanoState = {
     filhos:      [],
     renda:       0,
     despesa:     0,
+    sexo:        "",
+    uf:          "",
   },
   ativos: [],
   passivos: [],

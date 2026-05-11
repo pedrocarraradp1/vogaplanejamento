@@ -1,7 +1,7 @@
 "use client"
 
 import { cn } from "@/lib/utils"
-import { Shield } from "lucide-react"
+import { Shield, ShieldCheck } from "lucide-react"
 
 interface NavItem {
   id: string
@@ -29,12 +29,13 @@ const navGroups: NavGroup[] = [
       { id: "projecao", number: 4, label: "Projeção" },
       { id: "sucessorio", number: 5, label: "Sucessório" },
       { id: "protecao", number: 6, label: "Proteção Financeira" },
+      { id: "simulador-seguros", number: 7, label: "Simulador de Seguros" },
     ],
   },
   {
     title: "Resultado",
     items: [
-      { id: "dashboard", number: 7, label: "Dashboard" },
+      { id: "dashboard", number: 8, label: "Dashboard" },
     ],
   },
 ]
@@ -79,6 +80,9 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
                       </span>
                       {item.id === "protecao" && (
                         <Shield className={cn("h-4 w-4", isActive ? "text-primary-foreground" : "text-muted-foreground")} />
+                      )}
+                      {item.id === "simulador-seguros" && (
+                        <ShieldCheck className={cn("h-4 w-4 shrink-0", isActive ? "text-primary-foreground" : "text-muted-foreground")} />
                       )}
                       {item.label}
                     </button>
