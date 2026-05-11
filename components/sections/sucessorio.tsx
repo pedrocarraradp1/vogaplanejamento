@@ -191,7 +191,7 @@ export function Sucessorio({ onNavigate }: SucessorioProps) {
 
       const data = await res.json()
 
-      if (res.ok && typeof data.premioMensal === "number") {
+      if (res.ok && typeof data.premioMensal === "number" && data.premioMensal > 0) {
         setPremioMensal(data.premioMensal)
         setPremioAnual(typeof data.premioAnual === "number" ? data.premioAnual : data.premioMensal * 12)
         setFontePremio("mag_api")

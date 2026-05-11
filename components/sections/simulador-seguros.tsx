@@ -13,6 +13,7 @@ import {
 } from "recharts"
 import { ArrowLeft, ArrowRight, ShieldCheck } from "lucide-react"
 import { usePlano } from "@/lib/plano-context"
+import { calcularProjecao } from "@/lib/engine"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -27,6 +28,7 @@ interface SimuladorSegurosProps {
 
 const CS_MIN = 500_000
 const CS_MAX = 25_000_000
+const CS_INICIAL = 3_000_000
 
 const PRODUTOS_BTNS: { codigo: string; label: string }[] = [
   { codigo: "WL10", label: "Whole Life Integral (10a)" },
@@ -55,9 +57,34 @@ function custoTotalNominalPremios(premioMensal: number, anosPag: number, inflaca
   return total
 }
 
+/** Lê `sexo` ou `genero` (M/F, Masculino/Feminino, 1/2). */
+function normalizeSexoMF(dp: { sexo?: unknown; genero?: unknown }): "M" | "F" | null {
+  const raw = dp.sexo !== undefined && dp.sexo !== "" ? dp.sexo : dp.genero
+  if (raw === 1 || raw === "1") return "M"
+  if (raw === 2 || raw === "2") return "F"
+  if (typeof raw === "string") {
+    const s = raw.trim()
+    const lower = s.toLowerCase()
+    if (lower === "m" || lower === "masculino" || lower.startsWith("masc")) return "M"
+    if (lower === "f" || lower === "feminino" || lower.startsWith("fem")) return "F"
+  }
+  return null
+}
+
+function labelSexoExibicao(dp: { sexo?: unknown; genero?: unknown }): string {
+  const g = normalizeSexoMF(dp)
+  if (g === "M") return "Masculino"
+  if (g === "F") return "Feminino"
+  return "—"
+}
+
+function sexoIdParaMag(dp: { sexo?: unknown; genero?: unknown }): 1 | 2 {
+  return normalizeSexoMF(dp) === "M" ? 1 : 2
+}
+
 export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
-  const { state, getIdadeAtual } = usePlano()
-  const { dadosPessoais, projecao, premissas } = state
+  const { state, getIdadeAtual, getPatrimonioLiquido } = usePlano()
+  const { dadosPessoais, projecao, premissas, objetivos, passivos, kpis } = state
   const moeda = state.moeda ?? "BRL"
 
   /** Aliases alinhados ao modelo de dados (globais: `nascimento`, `renda`). */
@@ -78,35 +105,92 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
     return fmt(v)
   }
 
-  const [capitalSegurado, setCapitalSegurado] = useState(CS_MIN)
+  const [capitalSegurado, setCapitalSegurado] = useState(CS_INICIAL)
   const [produtoSelecionado, setProdutoSelecionado] = useState<string>("TL10")
   const [premioMensal, setPremioMensal] = useState<number | null>(null)
   const [premioAnual, setPremioAnual] = useState<number | null>(null)
-  const [fonte, setFonte] = useState<"mag" | "estimativa">("estimativa")
-  const [loading, setLoading] = useState(false)
+  const [fonte, setFonte] = useState<"mag_api" | "estimativa">("estimativa")
+  const [loadingMAG, setLoadingMAG] = useState(false)
 
   const idade = getIdadeAtual()
   const inflacaoPct = premissas.inflacao ?? 4
   const anospag = getAnospag(produtoSelecionado)
   const isWholeLife = produtoSelecionado.startsWith("WL")
 
-  const buscarPremio = useCallback(async () => {
-    if (!dataNascimento || capitalSegurado <= 0) {
-      const fb = calcularFallback(capitalSegurado, idade || 35, produtoSelecionado)
-      setPremioMensal(fb)
-      setPremioAnual(fb * 12)
-      setFonte("estimativa")
-      return
+  /** Mesmo horizonte da aba Projeção: idade aposentadoria − idade atual (anos). */
+  const horizonteAnos = useMemo(
+    () => Math.max(1, Math.round((Number(premissas.idadeApos) || 65) - (idade || 0))),
+    [premissas.idadeApos, idade],
+  )
+
+  const projecaoEfetiva = useMemo(() => {
+    const n = horizonteAnos
+    const saldoInicial = getPatrimonioLiquido()
+    const aporteM = Math.max(0, dadosPessoais.renda - dadosPessoais.despesa)
+    const idadeAtual = idade
+
+    const aporteArr = premissas.aportePorAnoNominal
+    const aportePorAnoNominal =
+      Array.isArray(aporteArr) && aporteArr.length > 0
+        ? aporteArr.slice(0, n + 1)
+        : undefined
+
+    const premEngine = {
+      ...premissas,
+      saldoInicial,
+      aporteM,
+      idadeAtual,
+      prazo: n,
+      ...(aportePorAnoNominal !== undefined ? { aportePorAnoNominal } : {}),
     }
 
-    setLoading(true)
+    if (projecao?.length && projecao.length >= n + 1) {
+      const slice = projecao.slice(0, n + 1)
+      const ultimoSaldo = slice[slice.length - 1]?.saldoNominal ?? 0
+      const temInput = Math.abs(saldoInicial) + aporteM > 1
+      if (Math.abs(ultimoSaldo) > 1 || !temInput) return slice
+    }
+
+    return calcularProjecao(premEngine as Parameters<typeof calcularProjecao>[0], objetivos, passivos)
+  }, [
+    horizonteAnos,
+    getPatrimonioLiquido,
+    dadosPessoais.renda,
+    dadosPessoais.despesa,
+    idade,
+    premissas,
+    projecao,
+    objetivos,
+    passivos,
+  ])
+
+  /** Patrimônio final Cenário A: último ano da projeção efetiva, ou KPI da Projeção, ou recálculo embutido em `projecaoEfetiva`. */
+  const patrimonioFinalCenarioA = useMemo(() => {
+    const ultimo = projecaoEfetiva.at(-1)?.saldoNominal
+    if (ultimo != null && Math.abs(ultimo) > 1) return ultimo
+    const k = kpis?.patrimonioApos
+    if (k != null && Math.abs(k) > 1) return k
+    return ultimo ?? 0
+  }, [projecaoEfetiva, kpis?.patrimonioApos])
+
+  useEffect(() => {
+    const fb = calcularFallback(capitalSegurado, idade || 35, produtoSelecionado)
+    setPremioMensal(fb)
+    setPremioAnual(fb * 12)
+    setFonte("estimativa")
+  }, [capitalSegurado, produtoSelecionado, idade])
+
+  const simularMAG = useCallback(async () => {
+    if (!dataNascimento) return
+
+    setLoadingMAG(true)
     try {
       const res = await fetch("/api/mag/simulacao", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           dataNascimento,
-          sexoId: dadosPessoais.sexo === "M" ? 1 : 2,
+          sexoId: sexoIdParaMag(dadosPessoais),
           renda: rendaMensal,
           uf: dadosPessoais.uf || "SP",
           codigoModeloProposta: produtoSelecionado,
@@ -115,7 +199,12 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
         }),
       })
 
-      let data: { premioMensal?: number; premioAnual?: number; error?: string }
+      let data: {
+        premioMensal?: number | null
+        premioAnual?: number | null
+        rawResponse?: unknown
+        error?: string
+      }
       try {
         data = (await res.json()) as typeof data
       } catch {
@@ -126,12 +215,12 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
         return
       }
 
-      if (res.ok && typeof data.premioMensal === "number") {
+      if (typeof data.premioMensal === "number" && data.premioMensal > 0) {
         setPremioMensal(data.premioMensal)
         setPremioAnual(
           typeof data.premioAnual === "number" ? data.premioAnual : data.premioMensal * 12,
         )
-        setFonte("mag")
+        setFonte("mag_api")
         return
       }
 
@@ -139,27 +228,26 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
       setPremioMensal(fb)
       setPremioAnual(fb * 12)
       setFonte("estimativa")
-    } catch {
+      // eslint-disable-next-line no-console -- diagnóstico MAG em sandbox
+      console.log("MAG raw response:", data.rawResponse ?? data)
+    } catch (e) {
       const fb = calcularFallback(capitalSegurado, idade || 35, produtoSelecionado)
       setPremioMensal(fb)
       setPremioAnual(fb * 12)
       setFonte("estimativa")
+      // eslint-disable-next-line no-console
+      console.warn("Simular MAG:", e)
     } finally {
-      setLoading(false)
+      setLoadingMAG(false)
     }
   }, [
     capitalSegurado,
     dataNascimento,
     rendaMensal,
-    dadosPessoais.sexo,
-    dadosPessoais.uf,
+    dadosPessoais,
     idade,
     produtoSelecionado,
   ])
-
-  useEffect(() => {
-    void buscarPremio()
-  }, [buscarPremio])
 
   const pm = premioMensal ?? 0
   const pa = premioAnual ?? pm * 12
@@ -172,17 +260,21 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
   const alavancagem = pm > 0 ? capitalSegurado / pm : null
 
   const chartData = useMemo(() => {
-    if (!projecao?.length || pm <= 0) return []
+    if (!projecaoEfetiva?.length) return []
 
+    const pmSafe = Math.max(0, pm)
     let cumPremioNominal = 0
-    return projecao.map((p, idx) => {
-      const inf = inflacaoPct / 100
-      cumPremioNominal += pm * 12 * Math.pow(1 + inf, idx)
+    const inf = inflacaoPct / 100
+
+    return projecaoEfetiva.map((p, idx) => {
+      if (pmSafe > 0) cumPremioNominal += pmSafe * 12 * Math.pow(1 + inf, idx)
 
       const cenárioA = p.saldoNominal
-      const cenárioBvivo = Math.max(0, cenárioA - cumPremioNominal)
-      const coberturaAtiva = isWholeLife || idx < anospag
-      const cenárioBmorte = cenárioBvivo + (coberturaAtiva ? capitalSegurado : 0)
+      const patrimonioInvestAno = Math.max(0, cenárioA - cumPremioNominal)
+      const prazoCoberturaAnos = isWholeLife ? Infinity : anospag
+      const coberto = isWholeLife || idx < prazoCoberturaAnos
+      const cenárioBvivo = patrimonioInvestAno
+      const cenárioBmorte = patrimonioInvestAno + (coberto ? capitalSegurado : 0)
 
       return {
         ano: p.t,
@@ -192,7 +284,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
         cenárioBmorte,
       }
     })
-  }, [projecao, pm, inflacaoPct, capitalSegurado, isWholeLife, anospag])
+  }, [projecaoEfetiva, pm, inflacaoPct, capitalSegurado, isWholeLife, anospag])
 
   const formatNasc = dataNascimento
     ? new Date(dataNascimento + "T12:00:00").toLocaleDateString("pt-BR")
@@ -224,9 +316,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
             </div>
             <div>
               <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Sexo</p>
-              <p className="font-medium text-foreground">
-                {dadosPessoais.sexo === "F" ? "Feminino" : dadosPessoais.sexo === "M" ? "Masculino" : "—"}
-              </p>
+              <p className="font-medium text-foreground">{labelSexoExibicao(dadosPessoais)}</p>
             </div>
             <div>
               <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">UF</p>
@@ -247,20 +337,24 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
         </CardHeader>
         <CardContent className="space-y-8">
           <div className="space-y-4">
-            <div className="flex justify-between gap-4">
-              <Label className="text-sm text-muted-foreground">Capital segurado</Label>
-              <span className="text-sm font-semibold text-[#1E5CE6] tabular-nums">{fmt(capitalSegurado)}</span>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+              <Label className="text-sm text-muted-foreground shrink-0">Capital segurado</Label>
+              <div className="flex flex-1 items-center gap-4 min-w-0">
+                <Slider
+                  value={[capitalSegurado]}
+                  onValueChange={(v) => setCapitalSegurado(Math.max(CS_MIN, v[0] ?? CS_MIN))}
+                  min={CS_MIN}
+                  max={CS_MAX}
+                  step={50_000}
+                  className="flex-1 min-w-0"
+                />
+                <span className="text-sm font-semibold text-[#1E5CE6] tabular-nums shrink-0 min-w-[7.5rem] text-right">
+                  {fmt(capitalSegurado)}
+                </span>
+              </div>
             </div>
-            <Slider
-              value={[capitalSegurado]}
-              onValueChange={(v) => setCapitalSegurado(v[0] ?? CS_MIN)}
-              min={CS_MIN}
-              max={CS_MAX}
-              step={50_000}
-              className="w-full"
-            />
             <p className="text-xs text-muted-foreground">
-              Faixa de R$ {fmt(CS_MIN)} a {fmt(CS_MAX)}
+              Faixa de {fmt(CS_MIN)} a {fmt(CS_MAX)} · inicial {fmt(CS_INICIAL)}
             </p>
           </div>
 
@@ -286,7 +380,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
             </div>
           </div>
 
-          {loading && <p className="text-xs text-muted-foreground">Atualizando cotação…</p>}
+          {loadingMAG && <p className="text-xs text-muted-foreground">Consultando API MAG…</p>}
         </CardContent>
       </Card>
 
@@ -297,7 +391,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Prêmio mensal</p>
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-xl font-semibold tabular-nums text-foreground">{fmt(pm)}</p>
-              {fonte === "mag" ? (
+              {fonte === "mag_api" ? (
                 <Badge className="border-transparent bg-[#1E5CE6] text-white hover:bg-[#1E5CE6]">
                   Cotação MAG
                 </Badge>
@@ -338,14 +432,15 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
         <CardHeader>
           <CardTitle className="text-base font-medium text-foreground">Evolução patrimonial</CardTitle>
           <p className="text-sm text-muted-foreground font-normal">
-            Azul: projeção atual (previdência + invest). Verde: cenário com prêmio do seguro. Tracejado: sobrevivência +
-            capital segurado enquanto houver cobertura por prazo (Term) ou permanente (Whole Life).
+            Horizonte: {horizonteAnos} anos (idade aposentadoria − idade atual). Azul: projeção atual. Verde: investimento
+            líquido de prêmios. Tracejado: óbito = patrimônio investido + capital segurado apenas enquanto houver cobertura
+            (Term); depois segue só o patrimônio investido.
           </p>
         </CardHeader>
         <CardContent className="h-[320px] w-full">
           {chartData.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Gere a projeção em &quot;Projeção&quot; para visualizar o gráfico.
+              Ajuste idade e aposentadoria em &quot;Projeção&quot; para montar o horizonte ({horizonteAnos} anos).
             </p>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
@@ -413,10 +508,8 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground space-y-2">
             <p>
-              Patrimônio final nominal (último ano da projeção):{" "}
-              <span className="text-foreground font-medium tabular-nums">
-                {projecao?.length ? fmt(projecao[projecao.length - 1].saldoNominal) : "—"}
-              </span>
+              Patrimônio final nominal (fim do horizonte de {horizonteAnos} anos na projeção):{" "}
+              <span className="text-foreground font-medium tabular-nums">{fmt(patrimonioFinalCenarioA)}</span>
             </p>
           </CardContent>
         </Card>
@@ -424,7 +517,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-medium text-foreground">Cenário B</CardTitle>
             <p className="text-sm text-muted-foreground font-normal">
-              100% investimento com dedução acumulada do prêmio do seguro ({fonte === "mag" ? "cotação MAG" : "estimativa"}{" "}
+              100% investimento com dedução acumulada do prêmio do seguro ({fonte === "mag_api" ? "cotação MAG" : "estimativa"}{" "}
               — {nomeProdutoMag(produtoSelecionado)}).
             </p>
           </CardHeader>
@@ -453,12 +546,11 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
         <div className="flex flex-col sm:flex-row gap-3">
           <Button
             type="button"
-            className="bg-[#1E5CE6] hover:bg-[#1E5CE6]/90 text-white"
-            onClick={() =>
-              window.open("https://loja.mag.com.br/simuleseusegurodevida", "_blank", "noopener,noreferrer")
-            }
+            className="bg-[#1E5CE6] hover:bg-[#1E5CE6]/90 text-white disabled:opacity-50"
+            disabled={!dataNascimento || loadingMAG}
+            onClick={() => void simularMAG()}
           >
-            Gerar proposta MAG
+            {loadingMAG ? "Simulando…" : "Simular via MAG"}
           </Button>
           <Button onClick={() => onNavigate("dashboard")} className="bg-primary hover:bg-primary/90 text-primary-foreground">
             Dashboard

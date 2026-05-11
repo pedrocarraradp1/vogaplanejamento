@@ -27,6 +27,8 @@ export interface DadosPessoais {
   despesa: number
   /** Sexo para cotações (ex.: MAG API): M ou F */
   sexo?: "M" | "F" | ""
+  /** Legado / formulários externos (ex.: Masculino, 1, 2) */
+  genero?: string | number | ""
   /** UF (2 letras) para simulações de seguro */
   uf?: string
 }
@@ -84,6 +86,8 @@ export interface Premissas {
   rentabilidadeConservador: number
   rentabilidadeModerado: number
   rentabilidadeAgressivo: number
+  /** Opcional: aporte nominal por ano (modo períodos), alinhado ao motor de projeção. */
+  aportePorAnoNominal?: number[]
   /** Modo de aporte mensal na simulação. */
   aporteModo: "fixo" | "periodos"
   /** Aporte mensal (em valor real de hoje) para cada bloco de 5 anos. */
@@ -204,6 +208,7 @@ const initialState: PlanoState = {
     renda:       0,
     despesa:     0,
     sexo:        "",
+    genero:      "",
     uf:          "",
   },
   ativos: [],

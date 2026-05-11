@@ -1,7 +1,5 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { getMagAccessToken } from "@/lib/mag/auth"
-import { extrairPremiosMag } from "@/lib/mag/extract-premio"
-import { nomeProdutoMag } from "@/lib/mag/produtos"
 
 type SimulacaoBody = {
   dataNascimento?: string
@@ -13,18 +11,27 @@ type SimulacaoBody = {
   anospag?: number
 }
 
-/** Simula prêmio na API MAG e devolve valores normalizados. */
-export async function POST(req: Request) {
-  try {
-    const apiUrl = process.env.MAG_API_URL
-    const cnpj = process.env.MAG_CNPJ
-    if (!apiUrl || !cnpj) {
-      return NextResponse.json(
-        { error: "MAG_API_URL ou MAG_CNPJ não configurados" },
-        { status: 500 },
-      )
-    }
+function extrairPremioMensalMag(magData: unknown): number | null {
+  const root = magData as Record<string, unknown>
+  const sims = root?.simulacoes as unknown[] | undefined
+  const sim0 = (sims?.[0] ?? null) as Record<string, unknown> | null
+  if (!sim0) return null
 
+  const premio = sim0.premio as Record<string, unknown> | undefined
+  const v1 = premio?.valorMensal
+  if (typeof v1 === "number") return v1
+
+  const v2 = sim0.premioMensal
+  if (typeof v2 === "number") return v2
+
+  const v3 = sim0.valorPremio
+  if (typeof v3 === "number") return v3
+
+  return null
+}
+
+export async function POST(req: NextRequest) {
+  try {
     const body = (await req.json()) as SimulacaoBody
     const {
       dataNascimento,
@@ -36,23 +43,35 @@ export async function POST(req: Request) {
       anospag,
     } = body
 
-    if (!codigoModeloProposta || capitalSegurado == null || dataNascimento == null) {
+    if (!codigoModeloProposta || dataNascimento == null) {
       return NextResponse.json(
-        { error: "codigoModeloProposta, capitalSegurado e dataNascimento são obrigatórios" },
+        { error: "codigoModeloProposta e dataNascimento são obrigatórios", fonte: "erro" },
         { status: 400 },
       )
     }
 
-    const token = await getMagAccessToken()
-    const base = apiUrl.replace(/\/$/, "")
-    const url = new URL(`${base}/apiseguradora/v3/simulacao`)
-    url.searchParams.set("cnpj", cnpj.replace(/\D/g, ""))
-    url.searchParams.set("codigoModeloProposta", String(codigoModeloProposta))
+    const apiUrl = process.env.MAG_API_URL?.replace(/\/$/, "")
+    if (!apiUrl) {
+      return NextResponse.json({ error: "MAG_API_URL não configurada", fonte: "erro" }, { status: 500 })
+    }
 
-    const payload = {
+    let token: string
+    try {
+      token = await getMagAccessToken()
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Falha ao obter token"
+      return NextResponse.json({ error: msg, fonte: "erro" }, { status: 502 })
+    }
+
+    const cnpj = (process.env.MAG_CNPJ || "27945275000154").replace(/\D/g, "")
+    const url = `${apiUrl}/apiseguradora/v3/simulacao?cnpj=${encodeURIComponent(cnpj)}&codigoModeloProposta=${encodeURIComponent(String(codigoModeloProposta))}`
+
+    const magBody = {
       simulacoes: [
         {
-          capitalSegurado: Number(capitalSegurado),
+          ...(capitalSegurado != null && capitalSegurado > 0
+            ? { capitalSegurado: Number(capitalSegurado) }
+            : {}),
           proponente: {
             tipoRelacaoSeguradoId: 1,
             nome: "SIMULACAO VOGA WEALTH",
@@ -70,55 +89,35 @@ export async function POST(req: Request) {
       ],
     }
 
-    const res = await fetch(url.toString(), {
+    const magRes = await fetch(url, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(magBody),
       cache: "no-store",
     })
 
-    const rawText = await res.text()
-    let json: unknown
+    let magData: unknown
     try {
-      json = JSON.parse(rawText)
+      magData = await magRes.json()
     } catch {
-      json = { raw: rawText }
+      magData = { parseError: true }
     }
 
-    if (!res.ok) {
-      return NextResponse.json(
-        {
-          error: `MAG simulação HTTP ${res.status}`,
-          detail: json,
-        },
-        { status: res.status },
-      )
-    }
-
-    const { premioMensal, premioAnual } = extrairPremiosMag(json)
-    const produto = nomeProdutoMag(String(codigoModeloProposta))
-
-    if (premioMensal == null) {
-      return NextResponse.json(
-        {
-          error: "Não foi possível extrair premioMensal da resposta MAG",
-          detail: json,
-        },
-        { status: 502 },
-      )
-    }
+    const premioMensal = extrairPremioMensalMag(magData)
 
     return NextResponse.json({
       premioMensal,
-      premioAnual: premioAnual ?? premioMensal * 12,
-      produto,
-      fonte: "mag_api",
+      premioAnual: premioMensal != null ? premioMensal * 12 : null,
+      produto: codigoModeloProposta,
+      fonte: premioMensal != null ? "mag_api" : "erro",
+      rawResponse: magData,
+      magHttpStatus: magRes.status,
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Erro na simulação MAG"
-    return NextResponse.json({ error: msg }, { status: 500 })
+    return NextResponse.json({ error: msg, fonte: "erro" }, { status: 500 })
   }
 }
