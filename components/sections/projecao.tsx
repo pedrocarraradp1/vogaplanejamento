@@ -9,11 +9,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, ArrowRight, TrendingUp, DollarSign, Clock, Info } from "lucide-react"
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ReferenceLine, Cell, Line, LineChart, Legend,
+  ResponsiveContainer, ReferenceLine, Cell, Line,
 } from "recharts"
 import { usePlano } from "@/lib/plano-context"
-import { calcularProjecao, calcularKPIs, type ProjecaoAno } from "@/lib/engine"
+import { calcularProjecao, calcularKPIs, calcularFluxoAnual, type ProjecaoAno } from "@/lib/engine"
+import { buildDadosFluxoGrafico, buildDadosRendaGrafico } from "@/lib/projecao-graficos-dados"
 import { CenariosInvestimento } from "@/components/ui/cenarios-investimento"
+import { FluxoAnualChart, RendaCarteiraChart } from "@/components/charts/projecao-extra-charts"
 
 interface ProjecaoProps {
   onNavigate: (section: string) => void
@@ -88,6 +90,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
     ...premissas,
     saldoInicial: saldoInicialCalculado,
     aporteM:      aporteMensal,
+    prazo:        Math.max(1, Number(premissas.prazo) || 0),
     ...(aportePorAnoNominal ? { aportePorAnoNominal } : {}),
     idadeAtual:   idadeAtualCalculada,
   }), [premissas, saldoInicialCalculado, aporteMensal, aportePorAnoNominal, idadeAtualCalculada])
@@ -146,10 +149,57 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
   const taxaRealMensal = Math.pow(1 + taxaReal, 1 / 12) - 1
   // Cenários foram extraídos para `components/ui/cenarios-investimento.tsx`
 
-  const projecao = useMemo(() => {
-    console.log("DEBUG premissasCompletas →", premissasCompletas)
-    return calcularProjecao(premissasCompletas, objetivosEngine, state.passivos)
-  }, [premissasCompletas, objetivosEngine, state.passivos])
+  const projecao = useMemo(
+    () => calcularProjecao(premissasCompletas, objetivosEngine, state.passivos),
+    [premissasCompletas, objetivosEngine, state.passivos]
+  )
+
+  const fluxoAnual = useMemo(
+    () =>
+      calcularFluxoAnual(
+        premissasCompletas,
+        objetivosEngine,
+        state.passivos,
+        Number(premissas.aliquotaImpostoRendimento) || 0.15
+      ),
+    [premissasCompletas, objetivosEngine, state.passivos, premissas.aliquotaImpostoRendimento]
+  )
+
+  const dadosFluxo = useMemo(
+    () =>
+      buildDadosFluxoGrafico(
+        projecao,
+        fluxoAnual,
+        displayMode,
+        Number(premissas.inflacao) || 0
+      ),
+    [projecao, fluxoAnual, displayMode, premissas.inflacao]
+  )
+
+  const dadosRenda = useMemo(
+    () =>
+      buildDadosRendaGrafico(
+        projecao,
+        taxaNominalMensal,
+        taxaRealMensal,
+        Number(premissas.retiradaMensal) || 0,
+        Number(premissas.inflacao) || 0,
+        displayMode
+      ),
+    [
+      projecao,
+      taxaNominalMensal,
+      taxaRealMensal,
+      premissas.retiradaMensal,
+      premissas.inflacao,
+      displayMode,
+    ]
+  )
+
+  useEffect(() => {
+    console.log("DADOS FLUXO:", dadosFluxo)
+    console.log("DADOS RENDA:", dadosRenda)
+  }, [dadosFluxo, dadosRenda])
 
   const kpis = useMemo(() =>
     calcularKPIs(projecao, premissasCompletas, dadosPessoais.renda, dadosPessoais.despesa)
@@ -166,24 +216,6 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
           : (Number(p.saldoNominal) || 0) / deflatorPorIdade(p.idade),
     }))
   , [projecao, displayMode, premissas.inflacao, idadeAtualCalculada])
-
-  const dadosRenda = useMemo(() => {
-    return projecao.map(p => {
-      const idade = Number(p.idade) || idadeAtualCalculada
-      const nominal = Number(p.saldoNominal) || 0
-      const realHoje = nominal / deflatorPorIdade(idade)
-      const rendaNominal = Math.max(0, nominal * taxaNominalMensal)
-      const rendaPoderCompra = rendaNominal / deflatorPorIdade(idade)
-      const rendaReal = Math.max(0, realHoje * taxaRealMensal)
-      return {
-        idade,
-        rendaNominal,
-        rendaPoderCompra,
-        rendaReal,
-        rendaDisplay: displayMode === "nominal" ? rendaNominal : rendaReal,
-      }
-    })
-  }, [projecao, idadeAtualCalculada, displayMode, premissas.inflacao, taxaNominalMensal, taxaRealMensal])
 
   const ToggleNominalReal = (
     <div className="flex items-center gap-3">
@@ -686,40 +718,22 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
             </p>
           )}
 
-          {/* Gráfico — Renda Mensal */}
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={dadosRenda} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
-                <XAxis dataKey="idade" stroke="#4A5268" tick={{ fill: "#4A5268", fontSize: 12 }} tickLine={false}
-                  axisLine={{ stroke: "rgba(255,255,255,0.04)" }} interval="preserveStartEnd" />
-                <YAxis stroke="#4A5268" tick={{ fill: "#4A5268", fontSize: 12 }} tickLine={false} axisLine={false}
-                  tickFormatter={formatarMoeda} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: "#131929", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "#fff" }}
-                  labelStyle={{ color: "#ffffff", fontWeight: 600 }}
-                  itemStyle={{ color: "#ffffff" }}
-                  formatter={(v: number, name: string) => {
-                    if (displayMode === "nominal") {
-                      if (name === "rendaNominal") return [formatarMoedaCompleta(v), "Nominal"]
-                      if (name === "rendaPoderCompra") return [formatarMoedaCompleta(v), "Poder de compra hoje"]
-                    }
-                    return [formatarMoedaCompleta(v), "Renda real"]
-                  }}
-                  labelFormatter={(label) => `Idade: ${label} anos`}
-                />
-                <Legend />
-                {displayMode === "nominal" ? (
-                  <>
-                    <Line type="monotone" dataKey="rendaNominal" name="Nominal" stroke="rgba(34,199,135,0.75)" strokeWidth={2} dot={false} />
-                    <Line type="monotone" dataKey="rendaPoderCompra" name="Poder de compra hoje" stroke="rgba(255,255,255,0.65)" strokeWidth={2} strokeDasharray="6 4" dot={false} />
-                  </>
-                ) : (
-                  <Line type="monotone" dataKey="rendaReal" name="Renda real (Fisher)" stroke="rgba(34,199,135,0.75)" strokeWidth={2} dot={false} />
-                )}
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          {dadosFluxo && dadosFluxo.length > 0 && (
+            <FluxoAnualChart
+              data={dadosFluxo}
+              formatarMoeda={formatarMoeda}
+              formatarMoedaCompleta={formatarMoedaCompleta}
+            />
+          )}
+
+          {dadosRenda && dadosRenda.length > 0 && (
+            <RendaCarteiraChart
+              data={dadosRenda}
+              displayMode={displayMode}
+              formatarMoeda={formatarMoeda}
+              formatarMoedaCompleta={formatarMoedaCompleta}
+            />
+          )}
         </CardContent>
       </Card>
 

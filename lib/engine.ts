@@ -246,6 +246,111 @@ export function calcularProjecao(
   return resultado
 }
 
+// ─── Fluxo anual (gráficos de projeção) ───────────────────────────────────────
+
+export interface FluxoAnualRow {
+  t: number
+  idade: number
+  fase: "Acumulação" | "Aposentadoria"
+  aporte: number
+  rendimento: number
+  previdencia: number
+  inss: number
+  complemento: number
+  extra: number
+  objetivos: number
+  dividas: number
+  retirada: number
+  ir: number
+  entradasTotal: number
+  saidasTotal: number
+  fluxoLiquido: number
+}
+
+/**
+ * Detalha entradas e saídas ano a ano, alinhado à lógica de `calcularProjecao`.
+ */
+export function calcularFluxoAnual(
+  premissas: Premissas,
+  objetivos: Objetivo[],
+  passivos: Passivo[] = [],
+  aliquotaIR = 0.15
+): FluxoAnualRow[] {
+  const r   = premissas.rendimento / 100
+  const inf = premissas.inflacao   / 100
+  const {
+    saldoInicial, aporteM, idadeAtual, prazo,
+    idadeApos, retiradaMensal, rendaAposentadoria, novaEntrada, idadeEntrada,
+  } = premissas
+  const retiradaEfetiva = Math.max(0, retiradaMensal - (rendaAposentadoria || 0))
+  const aliq = Math.max(0, Math.min(1, aliquotaIR))
+
+  const rows: FluxoAnualRow[] = []
+  let saldo = saldoInicial
+
+  for (let t = 0; t <= prazo; t++) {
+    const idade        = idadeAtual + t
+    const fatorInf     = Math.pow(1 + inf, t)
+    const isAposentado = idade >= idadeApos
+    const saldoInicio  = saldo
+
+    const objetivosAno = saqueObjetivosAno(t, objetivos, inf, prazo)
+    const dividasAno   = passivos.reduce((s, p) => s + pagamentoDividaAno(p, t), 0)
+    const aporteNominalAno =
+      (premissas.aportePorAnoNominal?.[t] ?? null) !== null
+        ? Number(premissas.aportePorAnoNominal?.[t]) || 0
+        : aporteM * fatorInf
+    const entradaAno =
+      novaEntrada > 0 && idadeEntrada > 0 && idade === idadeEntrada
+        ? novaEntrada * fatorInf
+        : 0
+
+    const aporte = isAposentado ? 0 : fvMensal(aporteNominalAno, r)
+    const rendimento = t > 0 && saldoInicio > 0 ? saldoInicio * r : 0
+    const previdencia = 0
+    const inss = isAposentado ? (rendaAposentadoria || 0) * 12 * fatorInf : 0
+    const complemento = 0
+    const extra = entradaAno
+    const objetivosVal = objetivosAno
+    const dividasVal = dividasAno
+    const retirada = isAposentado ? retiradaEfetiva * 12 * fatorInf : 0
+    const ir = rendimento * aliq
+
+    const entradasTotal = aporte + rendimento + previdencia + inss + complemento + extra
+    const saidasTotal = objetivosVal + dividasVal + retirada + ir
+    const fluxoLiquido = entradasTotal - saidasTotal
+
+    rows.push({
+      t,
+      idade,
+      fase: isAposentado ? "Aposentadoria" : "Acumulação",
+      aporte,
+      rendimento,
+      previdencia,
+      inss,
+      complemento,
+      extra,
+      objetivos: objetivosVal,
+      dividas: dividasVal,
+      retirada,
+      ir,
+      entradasTotal,
+      saidasTotal,
+      fluxoLiquido,
+    })
+
+    if (t === 0) {
+      saldo = saldoInicial + aporte - objetivosVal - dividasVal + extra
+    } else if (isAposentado) {
+      saldo = saldo * (1 + r) - retirada + extra
+    } else {
+      saldo = saldo * (1 + r) + aporte - objetivosVal - dividasVal + extra
+    }
+  }
+
+  return rows
+}
+
 // ─── KPIs ─────────────────────────────────────────────────────────────────────
 
 export function calcularKPIs(

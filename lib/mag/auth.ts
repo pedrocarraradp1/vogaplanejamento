@@ -24,8 +24,8 @@ export async function requestMAGToken(): Promise<MagTokenAuthResult> {
     }
   }
 
-  const tokenRes = await fetch(`${base}/connect/token`, {
-    method: "POST",
+  const tokenParams = {
+    method: "POST" as const,
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       client_id: clientId,
@@ -33,11 +33,18 @@ export async function requestMAGToken(): Promise<MagTokenAuthResult> {
       scope: "apiseguradora",
       grant_type: "client_credentials",
     }),
-  })
+  }
+
+  // Tenta primeiro com T maiúsculo (padrão em alguns ambientes MAG), depois minúsculo
+  let tokenRes = await fetch(`${base}/connect/Token`, tokenParams)
+  if (!tokenRes.ok) {
+    console.log("TOKEN /connect/Token falhou, tentando /connect/token...")
+    tokenRes = await fetch(`${base}/connect/token`, tokenParams)
+  }
 
   console.log("TOKEN STATUS:", tokenRes.status)
   const tokenText = await tokenRes.text()
-  console.log("TOKEN BODY RAW:", tokenText)
+  console.log("TOKEN BODY:", tokenText)
 
   if (!tokenRes.ok) {
     return { ok: false, status: tokenRes.status, body: tokenText }

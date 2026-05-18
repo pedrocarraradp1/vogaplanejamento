@@ -100,30 +100,37 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const simulacao = (magData as { simulacoes?: unknown[] })?.simulacoes?.[0] as
+    const magRoot = magData as {
+      Valor?: { simulacoes?: unknown[] }
+      simulacoes?: unknown[]
+    }
+
+    // Estrutura real: { Valor: { simulacoes: [...] } } ou { simulacoes: [...] }
+    const simulacao = (magRoot?.Valor?.simulacoes?.[0] ?? magRoot?.simulacoes?.[0]) as
       | Record<string, unknown>
       | undefined
 
-    const premioObj =
+    const premioNested =
       simulacao?.premio && typeof simulacao.premio === "object"
-        ? (simulacao.premio as Record<string, unknown>)
+        ? (simulacao.premio as { valorMensal?: number })
+        : null
+
+    const valorWrapper =
+      simulacao?.Valor && typeof simulacao.Valor === "object"
+        ? (simulacao.Valor as { premio?: { valorMensal?: number } })
         : null
 
     const premioMensal =
-      (typeof premioObj?.valorMensal === "number" ? premioObj.valorMensal : null) ??
+      (typeof premioNested?.valorMensal === "number" ? premioNested.valorMensal : null) ??
       (typeof simulacao?.premioMensal === "number" ? simulacao.premioMensal : null) ??
+      (typeof valorWrapper?.premio?.valorMensal === "number"
+        ? valorWrapper.premio.valorMensal
+        : null) ??
       (typeof simulacao?.valorPremio === "number" ? simulacao.valorPremio : null) ??
       null
 
-    console.log("PREMIO FIELDS:", {
-      "premio.valorMensal": premioObj?.valorMensal,
-      premioMensal: simulacao?.premioMensal,
-      valorPremio: simulacao?.valorPremio,
-      premio: simulacao?.premio,
-      custo: simulacao?.custo,
-      valorContribuicao: simulacao?.valorContribuicao,
-      contribuicaoMensal: simulacao?.contribuicaoMensal,
-    })
+    console.log("SIMULACAO EXTRAIDA:", JSON.stringify(simulacao, null, 2))
+    console.log("PREMIO MENSAL:", premioMensal)
 
     return NextResponse.json({
       premioMensal,
