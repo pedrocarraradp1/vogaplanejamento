@@ -26,15 +26,20 @@ import {
   ResponsiveContainer,
 } from "recharts"
 import { ArrowLeft, ArrowRight, Pencil, Plus } from "lucide-react"
-import { usePlano, type Ativo, type Passivo } from "@/lib/plano-context"
+import { usePlano, type Passivo } from "@/lib/plano-context"
 import {
   CATEGORIAS_PASSIVO,
+  DESCRICOES_ATIVOS_POR_TIPO,
   SECOES_ATIVOS,
+  TIPOS_ATIVO,
+  isTipoAtivoLabel,
   matchesAtivoCategoria,
   matchesPassivoCategoria,
+  normalizeAtivoDescricao,
   sumAtivoCategoria,
   sumPassivoCategoria,
   type SecaoAtivoConfig,
+  type TipoAtivoLabel,
 } from "@/lib/patrimonio-utils"
 
 interface PatrimonioProps {
@@ -49,10 +54,32 @@ const TOOLTIP_STYLE = {
 
 type DonutSlice = { name: string; value: number; fill: string }
 type BarraCategoria = { name: string; value: number; fill: string; pctTotal: number }
-type LinhaCategoria = { id: string; label: string; valor: number }
+type LinhaAtivo = {
+  id: string
+  label: string
+  sublabel?: string
+  valor: number
+  bemDeHeranca: boolean
+}
+
+type AddAtivoForm = {
+  tipo: TipoAtivoLabel
+  descricao: string
+  valor: number
+  instituicao: string
+  bemDeHeranca: boolean
+}
+
+const EMPTY_ATIVO_FORM = (): AddAtivoForm => ({
+  tipo: "Líquido",
+  descricao: DESCRICOES_ATIVOS_POR_TIPO["Líquido"][0],
+  valor: 0,
+  instituicao: "",
+  bemDeHeranca: false,
+})
 
 type AddModalState =
-  | { kind: "ativo"; secao: SecaoAtivoConfig }
+  | { kind: "ativo"; tipoInicial?: TipoAtivoLabel }
   | { kind: "passivo" }
   | null
 
@@ -346,7 +373,8 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
   const { ativos, passivos, patrimonio, moeda } = state
 
   const [addModal, setAddModal] = useState<AddModalState>(null)
-  const [addForm, setAddForm] = useState({ categoria: "", valor: 0 })
+  const [addAtivoForm, setAddAtivoForm] = useState<AddAtivoForm>(EMPTY_ATIVO_FORM)
+  const [addPassivoForm, setAddPassivoForm] = useState({ categoria: "", valor: 0 })
 
   const formatCurrency = useCallback(
     (value: number) =>
@@ -364,35 +392,32 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
     return parseInt(cleaned, 10) || 0
   }
 
-  const setAtivoCategoria = useCallback(
-    (tipo: string, categoria: string, valor: number) => {
-      const kept = ativos.filter((a) => !matchesAtivoCategoria(a, tipo, categoria))
+  const appendAtivo = useCallback(
+    (form: AddAtivoForm) => {
+      if (form.valor <= 0 || !form.descricao.trim()) return
+      const bem = form.bemDeHeranca
+      setAtivos(
+        ativos.concat({
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          tipo: form.tipo,
+          descricao: form.descricao.trim(),
+          instituicao: form.instituicao.trim(),
+          valor: form.valor,
+          heranca: bem,
+          bemDeHeranca: bem,
+        }),
+      )
+    },
+    [ativos, setAtivos],
+  )
+
+  const updateAtivoValor = useCallback(
+    (id: string, valor: number) => {
       if (valor <= 0) {
-        setAtivos(kept)
+        setAtivos(ativos.filter((a) => a.id !== id))
         return
       }
-      const existing = ativos.find((a) => matchesAtivoCategoria(a, tipo, categoria))
-      if (existing) {
-        setAtivos(
-          kept.concat({
-            ...existing,
-            valor,
-            descricao:
-              categoria === "Outros" && !existing.descricao ? "Outros" : existing.descricao || categoria,
-          }),
-        )
-      } else {
-        setAtivos(
-          kept.concat({
-            id: Date.now().toString(),
-            tipo,
-            descricao: categoria,
-            instituicao: "",
-            valor,
-            heranca: false,
-          }),
-        )
-      }
+      setAtivos(ativos.map((a) => (a.id === id ? { ...a, valor } : a)))
     },
     [ativos, setAtivos],
   )
@@ -425,15 +450,22 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
   )
 
   const linhasPorSecao = useMemo(() => {
-    const map = new Map<string, LinhaCategoria[]>()
+    const map = new Map<string, LinhaAtivo[]>()
     for (const secao of SECOES_ATIVOS) {
-      const linhas = secao.categorias
-        .map((cat) => ({
-          id: `${secao.id}-${cat}`,
-          label: cat,
-          valor: sumAtivoCategoria(ativos, secao.tipo, cat),
-        }))
-        .filter((l) => l.valor > 0)
+      const linhas = ativos
+        .filter((a) => (a.tipo ?? "").trim() === secao.tipo && (Number(a.valor) || 0) > 0)
+        .map((a) => {
+          const desc = normalizeAtivoDescricao(a.descricao)
+          const inst = (a.instituicao ?? "").trim()
+          return {
+            id: a.id,
+            label: desc || "Sem descrição",
+            sublabel: inst || undefined,
+            valor: Number(a.valor) || 0,
+            bemDeHeranca: a.heranca === true || a.bemDeHeranca === true,
+          }
+        })
+        .sort((a, b) => b.valor - a.valor)
       map.set(secao.id, linhas)
     }
     return map
@@ -489,24 +521,42 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
   const alturaBarras = Math.max(160, dataBarras.length * 48)
 
   const openAddAtivo = (secao: SecaoAtivoConfig) => {
-    setAddForm({ categoria: secao.categorias[0] ?? "", valor: 0 })
-    setAddModal({ kind: "ativo", secao })
+    const tipo = isTipoAtivoLabel(secao.tipo) ? secao.tipo : "Líquido"
+    setAddAtivoForm({
+      tipo,
+      descricao: DESCRICOES_ATIVOS_POR_TIPO[tipo][0],
+      valor: 0,
+      instituicao: "",
+      bemDeHeranca: false,
+    })
+    setAddModal({ kind: "ativo", tipoInicial: tipo })
   }
 
   const openAddPassivo = () => {
-    setAddForm({ categoria: CATEGORIAS_PASSIVO[0], valor: 0 })
+    setAddPassivoForm({ categoria: CATEGORIAS_PASSIVO[0], valor: 0 })
     setAddModal({ kind: "passivo" })
   }
 
+  const onAtivoTipoChange = (tipo: TipoAtivoLabel) => {
+    setAddAtivoForm({
+      ...addAtivoForm,
+      tipo,
+      descricao: DESCRICOES_ATIVOS_POR_TIPO[tipo][0],
+    })
+  }
+
   const saveAddModal = () => {
-    if (!addModal || !addForm.categoria) return
+    if (!addModal) return
     if (addModal.kind === "ativo") {
-      setAtivoCategoria(addModal.secao.tipo, addForm.categoria, addForm.valor)
+      if (!addAtivoForm.descricao.trim() || addAtivoForm.valor <= 0) return
+      appendAtivo(addAtivoForm)
+      setAddAtivoForm(EMPTY_ATIVO_FORM())
     } else {
-      setPassivoCategoria(addForm.categoria, addForm.valor)
+      if (!addPassivoForm.categoria) return
+      setPassivoCategoria(addPassivoForm.categoria, addPassivoForm.valor)
+      setAddPassivoForm({ categoria: "", valor: 0 })
     }
     setAddModal(null)
-    setAddForm({ categoria: "", valor: 0 })
   }
 
   const addButton = (onClick: () => void) => (
@@ -564,16 +614,24 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
               </p>
             ) : (
               linhas.map((linha) => (
-                <PatrimonioBarRow
-                  key={linha.id}
-                  label={linha.label}
-                  valor={linha.valor}
-                  totalSecao={total}
-                  barColor={secao.cor}
-                  formatCurrency={formatCurrency}
-                  valueClassName="text-foreground"
-                  onValueCommit={(v) => setAtivoCategoria(secao.tipo, linha.label, v)}
-                />
+                <div key={linha.id}>
+                  <PatrimonioBarRow
+                    label={linha.label}
+                    valor={linha.valor}
+                    totalSecao={total}
+                    barColor={secao.cor}
+                    formatCurrency={formatCurrency}
+                    valueClassName="text-foreground"
+                    onValueCommit={(v) => updateAtivoValor(linha.id, v)}
+                  />
+                  {(linha.sublabel || linha.bemDeHeranca) && (
+                    <p className="text-[11px] text-muted-foreground truncate -mt-1 pb-2 pl-0.5">
+                      {[linha.sublabel, linha.bemDeHeranca ? "Bem de herança" : null]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                  )}
+                </div>
               ))
             )}
           </PatrimonioSection>
@@ -640,58 +698,158 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
       </div>
 
       <Dialog open={addModal != null} onOpenChange={(open) => !open && setAddModal(null)}>
-        <DialogContent className="bg-[#131929] border-white/[0.18] rounded-2xl max-w-md">
+        <DialogContent className="bg-[#131929] border-white/[0.18] rounded-2xl max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-foreground">
-              {addModal?.kind === "passivo" ? "Adicionar dívida" : "Adicionar ativo"}
+              {addModal?.kind === "passivo" ? "Adicionar dívida" : "Adicionar Ativo"}
             </DialogTitle>
             <DialogDescription className="text-muted-foreground">
-              Selecione a categoria e informe o valor
+              {addModal?.kind === "passivo"
+                ? "Selecione a categoria e informe o valor"
+                : "Preencha os dados do bem patrimonial"}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
-                Categoria
-              </label>
-              <Select
-                value={addForm.categoria}
-                onValueChange={(value) => setAddForm({ ...addForm, categoria: value })}
-              >
-                <SelectTrigger className="bg-[#0D1220] border-white/10 text-foreground">
-                  <SelectValue placeholder="Selecione" />
-                </SelectTrigger>
-                <SelectContent className="bg-[#131929] border-white/10">
-                  {(addModal?.kind === "passivo"
-                    ? [...CATEGORIAS_PASSIVO]
-                    : addModal?.kind === "ativo"
-                      ? [...addModal.secao.categorias]
-                      : []
-                  ).map((cat) => (
-                    <SelectItem key={cat} value={cat}>
-                      {cat}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          {addModal?.kind === "ativo" ? (
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+                  Tipo
+                </label>
+                <Select
+                  value={addAtivoForm.tipo}
+                  onValueChange={(v) => onAtivoTipoChange(v as TipoAtivoLabel)}
+                >
+                  <SelectTrigger className="bg-[#0D1220] border-white/10 text-foreground">
+                    <SelectValue placeholder="Selecione o tipo" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#131929] border-white/10">
+                    {TIPOS_ATIVO.map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {t}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+                  Descrição
+                </label>
+                <Select
+                  value={addAtivoForm.descricao}
+                  onValueChange={(descricao) => setAddAtivoForm({ ...addAtivoForm, descricao })}
+                >
+                  <SelectTrigger className="bg-[#0D1220] border-white/10 text-foreground">
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#131929] border-white/10">
+                    {DESCRICOES_ATIVOS_POR_TIPO[addAtivoForm.tipo].map((d) => (
+                      <SelectItem key={d} value={d}>
+                        {d}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+                  Valor (R$)
+                </label>
+                <Input
+                  value={addAtivoForm.valor ? formatCurrency(addAtivoForm.valor) : ""}
+                  onChange={(e) =>
+                    setAddAtivoForm({ ...addAtivoForm, valor: parseCurrency(e.target.value) })
+                  }
+                  placeholder="0"
+                  className="bg-[#0D1220] border-white/10 text-foreground tabular-nums"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+                  Instituição / Localização
+                </label>
+                <Input
+                  value={addAtivoForm.instituicao}
+                  onChange={(e) => setAddAtivoForm({ ...addAtivoForm, instituicao: e.target.value })}
+                  placeholder="Ex: BTG Pactual, Brasília-DF..."
+                  className="bg-[#0D1220] border-white/10 text-foreground"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+                  Bem de Herança
+                </label>
+                <Select
+                  value={addAtivoForm.bemDeHeranca ? "sim" : "nao"}
+                  onValueChange={(v) =>
+                    setAddAtivoForm({ ...addAtivoForm, bemDeHeranca: v === "sim" })
+                  }
+                >
+                  <SelectTrigger className="bg-[#0D1220] border-white/10 text-foreground">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#131929] border-white/10">
+                    <SelectItem value="nao">Não</SelectItem>
+                    <SelectItem value="sim">Sim</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Se &quot;Sim&quot;, o valor entra na base de cálculo do ITCMD na aba Sucessório.
+                </p>
+              </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
-                Valor (R$)
-              </label>
-              <Input
-                value={addForm.valor ? formatCurrency(addForm.valor) : ""}
-                onChange={(e) => setAddForm({ ...addForm, valor: parseCurrency(e.target.value) })}
-                placeholder="0"
-                className="bg-[#0D1220] border-white/10 text-foreground"
-              />
+          ) : addModal?.kind === "passivo" ? (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+                  Categoria
+                </label>
+                <Select
+                  value={addPassivoForm.categoria}
+                  onValueChange={(value) => setAddPassivoForm({ ...addPassivoForm, categoria: value })}
+                >
+                  <SelectTrigger className="bg-[#0D1220] border-white/10 text-foreground">
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#131929] border-white/10">
+                    {CATEGORIAS_PASSIVO.map((cat) => (
+                      <SelectItem key={cat} value={cat}>
+                        {cat}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+                  Valor (R$)
+                </label>
+                <Input
+                  value={addPassivoForm.valor ? formatCurrency(addPassivoForm.valor) : ""}
+                  onChange={(e) =>
+                    setAddPassivoForm({ ...addPassivoForm, valor: parseCurrency(e.target.value) })
+                  }
+                  placeholder="0"
+                  className="bg-[#0D1220] border-white/10 text-foreground"
+                />
+              </div>
             </div>
-          </div>
+          ) : null}
           <DialogFooter className="gap-2">
             <Button variant="ghost" onClick={() => setAddModal(null)}>
               Cancelar
             </Button>
-            <Button onClick={saveAddModal} className="bg-primary text-primary-foreground">
+            <Button
+              onClick={saveAddModal}
+              disabled={
+                addModal?.kind === "ativo"
+                  ? addAtivoForm.valor <= 0 || !addAtivoForm.descricao
+                  : addModal?.kind === "passivo"
+                    ? !addPassivoForm.categoria || addPassivoForm.valor <= 0
+                    : true
+              }
+              className="bg-primary text-primary-foreground"
+            >
               Salvar
             </Button>
           </DialogFooter>

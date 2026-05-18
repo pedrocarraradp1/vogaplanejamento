@@ -36,12 +36,17 @@ export interface DadosPessoais {
 
 export interface Ativo {
   id: string
+  /** Líquido | Imobilizado | Participação Societária */
   tipo: string
   descricao: string
   instituicao: string
   valor: number
-  /** Se true, o bem vai direto à herança (sem incidir na meação nos regimes parcial/aquestos). Padrão false. */
+  /**
+   * Bem de herança — quando true, o valor entra na base de cálculo do ITCMD (aba Sucessório).
+   * Persistido como `heranca` no estado; `bemDeHeranca` é alias de leitura/escrita na UI.
+   */
   heranca?: boolean
+  bemDeHeranca?: boolean
 }
 
 export interface Passivo {
@@ -403,7 +408,10 @@ export function PlanoProvider({
 
   const setAtivos = useCallback((ativos: Ativo[]) => {
     setState(prev => {
-      const normalized = ativos.map(a => ({ ...a, heranca: a.heranca === true }))
+      const normalized = ativos.map((a) => {
+        const bem = a.heranca === true || a.bemDeHeranca === true
+        return { ...a, heranca: bem, bemDeHeranca: bem }
+      })
       return {
         ...prev,
         ativos: normalized,

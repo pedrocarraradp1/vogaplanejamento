@@ -1,24 +1,42 @@
 import type { Ativo, Passivo, PatrimonioState } from "@/lib/plano-context"
 
-export const DESCRICOES_ATIVOS_POR_TIPO: Record<string, string[]> = {
+export const TIPOS_ATIVO = ["Líquido", "Imobilizado", "Participação Societária"] as const
+export type TipoAtivoLabel = (typeof TIPOS_ATIVO)[number]
+
+export const DESCRICOES_ATIVOS_POR_TIPO: Record<TipoAtivoLabel, string[]> = {
   "Líquido": [
     "Ativos Nacionais",
     "Ativos Internacionais",
-    "Previdência Privada (PGBL/VGBL)",
+    "Previdência Privada",
     "Outros",
   ],
   Imobilizado: [
-    "Casa / Apartamento Residencial",
-    "Imóvel para Investimento",
+    "Casa/Apto Residencial",
+    "Imóvel Investimento",
     "Terreno",
-    "Veículo / Carro",
+    "Veículo/Carro",
     "Outros",
   ],
-  "Participação Societária": [
-    "Sociedade Empresarial (Quotas)",
-    "Holding Familiar",
-    "Outros",
-  ],
+  "Participação Societária": ["Empresa", "Holding", "Fundo Exclusivo", "Outros"],
+}
+
+/** Descrições antigas → rótulo atual (migração / agregação). */
+const LEGACY_DESCRICAO_ATIVO: Record<string, string> = {
+  "Previdência Privada (PGBL/VGBL)": "Previdência Privada",
+  "Casa / Apartamento Residencial": "Casa/Apto Residencial",
+  "Imóvel para Investimento": "Imóvel Investimento",
+  "Veículo / Carro": "Veículo/Carro",
+  "Sociedade Empresarial (Quotas)": "Empresa",
+  "Holding Familiar": "Holding",
+}
+
+export function normalizeAtivoDescricao(descricao: string): string {
+  const d = (descricao ?? "").trim()
+  return LEGACY_DESCRICAO_ATIVO[d] ?? d
+}
+
+export function isTipoAtivoLabel(tipo: string): tipo is TipoAtivoLabel {
+  return (TIPOS_ATIVO as readonly string[]).includes(tipo)
 }
 
 export const CATEGORIAS_PASSIVO = [
@@ -61,8 +79,8 @@ export type SecaoAtivoConfig = (typeof SECOES_ATIVOS)[number]
 
 export function matchesAtivoCategoria(ativo: Ativo, tipo: string, categoria: string): boolean {
   if ((ativo.tipo ?? "").trim() !== tipo) return false
-  const desc = (ativo.descricao ?? "").trim()
-  const cats = DESCRICOES_ATIVOS_POR_TIPO[tipo] ?? []
+  const desc = normalizeAtivoDescricao(ativo.descricao ?? "")
+  const cats = DESCRICOES_ATIVOS_POR_TIPO[tipo as TipoAtivoLabel] ?? []
   if (categoria === "Outros") {
     return desc === "Outros" || (desc !== "" && !cats.slice(0, -1).includes(desc))
   }
