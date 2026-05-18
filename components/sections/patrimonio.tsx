@@ -27,43 +27,19 @@ import {
 } from "recharts"
 import { ArrowLeft, ArrowRight, Pencil, Plus } from "lucide-react"
 import { usePlano, type Ativo, type Passivo } from "@/lib/plano-context"
+import {
+  CATEGORIAS_PASSIVO,
+  SECOES_ATIVOS,
+  matchesAtivoCategoria,
+  matchesPassivoCategoria,
+  sumAtivoCategoria,
+  sumPassivoCategoria,
+  type SecaoAtivoConfig,
+} from "@/lib/patrimonio-utils"
 
 interface PatrimonioProps {
   onNavigate: (section: string) => void
 }
-
-const DESCRICOES_ATIVOS_POR_TIPO: Record<string, string[]> = {
-  "Líquido": [
-    "Ativos Nacionais",
-    "Ativos Internacionais",
-    "Previdência Privada (PGBL/VGBL)",
-    "Outros",
-  ],
-  Imobilizado: [
-    "Casa / Apartamento Residencial",
-    "Imóvel para Investimento",
-    "Terreno",
-    "Veículo / Carro",
-    "Outros",
-  ],
-  "Participação Societária": [
-    "Sociedade Empresarial (Quotas)",
-    "Holding Familiar",
-    "Outros",
-  ],
-}
-
-const CATEGORIAS_PASSIVO = [
-  "Financiamento Imóvel",
-  "Financiamento Veículo",
-  "Empréstimo Pessoal",
-  "Outros",
-] as const
-
-const CATEGORIAS_LIQUIDO = DESCRICOES_ATIVOS_POR_TIPO["Líquido"]
-const CATEGORIAS_IMOBILIZADO_BASE = DESCRICOES_ATIVOS_POR_TIPO["Imobilizado"]
-const CATEGORIA_PARTICIPACOES = "Participações Societárias"
-const CATEGORIAS_IMOBILIZADO = [...CATEGORIAS_IMOBILIZADO_BASE, CATEGORIA_PARTICIPACOES]
 
 const TOOLTIP_STYLE = {
   backgroundColor: "#131929",
@@ -71,53 +47,146 @@ const TOOLTIP_STYLE = {
   borderRadius: "8px",
 } as const
 
-/** Azul escuro (maior) → azul claro (menor), por posição no ranking. */
-function blueShadeByRank(index: number, total: number): string {
-  if (total <= 1) return "#1E5CE6"
-  const t = 1 - index / (total - 1)
-  const r = Math.round(140 + (30 - 140) * t)
-  const g = Math.round(180 + (92 - 180) * t)
-  const b = Math.round(255 + (230 - 255) * t)
-  return `rgb(${r},${g},${b})`
-}
-
-function matchesAtivoCategoria(ativo: Ativo, tipo: string, categoria: string): boolean {
-  if ((ativo.tipo ?? "").trim() !== tipo) return false
-  const desc = (ativo.descricao ?? "").trim()
-  const cats = DESCRICOES_ATIVOS_POR_TIPO[tipo] ?? []
-  if (categoria === "Outros") {
-    return desc === "Outros" || (desc !== "" && !cats.slice(0, -1).includes(desc))
-  }
-  return desc === categoria
-}
-
-function isAtivoLiquidoCustom(ativo: Ativo): boolean {
-  if ((ativo.tipo ?? "").trim() !== "Líquido") return false
-  return !CATEGORIAS_LIQUIDO.some((cat) => matchesAtivoCategoria(ativo, "Líquido", cat))
-}
-
-function matchesPassivoCategoria(passivo: Passivo, categoria: string): boolean {
-  const tipo = (passivo.tipo ?? "").trim()
-  if (categoria === "Outros") {
-    return tipo === "Outros" || (tipo !== "" && !CATEGORIAS_PASSIVO.slice(0, -1).includes(tipo as (typeof CATEGORIAS_PASSIVO)[number]))
-  }
-  return tipo === categoria
-}
-
 type DonutSlice = { name: string; value: number; fill: string }
-type BarraLiquido = { name: string; value: number; fill: string; pctLiquido: number }
+type BarraCategoria = { name: string; value: number; fill: string; pctTotal: number }
+type LinhaCategoria = { id: string; label: string; valor: number }
+
+type AddModalState =
+  | { kind: "ativo"; secao: SecaoAtivoConfig }
+  | { kind: "passivo" }
+  | null
+
+function PatrimonioBarRow({
+  label,
+  valor,
+  totalSecao,
+  barColor,
+  formatCurrency,
+  valueClassName = "text-foreground",
+  onValueCommit,
+}: {
+  label: string
+  valor: number
+  totalSecao: number
+  barColor: string
+  formatCurrency: (value: number) => string
+  valueClassName?: string
+  onValueCommit: (valor: number) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState("")
+
+  const pct = totalSecao > 0 ? Math.min(100, Math.round((valor / totalSecao) * 100)) : 0
+  const barWidth = totalSecao > 0 ? (valor / totalSecao) * 100 : 0
+
+  const startEdit = () => {
+    setDraft(valor > 0 ? formatCurrency(valor) : "")
+    setEditing(true)
+  }
+
+  const commit = (raw: string) => {
+    const cleaned = raw.replace(/[^\d]/g, "")
+    onValueCommit(parseInt(cleaned, 10) || 0)
+    setEditing(false)
+  }
+
+  return (
+    <div className="py-3 border-b border-white/5 last:border-0 space-y-2">
+      <div className="flex items-center gap-3">
+        <span className="text-sm text-foreground flex-1 min-w-0 truncate">{label}</span>
+        <div className="flex items-center gap-1 shrink-0">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={startEdit}
+            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+            aria-label="Editar valor"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </Button>
+          {editing ? (
+            <Input
+              autoFocus
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={() => commit(draft)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commit(draft)
+                if (e.key === "Escape") setEditing(false)
+              }}
+              className="h-8 w-32 text-right bg-[#0D1220] border-white/10 text-foreground text-sm tabular-nums"
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={startEdit}
+              className={`text-sm font-semibold tabular-nums hover:opacity-80 ${valueClassName}`}
+            >
+              {formatCurrency(valor)}
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center gap-3">
+        <div className="flex-1 h-2 rounded-full bg-white/5 overflow-hidden">
+          <div
+            className="h-full rounded-full transition-all duration-300"
+            style={{ width: `${barWidth}%`, backgroundColor: barColor }}
+          />
+        </div>
+        <span className="text-xs text-muted-foreground tabular-nums w-9 text-right shrink-0">
+          {pct}%
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function PatrimonioSection({
+  title,
+  totalLabel,
+  totalValue,
+  totalClassName = "text-foreground",
+  headerAction,
+  children,
+}: {
+  title: string
+  totalLabel: string
+  totalValue: string
+  totalClassName?: string
+  headerAction?: ReactNode
+  children: ReactNode
+}) {
+  return (
+    <section className="rounded-xl bg-[#131929] border border-white/10 p-5 md:p-6">
+      <div className="flex flex-col gap-3 mb-4 pb-4 border-b border-white/10">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <h2 className="text-base font-semibold text-foreground">{title}</h2>
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+            {headerAction}
+            <p className={`text-lg md:text-xl font-bold tabular-nums ${totalClassName}`}>
+              {totalLabel} {totalValue}
+            </p>
+          </div>
+        </div>
+      </div>
+      <div>{children}</div>
+    </section>
+  )
+}
 
 function PatrimonioCharts({
   dataDonut,
   totalDonut,
-  dataBarrasLiquido,
+  dataBarras,
   alturaBarras,
   patrimonioTotal,
   formatCurrency,
 }: {
   dataDonut: DonutSlice[]
   totalDonut: number
-  dataBarrasLiquido: BarraLiquido[]
+  dataBarras: BarraCategoria[]
   alturaBarras: number
   patrimonioTotal: number
   formatCurrency: (value: number) => string
@@ -218,15 +287,13 @@ function PatrimonioCharts({
         </div>
 
         <div className="w-full lg:w-[60%] flex flex-col min-w-0">
-          <p className="text-sm font-medium text-foreground mb-3">
-            Subcategorias de Ativos Líquidos
-          </p>
-          {dataBarrasLiquido.length > 0 ? (
+          <p className="text-sm font-medium text-foreground mb-3">Subcategorias com valor</p>
+          {dataBarras.length > 0 ? (
             <div className="w-full" style={{ height: alturaBarras }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   layout="vertical"
-                  data={dataBarrasLiquido}
+                  data={dataBarras}
                   margin={{ top: 4, right: 88, left: 4, bottom: 4 }}
                 >
                   <XAxis type="number" hide domain={[0, "dataMax"]} />
@@ -243,16 +310,14 @@ function PatrimonioCharts({
                     contentStyle={TOOLTIP_STYLE}
                     labelStyle={{ color: "#ffffff", fontWeight: 600 }}
                     itemStyle={{ color: "#ffffff" }}
-                    formatter={(v: number, _name: string, item) => {
+                    formatter={(v: number) => {
                       const pct =
-                        (item as { payload?: { pctLiquido?: number } }).payload?.pctLiquido?.toFixed(
-                          1,
-                        ) ?? "0"
-                      return [`${formatCurrency(v)} (${pct}% do líquido)`, "Valor"]
+                        dataBarras.find((b) => b.value === v)?.pctTotal?.toFixed(1) ?? "0"
+                      return [`${formatCurrency(v)} (${pct}% do total)`, "Valor"]
                     }}
                   />
                   <Bar dataKey="value" radius={[0, 4, 4, 0]} maxBarSize={28}>
-                    {dataBarrasLiquido.map((entry, i) => (
+                    {dataBarras.map((entry, i) => (
                       <Cell key={`${entry.name}-${i}`} fill={entry.fill} />
                     ))}
                     <LabelList
@@ -267,179 +332,30 @@ function PatrimonioCharts({
             </div>
           ) : (
             <p className="text-sm text-muted-foreground text-center py-16">
-              Nenhuma subcategoria de ativos líquidos com valor informado.
+              Nenhuma subcategoria com valor informado.
             </p>
           )}
         </div>
       </div>
-    </section>
-  )
-}
-
-function PatrimonioBarRow({
-  label,
-  valor,
-  totalSecao,
-  barColor,
-  formatCurrency,
-  valueClassName = "text-foreground",
-  onValueCommit,
-  onEdit,
-}: {
-  label: string
-  valor: number
-  totalSecao: number
-  barColor: string
-  formatCurrency: (value: number) => string
-  valueClassName?: string
-  onValueCommit: (valor: number) => void
-  onEdit?: () => void
-}) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState("")
-
-  const pct =
-    totalSecao > 0 ? Math.min(100, Math.round((valor / totalSecao) * 100)) : 0
-  const barWidth = totalSecao > 0 ? (valor / totalSecao) * 100 : 0
-
-  const startEdit = () => {
-    setDraft(valor > 0 ? formatCurrency(valor) : "")
-    setEditing(true)
-  }
-
-  const commit = (raw: string) => {
-    const cleaned = raw.replace(/[^\d]/g, "")
-    onValueCommit(parseInt(cleaned, 10) || 0)
-    setEditing(false)
-  }
-
-  return (
-    <div className="py-3 border-b border-white/5 last:border-0 space-y-2">
-      <div className="flex items-center gap-3">
-        <span className="text-sm text-foreground flex-1 min-w-0 truncate">{label}</span>
-        <div className="flex items-center gap-1 shrink-0">
-          {onEdit && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={onEdit}
-              className="h-7 w-7 text-muted-foreground hover:text-foreground"
-            >
-              <Pencil className="w-3.5 h-3.5" />
-            </Button>
-          )}
-          {editing ? (
-            <Input
-              autoFocus
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onBlur={() => commit(draft)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") commit(draft)
-                if (e.key === "Escape") setEditing(false)
-              }}
-              className="h-8 w-32 text-right bg-[#0D1220] border-white/10 text-foreground text-sm tabular-nums"
-            />
-          ) : (
-            <button
-              type="button"
-              onClick={startEdit}
-              className={`text-sm font-semibold tabular-nums hover:opacity-80 ${valueClassName}`}
-            >
-              {formatCurrency(valor)}
-            </button>
-          )}
-        </div>
-      </div>
-      <div className="flex items-center gap-3">
-        <div className="flex-1 h-2 rounded-full bg-white/5 overflow-hidden">
-          <div
-            className="h-full rounded-full transition-all duration-300"
-            style={{ width: `${barWidth}%`, backgroundColor: barColor }}
-          />
-        </div>
-        <span className="text-xs text-muted-foreground tabular-nums w-9 text-right shrink-0">
-          {pct}%
-        </span>
-      </div>
-    </div>
-  )
-}
-
-function PatrimonioSection({
-  title,
-  totalLabel,
-  totalValue,
-  totalClassName = "text-foreground",
-  headerAction,
-  children,
-}: {
-  title: string
-  totalLabel: string
-  totalValue: string
-  totalClassName?: string
-  headerAction?: ReactNode
-  children: ReactNode
-}) {
-  return (
-    <section className="rounded-xl bg-[#131929] border border-white/10 p-5 md:p-6">
-      <div className="flex flex-col gap-3 mb-4 pb-4 border-b border-white/10">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <h2 className="text-base font-semibold text-foreground">{title}</h2>
-          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-            {headerAction}
-            <p className={`text-lg md:text-xl font-bold tabular-nums ${totalClassName}`}>
-              {totalLabel} {totalValue}
-            </p>
-          </div>
-        </div>
-      </div>
-      <div>{children}</div>
     </section>
   )
 }
 
 export function Patrimonio({ onNavigate }: PatrimonioProps) {
-  const { state, setAtivos, setPassivos, setPatrimonio, getPatrimonioLiquido } = usePlano()
+  const { state, setAtivos, setPassivos } = usePlano()
   const { ativos, passivos, patrimonio, moeda } = state
-  const participacoes = patrimonio?.participacoes ?? 0
 
-  const [addLiquidoModalOpen, setAddLiquidoModalOpen] = useState(false)
-  const [novoAtivoLiquido, setNovoAtivoLiquido] = useState({ nome: "", valor: 0 })
-
-  const [ativoModalOpen, setAtivoModalOpen] = useState(false)
-  const [editingAtivo, setEditingAtivo] = useState<Ativo | null>(null)
-  const [ativoForm, setAtivoForm] = useState<Omit<Ativo, "id">>({
-    tipo: "",
-    descricao: "",
-    instituicao: "",
-    valor: 0,
-    heranca: false,
-  })
-
-  type PassivoForm = Omit<Passivo, "id" | "modelo"> & { modelo: Passivo["modelo"] }
-
-  const [passivoModalOpen, setPassivoModalOpen] = useState(false)
-  const [editingPassivo, setEditingPassivo] = useState<Passivo | null>(null)
-  const [passivoForm, setPassivoForm] = useState<PassivoForm>({
-    tipo: "",
-    modelo: "SAC",
-    descricao: "",
-    valor: 0,
-    taxa: 0,
-    prazo: 0,
-  })
+  const [addModal, setAddModal] = useState<AddModalState>(null)
+  const [addForm, setAddForm] = useState({ categoria: "", valor: 0 })
 
   const formatCurrency = useCallback(
-    (value: number) => {
-      return new Intl.NumberFormat(moeda === "USD" ? "en-US" : "pt-BR", {
+    (value: number) =>
+      new Intl.NumberFormat(moeda === "USD" ? "en-US" : "pt-BR", {
         style: "currency",
         currency: moeda === "USD" ? "USD" : "BRL",
         minimumFractionDigits: 0,
         maximumFractionDigits: 0,
-      }).format(value)
-    },
+      }).format(value),
     [moeda],
   )
 
@@ -447,22 +363,6 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
     const cleaned = value.replace(/[^\d]/g, "")
     return parseInt(cleaned, 10) || 0
   }
-
-  const sumAtivoCategoria = useCallback(
-    (tipo: string, categoria: string) =>
-      ativos
-        .filter((a) => matchesAtivoCategoria(a, tipo, categoria))
-        .reduce((s, a) => s + (Number(a.valor) || 0), 0),
-    [ativos],
-  )
-
-  const sumPassivoCategoria = useCallback(
-    (categoria: string) =>
-      passivos
-        .filter((p) => matchesPassivoCategoria(p, categoria))
-        .reduce((s, p) => s + (Number(p.valor) || 0), 0),
-    [passivos],
-  )
 
   const setAtivoCategoria = useCallback(
     (tipo: string, categoria: string, valor: number) => {
@@ -477,7 +377,8 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
           kept.concat({
             ...existing,
             valor,
-            descricao: categoria === "Outros" && !existing.descricao ? "Outros" : existing.descricao || categoria,
+            descricao:
+              categoria === "Outros" && !existing.descricao ? "Outros" : existing.descricao || categoria,
           }),
         )
       } else {
@@ -523,49 +424,38 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
     [passivos, setPassivos],
   )
 
-  const valoresLiquido = useMemo(
-    () => CATEGORIAS_LIQUIDO.map((cat) => ({ cat, valor: sumAtivoCategoria("Líquido", cat) })),
-    [sumAtivoCategoria],
-  )
-  const valoresImobilizado = useMemo(
-    () => CATEGORIAS_IMOBILIZADO.map((cat) => ({ cat, valor: sumAtivoCategoria("Imobilizado", cat) })),
-    [sumAtivoCategoria],
-  )
-  const valoresPassivo = useMemo(
-    () => CATEGORIAS_PASSIVO.map((cat) => ({ cat, valor: sumPassivoCategoria(cat) })),
-    [sumPassivoCategoria],
-  )
+  const linhasPorSecao = useMemo(() => {
+    const map = new Map<string, LinhaCategoria[]>()
+    for (const secao of SECOES_ATIVOS) {
+      const linhas = secao.categorias
+        .map((cat) => ({
+          id: `${secao.id}-${cat}`,
+          label: cat,
+          valor: sumAtivoCategoria(ativos, secao.tipo, cat),
+        }))
+        .filter((l) => l.valor > 0)
+      map.set(secao.id, linhas)
+    }
+    return map
+  }, [ativos])
 
-  const ativosLiquidosCustom = useMemo(
-    () => ativos.filter((a) => isAtivoLiquidoCustom(a)),
-    [ativos],
-  )
-
-  const totalAtivosLiquidos = useMemo(
+  const linhasPassivo = useMemo(
     () =>
-      ativos
-        .filter((a) => (a.tipo ?? "").trim() === "Líquido")
-        .reduce((s, a) => s + (Number(a.valor) || 0), 0),
-    [ativos],
+      CATEGORIAS_PASSIVO.map((cat) => ({
+        id: `passivo-${cat}`,
+        label: cat,
+        valor: sumPassivoCategoria(passivos, cat),
+      })).filter((l) => l.valor > 0),
+    [passivos],
   )
 
-  const totalImobilizadoBase = useMemo(
-    () =>
-      CATEGORIAS_IMOBILIZADO_BASE.reduce(
-        (s, cat) => s + sumAtivoCategoria("Imobilizado", cat),
-        0,
-      ),
-    [sumAtivoCategoria],
-  )
+  const ativosLiquidos = patrimonio.ativosLiquidos
+  const imobilizado = patrimonio.imobilizado
+  const participacoes = patrimonio.participacoes
+  const totalPassivos = patrimonio.passivos
 
-  const totalAtivosReais = totalImobilizadoBase + participacoes
-  const totalPassivos = valoresPassivo.reduce((s, x) => s + x.valor, 0)
-  const totalAtivos = totalAtivosLiquidos + totalAtivosReais
-  const patrimonioLiquidoResumo = totalAtivos - totalPassivos
-  const plConsolidado = getPatrimonioLiquido()
-
-  const ativosLiquidos = totalAtivosLiquidos
-  const imobilizado = totalImobilizadoBase
+  const patrimonioTotal = ativosLiquidos + imobilizado + participacoes
+  const patrimonioLiquidoResumo = patrimonioTotal - totalPassivos
 
   const dataDonut = useMemo(
     () => [
@@ -576,155 +466,67 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
     [ativosLiquidos, imobilizado, participacoes],
   )
 
-  const patrimonioTotal = ativosLiquidos + imobilizado + participacoes
-
   const totalDonut = dataDonut.reduce((s, d) => s + d.value, 0)
 
-  const dataBarrasLiquido = useMemo(() => {
-    const fixed = valoresLiquido
-      .filter((x) => x.valor > 0)
-      .map((x) => ({ name: x.cat, value: x.valor }))
-    const custom = ativosLiquidosCustom
-      .filter((a) => (a.valor || 0) > 0)
-      .map((a) => ({ name: a.descricao || "Ativo", value: Number(a.valor) || 0 }))
-    const sorted = [...fixed, ...custom].sort((a, b) => b.value - a.value)
-    return sorted.map((x, i) => ({
-      name: x.name,
-      value: x.value,
-      fill: blueShadeByRank(i, sorted.length),
-      pctLiquido:
-        totalAtivosLiquidos > 0 ? (x.value / totalAtivosLiquidos) * 100 : 0,
-    }))
-  }, [valoresLiquido, ativosLiquidosCustom, totalAtivosLiquidos])
-
-  const alturaBarras = Math.max(160, dataBarrasLiquido.length * 48)
-
-  const openEditAtivo = (tipo: string, categoria: string) => {
-    const found = ativos.find((a) => matchesAtivoCategoria(a, tipo, categoria))
-    if (found) {
-      setEditingAtivo(found)
-      setAtivoForm({
-        tipo: found.tipo,
-        descricao: found.descricao,
-        instituicao: found.instituicao,
-        valor: found.valor,
-        heranca: found.heranca === true,
-      })
-    } else {
-      setEditingAtivo(null)
-      setAtivoForm({
-        tipo,
-        descricao: categoria,
-        instituicao: "",
-        valor: sumAtivoCategoria(tipo, categoria),
-        heranca: false,
-      })
+  const dataBarras = useMemo(() => {
+    const todas: BarraCategoria[] = []
+    for (const secao of SECOES_ATIVOS) {
+      for (const cat of secao.categorias) {
+        const valor = sumAtivoCategoria(ativos, secao.tipo, cat)
+        if (valor > 0) {
+          todas.push({
+            name: cat,
+            value: valor,
+            fill: secao.cor,
+            pctTotal: patrimonioTotal > 0 ? (valor / patrimonioTotal) * 100 : 0,
+          })
+        }
+      }
     }
-    setAtivoModalOpen(true)
-  }
+    return todas.sort((a, b) => b.value - a.value)
+  }, [ativos, patrimonioTotal])
 
-  const openEditPassivo = (categoria: string) => {
-    const found = passivos.find((p) => matchesPassivoCategoria(p, categoria))
-    if (found) {
-      setEditingPassivo(found)
-      setPassivoForm({
-        tipo: found.tipo,
-        modelo: found.modelo,
-        descricao: found.descricao,
-        valor: found.valor,
-        taxa: found.taxa,
-        prazo: found.prazo,
-      })
-    } else {
-      setEditingPassivo(null)
-      setPassivoForm({
-        tipo: categoria,
-        modelo: "SAC",
-        descricao: categoria,
-        valor: sumPassivoCategoria(categoria),
-        taxa: 0,
-        prazo: 0,
-      })
-    }
-    setPassivoModalOpen(true)
-  }
+  const alturaBarras = Math.max(160, dataBarras.length * 48)
 
-  const saveAtivo = () => {
-    if (editingAtivo) {
-      setAtivos(ativos.map((a) => (a.id === editingAtivo.id ? { ...a, ...ativoForm } : a)))
-    } else {
-      setAtivos([...ativos, { id: Date.now().toString(), ...ativoForm }])
-    }
-    setAtivoModalOpen(false)
-  }
-
-  const savePassivo = () => {
-    if (editingPassivo) {
-      setPassivos(passivos.map((p) => (p.id === editingPassivo.id ? { ...p, ...passivoForm } : p)))
-    } else {
-      setPassivos([...passivos, { id: Date.now().toString(), ...passivoForm }])
-    }
-    setPassivoModalOpen(false)
-  }
-
-  const handleNext = () => onNavigate("objetivos")
-
-  const saveNovoAtivoLiquido = () => {
-    const nome = novoAtivoLiquido.nome.trim()
-    if (!nome) return
-    setAtivos([
-      ...ativos,
-      {
-        id: Date.now().toString(),
-        tipo: "Líquido",
-        descricao: nome,
-        instituicao: "",
-        valor: novoAtivoLiquido.valor,
-        heranca: false,
-      },
-    ])
-    setNovoAtivoLiquido({ nome: "", valor: 0 })
-    setAddLiquidoModalOpen(false)
+  const openAddAtivo = (secao: SecaoAtivoConfig) => {
+    setAddForm({ categoria: secao.categorias[0] ?? "", valor: 0 })
+    setAddModal({ kind: "ativo", secao })
   }
 
   const openAddPassivo = () => {
-    setEditingPassivo(null)
-    setPassivoForm({
-      tipo: "",
-      modelo: "SAC",
-      descricao: "",
-      valor: 0,
-      taxa: 0,
-      prazo: 0,
-    })
-    setPassivoModalOpen(true)
+    setAddForm({ categoria: CATEGORIAS_PASSIVO[0], valor: 0 })
+    setAddModal({ kind: "passivo" })
   }
 
-  const addAtivoButton = (
+  const saveAddModal = () => {
+    if (!addModal || !addForm.categoria) return
+    if (addModal.kind === "ativo") {
+      setAtivoCategoria(addModal.secao.tipo, addForm.categoria, addForm.valor)
+    } else {
+      setPassivoCategoria(addForm.categoria, addForm.valor)
+    }
+    setAddModal(null)
+    setAddForm({ categoria: "", valor: 0 })
+  }
+
+  const addButton = (onClick: () => void) => (
     <Button
       type="button"
       variant="ghost"
       size="sm"
-      onClick={() => setAddLiquidoModalOpen(true)}
+      onClick={onClick}
       className="border border-dashed border-muted-foreground/50 text-muted-foreground hover:text-foreground hover:border-foreground"
     >
       <Plus className="w-4 h-4 mr-1" />
-      Adicionar ativo
+      Adicionar
     </Button>
   )
 
-  const addPassivoButton = (
-    <Button
-      type="button"
-      variant="ghost"
-      size="sm"
-      onClick={openAddPassivo}
-      className="border border-dashed border-muted-foreground/50 text-muted-foreground hover:text-foreground hover:border-foreground"
-    >
-      <Plus className="w-4 h-4 mr-1" />
-      Adicionar dívida
-    </Button>
-  )
+  const totalSecao = (secao: SecaoAtivoConfig) => {
+    if (secao.id === "liquidos") return ativosLiquidos
+    if (secao.id === "imobilizado") return imobilizado
+    return participacoes
+  }
 
   return (
     <div className="space-y-6">
@@ -738,94 +540,50 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
         </p>
       </div>
 
-      <PatrimonioSection
-        title="Ativos de Investimento"
-        totalLabel="PL Consolidado"
-        totalValue={formatCurrency(plConsolidado)}
-        totalClassName="text-[#1E5CE6]"
-        headerAction={addAtivoButton}
-      >
-        {CATEGORIAS_LIQUIDO.map((cat) => {
-          const valor = sumAtivoCategoria("Líquido", cat)
-          return (
-            <PatrimonioBarRow
-              key={cat}
-              label={cat}
-              valor={valor}
-              totalSecao={totalAtivosLiquidos}
-              barColor="#1E5CE6"
-              formatCurrency={formatCurrency}
-              valueClassName="text-foreground"
-              onValueCommit={(v) => setAtivoCategoria("Líquido", cat, v)}
-              onEdit={() => openEditAtivo("Líquido", cat)}
-            />
-          )
-        })}
-        {ativosLiquidosCustom.map((ativo) => (
-          <PatrimonioBarRow
-            key={ativo.id}
-            label={ativo.descricao || "Ativo"}
-            valor={ativo.valor || 0}
-            totalSecao={totalAtivosLiquidos}
-            barColor="#1E5CE6"
-            formatCurrency={formatCurrency}
-            valueClassName="text-foreground"
-            onValueCommit={(v) => {
-              setAtivos(ativos.map((a) => (a.id === ativo.id ? { ...a, valor: v } : a)))
-            }}
-            onEdit={() => {
-              setEditingAtivo(ativo)
-              setAtivoForm({
-                tipo: ativo.tipo,
-                descricao: ativo.descricao,
-                instituicao: ativo.instituicao,
-                valor: ativo.valor,
-                heranca: ativo.heranca === true,
-              })
-              setAtivoModalOpen(true)
-            }}
-          />
-        ))}
-      </PatrimonioSection>
-
-      <PatrimonioSection
-        title="Ativos Reais"
-        totalLabel="Total"
-        totalValue={formatCurrency(totalAtivosReais)}
-        totalClassName="text-[#1D9E75]"
-      >
-        {CATEGORIAS_IMOBILIZADO_BASE.map((cat) => {
-          const valor = sumAtivoCategoria("Imobilizado", cat)
-          return (
-            <PatrimonioBarRow
-              key={cat}
-              label={cat}
-              valor={valor}
-              totalSecao={totalAtivosReais}
-              barColor="#1D9E75"
-              formatCurrency={formatCurrency}
-              valueClassName="text-foreground"
-              onValueCommit={(v) => setAtivoCategoria("Imobilizado", cat, v)}
-              onEdit={() => openEditAtivo("Imobilizado", cat)}
-            />
-          )
-        })}
-        <PatrimonioBarRow
-          key={CATEGORIA_PARTICIPACOES}
-          label={CATEGORIA_PARTICIPACOES}
-          valor={participacoes}
-          totalSecao={totalAtivosReais}
-          barColor="#7C3AED"
-          formatCurrency={formatCurrency}
-          valueClassName="text-foreground"
-          onValueCommit={(v) => setPatrimonio({ participacoes: v })}
-        />
-      </PatrimonioSection>
+      {SECOES_ATIVOS.map((secao) => {
+        const linhas = linhasPorSecao.get(secao.id) ?? []
+        const total = totalSecao(secao)
+        return (
+          <PatrimonioSection
+            key={secao.id}
+            title={secao.title}
+            totalLabel={secao.totalLabel}
+            totalValue={formatCurrency(total)}
+            totalClassName={
+              secao.id === "liquidos"
+                ? "text-[#1E5CE6]"
+                : secao.id === "imobilizado"
+                  ? "text-[#1D9E75]"
+                  : "text-[#7C3AED]"
+            }
+            headerAction={addButton(() => openAddAtivo(secao))}
+          >
+            {linhas.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">
+                Nenhum ativo cadastrado
+              </p>
+            ) : (
+              linhas.map((linha) => (
+                <PatrimonioBarRow
+                  key={linha.id}
+                  label={linha.label}
+                  valor={linha.valor}
+                  totalSecao={total}
+                  barColor={secao.cor}
+                  formatCurrency={formatCurrency}
+                  valueClassName="text-foreground"
+                  onValueCommit={(v) => setAtivoCategoria(secao.tipo, linha.label, v)}
+                />
+              ))
+            )}
+          </PatrimonioSection>
+        )
+      })}
 
       <PatrimonioCharts
         dataDonut={dataDonut}
         totalDonut={totalDonut}
-        dataBarrasLiquido={dataBarrasLiquido}
+        dataBarras={dataBarras}
         alturaBarras={alturaBarras}
         patrimonioTotal={patrimonioTotal}
         formatCurrency={formatCurrency}
@@ -836,34 +594,32 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
         totalLabel="Total"
         totalValue={formatCurrency(totalPassivos)}
         totalClassName="text-[#E24B4A]"
-        headerAction={addPassivoButton}
+        headerAction={addButton(openAddPassivo)}
       >
-        {CATEGORIAS_PASSIVO.map((cat) => {
-          const valor = sumPassivoCategoria(cat)
-          return (
+        {linhasPassivo.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-6">Nenhum passivo cadastrado</p>
+        ) : (
+          linhasPassivo.map((linha) => (
             <PatrimonioBarRow
-              key={cat}
-              label={cat}
-              valor={valor}
+              key={linha.id}
+              label={linha.label}
+              valor={linha.valor}
               totalSecao={totalPassivos}
               barColor="#E24B4A"
               formatCurrency={formatCurrency}
               valueClassName="text-[#E24B4A]"
-              onValueCommit={(v) => setPassivoCategoria(cat, v)}
-              onEdit={() => openEditPassivo(cat)}
+              onValueCommit={(v) => setPassivoCategoria(linha.label, v)}
             />
-          )
-        })}
+          ))
+        )}
       </PatrimonioSection>
 
       <div className="rounded-xl bg-[#131929] border border-white/10 p-5 md:p-6">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-center sm:text-left">
           <div>
-            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
-              Ativos Totais
-            </p>
+            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Ativos Totais</p>
             <p className="text-xl font-semibold text-[#1D9E75] tabular-nums">
-              {formatCurrency(totalAtivos)}
+              {formatCurrency(patrimonioTotal)}
             </p>
           </div>
           <div>
@@ -883,48 +639,59 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
         </div>
       </div>
 
-      <Dialog open={addLiquidoModalOpen} onOpenChange={setAddLiquidoModalOpen}>
+      <Dialog open={addModal != null} onOpenChange={(open) => !open && setAddModal(null)}>
         <DialogContent className="bg-[#131929] border-white/[0.18] rounded-2xl max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-foreground">Adicionar ativo líquido</DialogTitle>
+            <DialogTitle className="text-foreground">
+              {addModal?.kind === "passivo" ? "Adicionar dívida" : "Adicionar ativo"}
+            </DialogTitle>
             <DialogDescription className="text-muted-foreground">
-              Informe o nome e o valor do ativo de investimento
+              Selecione a categoria e informe o valor
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
-                Nome do ativo
+                Categoria
               </label>
-              <Input
-                value={novoAtivoLiquido.nome}
-                onChange={(e) => setNovoAtivoLiquido({ ...novoAtivoLiquido, nome: e.target.value })}
-                placeholder="Ex: CDB Banco X"
-                className="bg-[#0D1220] border-white/10 text-foreground"
-              />
+              <Select
+                value={addForm.categoria}
+                onValueChange={(value) => setAddForm({ ...addForm, categoria: value })}
+              >
+                <SelectTrigger className="bg-[#0D1220] border-white/10 text-foreground">
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent className="bg-[#131929] border-white/10">
+                  {(addModal?.kind === "passivo"
+                    ? [...CATEGORIAS_PASSIVO]
+                    : addModal?.kind === "ativo"
+                      ? [...addModal.secao.categorias]
+                      : []
+                  ).map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
                 Valor (R$)
               </label>
               <Input
-                value={novoAtivoLiquido.valor ? formatCurrency(novoAtivoLiquido.valor) : ""}
-                onChange={(e) =>
-                  setNovoAtivoLiquido({
-                    ...novoAtivoLiquido,
-                    valor: parseCurrency(e.target.value),
-                  })
-                }
+                value={addForm.valor ? formatCurrency(addForm.valor) : ""}
+                onChange={(e) => setAddForm({ ...addForm, valor: parseCurrency(e.target.value) })}
                 placeholder="0"
                 className="bg-[#0D1220] border-white/10 text-foreground"
               />
             </div>
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="ghost" onClick={() => setAddLiquidoModalOpen(false)}>
+            <Button variant="ghost" onClick={() => setAddModal(null)}>
               Cancelar
             </Button>
-            <Button onClick={saveNovoAtivoLiquido} className="bg-primary text-primary-foreground">
+            <Button onClick={saveAddModal} className="bg-primary text-primary-foreground">
               Salvar
             </Button>
           </DialogFooter>
@@ -940,306 +707,11 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
           <ArrowLeft className="w-4 h-4 mr-2" />
           Voltar
         </Button>
-        <Button
-          onClick={handleNext}
-          className="bg-primary hover:bg-primary/90 text-primary-foreground"
-        >
+        <Button onClick={() => onNavigate("objetivos")} className="bg-primary hover:bg-primary/90 text-primary-foreground">
           Próximo
           <ArrowRight className="w-4 h-4 ml-2" />
         </Button>
       </div>
-
-      <Dialog open={ativoModalOpen} onOpenChange={setAtivoModalOpen}>
-        <DialogContent className="bg-[#131929] border-white/[0.18] rounded-2xl max-w-md max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-foreground">
-              {editingAtivo ? "Editar Ativo" : "Adicionar Ativo"}
-            </DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              Cadastre um novo ativo no patrimônio
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
-                Tipo
-              </label>
-              <Select
-                value={ativoForm.tipo}
-                onValueChange={(value) => setAtivoForm({ ...ativoForm, tipo: value })}
-              >
-                <SelectTrigger className="bg-[#0D1220] border-white/10 text-foreground">
-                  <SelectValue placeholder="Selecione o tipo" />
-                </SelectTrigger>
-                <SelectContent className="bg-[#131929] border-white/10">
-                  <SelectItem value="Líquido">Líquido</SelectItem>
-                  <SelectItem value="Imobilizado">Imobilizado</SelectItem>
-                  <SelectItem value="Participação Societária">Participação Societária</SelectItem>
-                  <SelectItem value="Outros">Outros</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
-                Descrição
-              </label>
-              {(() => {
-                const tipo = ativoForm.tipo?.trim() || ""
-                const opcoes = DESCRICOES_ATIVOS_POR_TIPO[tipo]
-
-                if (!tipo || tipo === "Outros" || !opcoes) {
-                  return (
-                    <Input
-                      value={ativoForm.descricao}
-                      onChange={(e) => setAtivoForm({ ...ativoForm, descricao: e.target.value })}
-                      placeholder="Ex: CDB Banco X, Apartamento Y..."
-                      className="bg-[#0D1220] border-white/10 text-foreground placeholder:text-muted-foreground"
-                    />
-                  )
-                }
-
-                const descricaoAtual = (ativoForm.descricao ?? "").trim()
-                const isOpcaoValida = opcoes.includes(descricaoAtual)
-                const selectValue = isOpcaoValida ? descricaoAtual : "Outros"
-                const otherValue = isOpcaoValida ? "" : descricaoAtual
-
-                return (
-                  <div className="space-y-2">
-                    <Select
-                      value={selectValue}
-                      onValueChange={(value) => {
-                        if (value === "Outros") {
-                          setAtivoForm({
-                            ...ativoForm,
-                            descricao: isOpcaoValida ? "" : descricaoAtual,
-                          })
-                          return
-                        }
-                        setAtivoForm({ ...ativoForm, descricao: value })
-                      }}
-                    >
-                      <SelectTrigger className="bg-[#0D1220] border-white/10 text-foreground">
-                        <SelectValue placeholder="Selecione" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-[#131929] border-white/10">
-                        {opcoes.map((o) => (
-                          <SelectItem key={o} value={o}>
-                            {o}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-
-                    {selectValue === "Outros" && (
-                      <Input
-                        value={otherValue}
-                        onChange={(e) => setAtivoForm({ ...ativoForm, descricao: e.target.value })}
-                        placeholder="Descreva o ativo..."
-                        className="bg-[#0D1220] border-white/10 text-foreground placeholder:text-muted-foreground"
-                      />
-                    )}
-                  </div>
-                )
-              })()}
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
-                Valor (R$)
-              </label>
-              <Input
-                value={ativoForm.valor ? formatCurrency(ativoForm.valor) : ""}
-                onChange={(e) => setAtivoForm({ ...ativoForm, valor: parseCurrency(e.target.value) })}
-                placeholder="0,00"
-                className="bg-[#0D1220] border-white/10 text-foreground placeholder:text-muted-foreground"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
-                Instituição / Localização
-              </label>
-              <Input
-                value={ativoForm.instituicao}
-                onChange={(e) => setAtivoForm({ ...ativoForm, instituicao: e.target.value })}
-                placeholder="Ex: BTG Pactual, Brasília-DF..."
-                className="bg-[#0D1220] border-white/10 text-foreground placeholder:text-muted-foreground"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
-                Bem de Herança
-              </label>
-              <Select
-                value={ativoForm.heranca ? "sim" : "nao"}
-                onValueChange={(value) =>
-                  setAtivoForm({ ...ativoForm, heranca: value === "sim" })
-                }
-              >
-                <SelectTrigger className="bg-[#0D1220] border-white/10 text-foreground">
-                  <SelectValue placeholder="Selecione" />
-                </SelectTrigger>
-                <SelectContent className="bg-[#131929] border-white/10">
-                  <SelectItem value="nao">Não</SelectItem>
-                  <SelectItem value="sim">Sim</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <DialogFooter className="gap-2">
-            <Button
-              variant="ghost"
-              onClick={() => setAtivoModalOpen(false)}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={saveAtivo}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground"
-            >
-              {editingAtivo ? "Salvar" : "Adicionar"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={passivoModalOpen} onOpenChange={setPassivoModalOpen}>
-        <DialogContent className="bg-[#131929] border-white/[0.18] rounded-2xl max-w-md max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-foreground">
-              {editingPassivo ? "Editar Passivo" : "Adicionar Passivo"}
-            </DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              Cadastre uma dívida ou financiamento
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
-                  Tipo
-                </label>
-                <Select
-                  value={passivoForm.tipo}
-                  onValueChange={(value) => setPassivoForm({ ...passivoForm, tipo: value })}
-                >
-                  <SelectTrigger className="bg-[#0D1220] border-white/10 text-foreground">
-                    <SelectValue placeholder="Selecione" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#131929] border-white/10">
-                    <SelectItem value="Financiamento Imóvel">Financiamento Imóvel</SelectItem>
-                    <SelectItem value="Financiamento Veículo">Financiamento Veículo</SelectItem>
-                    <SelectItem value="Empréstimo Pessoal">Empréstimo Pessoal</SelectItem>
-                    <SelectItem value="Outros">Outros</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
-                  Modelo de Dívida
-                </label>
-                <Select
-                  value={passivoForm.modelo}
-                  onValueChange={(value) =>
-                    setPassivoForm({ ...passivoForm, modelo: value as Passivo["modelo"] })
-                  }
-                >
-                  <SelectTrigger className="bg-[#0D1220] border-white/10 text-foreground">
-                    <SelectValue placeholder="Selecione" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#131929] border-white/10">
-                    <SelectItem value="SAC">SAC</SelectItem>
-                    <SelectItem value="PRICE">PRICE</SelectItem>
-                    <SelectItem value="AMERICANA">AMERICANA</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
-                Descrição
-              </label>
-              <Input
-                value={passivoForm.descricao}
-                onChange={(e) => setPassivoForm({ ...passivoForm, descricao: e.target.value })}
-                placeholder="Ex: Financiamento Apt Centro..."
-                className="bg-[#0D1220] border-white/10 text-foreground placeholder:text-muted-foreground"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
-                Saldo Devedor (R$)
-              </label>
-              <Input
-                value={passivoForm.valor ? formatCurrency(passivoForm.valor) : ""}
-                onChange={(e) =>
-                  setPassivoForm({ ...passivoForm, valor: parseCurrency(e.target.value) })
-                }
-                placeholder="0,00"
-                className="bg-[#0D1220] border-white/10 text-foreground placeholder:text-muted-foreground"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
-                  Taxa de Juros (%)
-                </label>
-                <Input
-                  type="number"
-                  step="0.1"
-                  value={passivoForm.taxa || ""}
-                  onChange={(e) =>
-                    setPassivoForm({ ...passivoForm, taxa: parseFloat(e.target.value) || 0 })
-                  }
-                  placeholder="0"
-                  className="bg-[#0D1220] border-white/10 text-foreground placeholder:text-muted-foreground"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
-                  Prazo (meses)
-                </label>
-                <Input
-                  type="number"
-                  value={passivoForm.prazo || ""}
-                  onChange={(e) =>
-                    setPassivoForm({ ...passivoForm, prazo: parseInt(e.target.value) || 0 })
-                  }
-                  placeholder="0"
-                  className="bg-[#0D1220] border-white/10 text-foreground placeholder:text-muted-foreground"
-                />
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter className="gap-2">
-            <Button
-              variant="ghost"
-              onClick={() => setPassivoModalOpen(false)}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={savePassivo}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground"
-            >
-              {editingPassivo ? "Salvar" : "Adicionar"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

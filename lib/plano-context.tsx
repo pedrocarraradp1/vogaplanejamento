@@ -12,6 +12,7 @@ import {
   type InventarioResult,
   type ProtecaoResult,
 } from "@/lib/engine"
+import { computePatrimonioTotals } from "@/lib/patrimonio-utils"
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
@@ -111,7 +112,10 @@ export interface Protecao {
 }
 
 export interface PatrimonioState {
+  ativosLiquidos: number
+  imobilizado: number
   participacoes: number
+  passivos: number
 }
 
 export interface PlanoState {
@@ -219,7 +223,7 @@ const initialState: PlanoState = {
   },
   ativos: [],
   passivos: [],
-  patrimonio: { participacoes: 0 },
+  patrimonio: { ativosLiquidos: 0, imobilizado: 0, participacoes: 0, passivos: 0 },
   objetivos: [],
   premissas: defaultPremissas,
   sucessao: {
@@ -277,8 +281,10 @@ export function PlanoProvider({
       ativos: Array.isArray(raw?.ativos) ? raw.ativos : [],
       passivos: Array.isArray(raw?.passivos) ? raw.passivos : [],
       patrimonio: {
-        participacoes:
-          Number((raw as { patrimonio?: PatrimonioState })?.patrimonio?.participacoes) || 0,
+        ativosLiquidos: 0,
+        imobilizado: 0,
+        participacoes: 0,
+        passivos: 0,
       },
       objetivos: Array.isArray(raw?.objetivos) ? raw.objetivos : [],
       projecao: Array.isArray(raw?.projecao) ? raw.projecao : initialState.projecao,
@@ -324,15 +330,26 @@ export function PlanoProvider({
       }
     })
 
-    // Migra participações legadas (ativos tipo "Participação Societária") para patrimonio.participacoes
-    if (!merged.patrimonio.participacoes) {
-      const legadoParticipacoes = (merged.ativos ?? [])
-        .filter((a) => (a.tipo ?? "").trim() === "Participação Societária")
-        .reduce((s, a) => s + (Number(a.valor) || 0), 0)
-      if (legadoParticipacoes > 0) {
-        merged.patrimonio.participacoes = legadoParticipacoes
-      }
+    const rawPat = (raw?.patrimonio ?? {}) as Partial<PatrimonioState> & { participacoes?: number }
+    const participacoesLegado = Number(rawPat.participacoes) || 0
+    const temAtivosParticipacao = (merged.ativos ?? []).some(
+      (a) => (a.tipo ?? "").trim() === "Participação Societária",
+    )
+    if (participacoesLegado > 0 && !temAtivosParticipacao) {
+      merged.ativos = [
+        ...merged.ativos,
+        {
+          id: `mig-part-${Date.now()}`,
+          tipo: "Participação Societária",
+          descricao: "Outros",
+          instituicao: "",
+          valor: participacoesLegado,
+          heranca: false,
+        },
+      ]
     }
+
+    merged.patrimonio = computePatrimonioTotals(merged.ativos, merged.passivos)
 
     // Normaliza rendimento líquido derivado
     const bruto = Number(merged.premissas.rendimentoBruto) || 0
@@ -385,14 +402,22 @@ export function PlanoProvider({
   }, [])
 
   const setAtivos = useCallback((ativos: Ativo[]) => {
-    setState(prev => ({
-      ...prev,
-      ativos: ativos.map(a => ({ ...a, heranca: a.heranca === true })),
-    }))
+    setState(prev => {
+      const normalized = ativos.map(a => ({ ...a, heranca: a.heranca === true }))
+      return {
+        ...prev,
+        ativos: normalized,
+        patrimonio: computePatrimonioTotals(normalized, prev.passivos),
+      }
+    })
   }, [])
 
   const setPassivos = useCallback((passivos: Passivo[]) => {
-    setState(prev => ({ ...prev, passivos }))
+    setState(prev => ({
+      ...prev,
+      passivos,
+      patrimonio: computePatrimonioTotals(prev.ativos, passivos),
+    }))
   }, [])
 
   const setPatrimonio = useCallback((patrimonio: Partial<PatrimonioState>) => {
