@@ -12,7 +12,13 @@ import {
   ResponsiveContainer, ReferenceLine, Cell, Line,
 } from "recharts"
 import { usePlano } from "@/lib/plano-context"
-import { calcularProjecao, calcularKPIs, calcularFluxoAnual, type ProjecaoAno } from "@/lib/engine"
+import {
+  calcularProjecao,
+  calcularKPIs,
+  calcularFluxoAnual,
+  calcularPassivosPorAnoSeries,
+  type ProjecaoAno,
+} from "@/lib/engine"
 import { buildDadosFluxoGrafico, buildDadosRendaGrafico } from "@/lib/projecao-graficos-dados"
 import { CenariosInvestimento } from "@/components/ui/cenarios-investimento"
 import { FluxoAnualChart, RendaCarteiraChart } from "@/components/charts/projecao-extra-charts"
@@ -165,6 +171,22 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
     [premissasCompletas, objetivosEngine, state.passivos, premissas.aliquotaImpostoRendimento]
   )
 
+  const passivosPorAno = useMemo(
+    () =>
+      calcularPassivosPorAnoSeries(
+        state.passivos.map((p) => ({
+          id: p.id,
+          descricao: p.descricao,
+          valor: Number(p.valor) || 0,
+          prazo: Number(p.prazo) || 0,
+          taxa: Number(p.taxa) || 0,
+          modelo: p.modelo,
+        })),
+        premissasCompletas.prazo
+      ),
+    [state.passivos, premissasCompletas.prazo]
+  )
+
   const dadosFluxo = useMemo(
     () =>
       buildDadosFluxoGrafico(projecao, {
@@ -176,10 +198,12 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
         displayMode,
         inflacaoPct: Number(premissas.inflacao) || 0,
         objetivosPorAno: fluxoAnual.map((r) => r.objetivos),
+        passivosPorAno,
       }),
     [
       projecao,
       fluxoAnual,
+      passivosPorAno,
       displayMode,
       premissas.inflacao,
       premissas.idadeApos,

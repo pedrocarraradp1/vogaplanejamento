@@ -1,6 +1,6 @@
 import type { ProjecaoAno } from "@/lib/engine"
 
-/** Ponto simplificado para o ComposedChart de fluxo anual (5 séries). */
+/** Ponto simplificado para o ComposedChart de fluxo anual (6 séries + meta). */
 export interface DadoFluxoGrafico {
   idade: number
   t: number
@@ -11,6 +11,7 @@ export interface DadoFluxoGrafico {
   rendimento: number
   aporte: number
   objetivos: number
+  passivos: number
   retirada: number
   metaRenda: number
 }
@@ -35,10 +36,11 @@ export interface BuildDadosFluxoOptions {
   displayMode: "nominal" | "real"
   inflacaoPct: number
   objetivosPorAno: number[]
+  passivosPorAno: number[]
 }
 
 /**
- * Séries: Rendimento, Aporte Mensal (entradas) | Objetivos, Retirada (saídas) | metaRenda (linha).
+ * Séries: Rendimento, Aporte (entradas) | Objetivos, Passivos, Retirada (saídas) | metaRenda (linha).
  */
 export function buildDadosFluxoGrafico(
   projecao: ProjecaoAno[],
@@ -53,6 +55,7 @@ export function buildDadosFluxoGrafico(
     displayMode,
     inflacaoPct,
     objetivosPorAno,
+    passivosPorAno,
   } = options
 
   const inf = inflacaoPct / 100
@@ -69,11 +72,13 @@ export function buildDadosFluxoGrafico(
     const aporte = i < prazoAcumulacao ? Math.round(scale(aporteMensal * 12)) : 0
     const objetivosPos = objetivosPorAno[i] ?? 0
     const objetivos = -Math.round(scale(objetivosPos))
+    const passivosPos = passivosPorAno[i] ?? 0
+    const passivos = -Math.round(scale(passivosPos))
     const retirada = i >= prazoAcumulacao ? -Math.round(scale(metaAnual)) : 0
     const metaRenda = metaAnual
 
     const entradasTotal = rendimento + aporte
-    const saidasTotal = Math.abs(objetivos) + Math.abs(retirada)
+    const saidasTotal = Math.abs(objetivos) + Math.abs(passivos) + Math.abs(retirada)
     const fluxoLiquido = entradasTotal - saidasTotal
 
     return {
@@ -86,6 +91,7 @@ export function buildDadosFluxoGrafico(
       rendimento,
       aporte,
       objetivos,
+      passivos,
       retirada,
       metaRenda,
     }

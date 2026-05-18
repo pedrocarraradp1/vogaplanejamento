@@ -15,7 +15,12 @@ import { CenariosInvestimento } from "@/components/ui/cenarios-investimento"
 import { FluxoAnualChart, RendaCarteiraChart } from "@/components/charts/projecao-extra-charts"
 import { buildDadosFluxoGrafico, buildDadosRendaGrafico } from "@/lib/projecao-graficos-dados"
 import {
-  calcularProjecao, calcularKPIs, calcularInventario, calcularProtecao, calcularFluxoAnual,
+  calcularProjecao,
+  calcularKPIs,
+  calcularInventario,
+  calcularProtecao,
+  calcularFluxoAnual,
+  calcularPassivosPorAnoSeries,
   type ProjecaoAno,
 } from "@/lib/engine"
 
@@ -128,6 +133,22 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const taxaReal = (1 + taxaNominalAnual) / (1 + inflacaoAnual) - 1
   const taxaRealMensal = Math.pow(1 + taxaReal, 1 / 12) - 1
 
+  const passivosPorAno = useMemo(
+    () =>
+      calcularPassivosPorAnoSeries(
+        state.passivos.map((p) => ({
+          id: p.id,
+          descricao: p.descricao,
+          valor: Number(p.valor) || 0,
+          prazo: Number(p.prazo) || 0,
+          taxa: Number(p.taxa) || 0,
+          modelo: p.modelo,
+        })),
+        premissasCompletas.prazo
+      ),
+    [state.passivos, premissasCompletas.prazo]
+  )
+
   const dadosFluxo = useMemo(
     () =>
       buildDadosFluxoGrafico(projecao, {
@@ -139,10 +160,12 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         displayMode: viewMode,
         inflacaoPct: Number(premissas.inflacao) || 0,
         objetivosPorAno: fluxoAnual.map((r) => r.objetivos),
+        passivosPorAno,
       }),
     [
       projecao,
       fluxoAnual,
+      passivosPorAno,
       viewMode,
       premissas.inflacao,
       premissas.idadeApos,

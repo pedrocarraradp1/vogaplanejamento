@@ -166,6 +166,40 @@ function pagamentoDividaAno(passivo: Passivo, anoT: number): number {
   return total
 }
 
+/** Parcela mensal estimada (valor/120) quando financiamento não está modelado. */
+function parcelaMensalEstimada(passivo: Passivo): number {
+  const valor = Math.max(0, Number(passivo.valor) || 0)
+  return valor > 0 ? valor / 120 : 0
+}
+
+function passivoTemFinanciamentoModelado(passivo: Passivo): boolean {
+  const prazo = Number(passivo.prazo) || 0
+  const valor = Number(passivo.valor) || 0
+  return valor > 0 && prazo > 0 && Boolean(passivo.modelo)
+}
+
+/**
+ * Pagamento anual de um passivo: soma das parcelas mensais (SAC/PRICE/AMERICANA)
+ * ou estimativa valor/120 × 12 (amortização em 10 anos).
+ */
+export function calcularPagamentoPassivosAno(passivo: Passivo, anoT: number): number {
+  if (passivoTemFinanciamentoModelado(passivo)) {
+    return pagamentoDividaAno(passivo, anoT)
+  }
+  return parcelaMensalEstimada(passivo) * 12
+}
+
+/** Série anual (t = 0..numAnos) do pagamento de todos os passivos. */
+export function calcularPassivosPorAnoSeries(
+  passivos: Passivo[],
+  numAnos: number
+): number[] {
+  const n = Math.max(0, numAnos)
+  return Array.from({ length: n + 1 }, (_, t) =>
+    passivos.reduce((s, p) => s + calcularPagamentoPassivosAno(p, t), 0)
+  )
+}
+
 // ─── Projeção Patrimonial ─────────────────────────────────────────────────────
 
 /**

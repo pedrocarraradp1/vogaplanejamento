@@ -21,6 +21,7 @@ const CORES_FLUXO = {
   rendimento: "#378ADD",
   aporte: "#1E5CE6",
   objetivos: "#BA7517",
+  passivos: "#7C3AED",
   retirada: "#E24B4A",
   metaRenda: "#1D9E75",
 } as const
@@ -29,6 +30,7 @@ const LEGENDA_FLUXO: Record<string, string> = {
   rendimento: "Rendimento",
   aporte: "Aporte Mensal",
   objetivos: "Objetivos",
+  passivos: "Passivos",
   retirada: "Retirada Aposentadoria",
   metaRenda: "Renda Aposentadoria",
 }
@@ -92,6 +94,9 @@ export function FluxoAnualChart({
                     <p className="text-[#BA7517]">
                       Objetivos: {formatarMoedaCompleta(Math.abs(p.objetivos))}
                     </p>
+                    <p className="text-[#7C3AED]">
+                      Passivos: {formatarMoedaCompleta(Math.abs(p.passivos))}
+                    </p>
                     <p className="text-[#E24B4A]">
                       Retirada: {formatarMoedaCompleta(Math.abs(p.retirada))}
                     </p>
@@ -122,6 +127,12 @@ export function FluxoAnualChart({
               name="objetivos"
               stackId="fluxo"
               fill={CORES_FLUXO.objetivos}
+            />
+            <Bar
+              dataKey="passivos"
+              name="passivos"
+              stackId="fluxo"
+              fill={CORES_FLUXO.passivos}
             />
             <Bar
               dataKey="retirada"
