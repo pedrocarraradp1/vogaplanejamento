@@ -11,21 +11,37 @@ type SimulacaoBody = {
   anospag?: number
 }
 
+function asNumber(v: unknown): number | null {
+  if (typeof v === "number" && Number.isFinite(v)) return v
+  if (typeof v === "string" && v.trim() !== "") {
+    const n = Number(v.replace(",", "."))
+    return Number.isFinite(n) ? n : null
+  }
+  return null
+}
+
 function extrairPremioMensalMag(magData: unknown): number | null {
   const root = magData as Record<string, unknown>
   const sims = root?.simulacoes as unknown[] | undefined
   const sim0 = (sims?.[0] ?? null) as Record<string, unknown> | null
   if (!sim0) return null
 
-  const premio = sim0.premio as Record<string, unknown> | undefined
-  const v1 = premio?.valorMensal
-  if (typeof v1 === "number") return v1
+  const premio = sim0.premio as Record<string, unknown> | number | undefined
 
-  const v2 = sim0.premioMensal
-  if (typeof v2 === "number") return v2
+  const candidates: unknown[] = [
+    typeof premio === "object" && premio != null ? premio.valorMensal : undefined,
+    typeof premio === "number" ? premio : undefined,
+    sim0.premioMensal,
+    sim0.valorPremio,
+    sim0.custo,
+    sim0.valorContribuicao,
+    sim0.contribuicaoMensal,
+  ]
 
-  const v3 = sim0.valorPremio
-  if (typeof v3 === "number") return v3
+  for (const c of candidates) {
+    const n = asNumber(c)
+    if (n != null) return n
+  }
 
   return null
 }
@@ -105,6 +121,29 @@ export async function POST(req: NextRequest) {
     } catch {
       magData = { parseError: true }
     }
+
+    console.log("MAG RAW RESPONSE:", JSON.stringify(magData, null, 2))
+    console.log("MAG STATUS:", magRes.status)
+
+    const simulacao = (magData as { simulacoes?: unknown[] })?.simulacoes?.[0] as
+      | Record<string, unknown>
+      | undefined
+
+    console.log("SIMULACAO:", JSON.stringify(simulacao, null, 2))
+    console.log("PREMIO FIELDS:", {
+      "premio.valorMensal":
+        simulacao?.premio &&
+        typeof simulacao.premio === "object" &&
+        simulacao.premio != null
+          ? (simulacao.premio as Record<string, unknown>).valorMensal
+          : undefined,
+      premioMensal: simulacao?.premioMensal,
+      valorPremio: simulacao?.valorPremio,
+      premio: simulacao?.premio,
+      custo: simulacao?.custo,
+      valorContribuicao: simulacao?.valorContribuicao,
+      contribuicaoMensal: simulacao?.contribuicaoMensal,
+    })
 
     const premioMensal = extrairPremioMensalMag(magData)
 

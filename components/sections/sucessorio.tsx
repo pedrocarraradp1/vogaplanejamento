@@ -180,7 +180,7 @@ export function Sucessorio({ onNavigate }: SucessorioProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           dataNascimento: dadosPessoais.nascimento,
-          sexoId: dadosPessoais.sexo === "F" ? 2 : 1,
+          sexoId: dadosPessoais.sexo === "M" ? 1 : 2,
           renda: dadosPessoais.renda,
           uf: dadosPessoais.uf || "SP",
           codigoModeloProposta: produtoSelecionado,
@@ -395,7 +395,11 @@ export function Sucessorio({ onNavigate }: SucessorioProps) {
             <div className="space-y-2">
               <Label className="text-sm text-muted-foreground">Sexo (simulação)</Label>
               <Select
-                value={dadosPessoais.sexo || undefined}
+                value={
+                  dadosPessoais.sexo === "M" || dadosPessoais.sexo === "F"
+                    ? dadosPessoais.sexo
+                    : undefined
+                }
                 onValueChange={(v) => setDadosPessoais({ sexo: v as "M" | "F" })}
               >
                 <SelectTrigger className="bg-[#131929] border-white/10 text-foreground focus:border-primary focus:ring-1 focus:ring-primary">

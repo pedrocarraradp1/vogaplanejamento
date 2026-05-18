@@ -242,6 +242,35 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
               </Select>
             </div>
 
+            {/* Sexo */}
+            <div className="space-y-2">
+              <Label
+                htmlFor="sexo"
+                className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground"
+              >
+                Sexo
+              </Label>
+              <Select
+                value={
+                  dadosPessoais.sexo === "M" || dadosPessoais.sexo === "F"
+                    ? dadosPessoais.sexo
+                    : undefined
+                }
+                onValueChange={(value) => setDadosPessoais({ sexo: value as "M" | "F" })}
+              >
+                <SelectTrigger
+                  id="sexo"
+                  className="h-11 bg-[#131929] border-[rgba(255,255,255,0.14)] text-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
+                >
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent className="bg-card border-border">
+                  <SelectItem value="M">Masculino</SelectItem>
+                  <SelectItem value="F">Feminino</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Número de Filhos */}
             <div className="space-y-2">
               <Label 
