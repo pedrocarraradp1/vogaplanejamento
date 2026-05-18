@@ -167,13 +167,27 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
 
   const dadosFluxo = useMemo(
     () =>
-      buildDadosFluxoGrafico(
-        projecao,
-        fluxoAnual,
+      buildDadosFluxoGrafico(projecao, {
+        taxaLiqAnual: taxaNominalAnual,
+        aporteMensal,
+        idadeAtual: idadeAtualCalculada,
+        idadeApos: Number(premissas.idadeApos) || 0,
+        rendaMensalMeta: Number(premissas.retiradaMensal) || 0,
         displayMode,
-        Number(premissas.inflacao) || 0
-      ),
-    [projecao, fluxoAnual, displayMode, premissas.inflacao]
+        inflacaoPct: Number(premissas.inflacao) || 0,
+        objetivosPorAno: fluxoAnual.map((r) => r.objetivos),
+      }),
+    [
+      projecao,
+      fluxoAnual,
+      displayMode,
+      premissas.inflacao,
+      premissas.idadeApos,
+      premissas.retiradaMensal,
+      taxaNominalAnual,
+      aporteMensal,
+      idadeAtualCalculada,
+    ]
   )
 
   const dadosRenda = useMemo(
@@ -195,11 +209,6 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
       displayMode,
     ]
   )
-
-  useEffect(() => {
-    console.log("DADOS FLUXO:", dadosFluxo)
-    console.log("DADOS RENDA:", dadosRenda)
-  }, [dadosFluxo, dadosRenda])
 
   const kpis = useMemo(() =>
     calcularKPIs(projecao, premissasCompletas, dadosPessoais.renda, dadosPessoais.despesa)

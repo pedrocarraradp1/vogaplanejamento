@@ -18,33 +18,20 @@ import {
 import type { DadoFluxoGrafico, DadoRendaGrafico } from "@/lib/projecao-graficos-dados"
 
 const CORES_FLUXO = {
+  rendimento: "#378ADD",
   aporte: "#1E5CE6",
-  rendimento: "#4A9EFF",
-  previdencia: "#8B5CF6",
-  inss: "#06B6D4",
-  complemento: "#22C787",
-  extra: "#34D399",
-  objetivos: "#F5A623",
-  dividas: "#FB923C",
-  retirada: "#EF4444",
-  ir: "#EC4899",
+  objetivos: "#BA7517",
+  retirada: "#E24B4A",
+  metaRenda: "#1D9E75",
 } as const
 
-const ENTRADAS: { key: keyof typeof CORES_FLUXO; label: string }[] = [
-  { key: "aporte", label: "Aporte" },
-  { key: "rendimento", label: "Rendimento" },
-  { key: "previdencia", label: "Previdência" },
-  { key: "inss", label: "INSS" },
-  { key: "complemento", label: "Complemento" },
-  { key: "extra", label: "Extra" },
-]
-
-const SAIDAS: { key: keyof typeof CORES_FLUXO; label: string }[] = [
-  { key: "objetivos", label: "Objetivos" },
-  { key: "dividas", label: "Dívidas" },
-  { key: "retirada", label: "Retirada" },
-  { key: "ir", label: "IR" },
-]
+const LEGENDA_FLUXO: Record<string, string> = {
+  rendimento: "Rendimento",
+  aporte: "Aporte Mensal",
+  objetivos: "Objetivos",
+  retirada: "Retirada Aposentadoria",
+  metaRenda: "Renda Aposentadoria",
+}
 
 const CHART_HEIGHT = 280
 
@@ -91,15 +78,26 @@ export function FluxoAnualChart({
               content={({ active, payload }) => {
                 if (!active || !payload?.length) return null
                 const p = payload[0]?.payload as DadoFluxoGrafico
-                const corLiq = p.fluxoLiquido >= 0 ? "#22C787" : "#EF4444"
+                const corLiq = p.fluxoLiquido >= 0 ? "#1D9E75" : "#E24B4A"
                 return (
                   <div className="rounded-lg border border-white/10 bg-[#131929] px-3 py-2 text-xs shadow-lg min-w-[200px]">
                     <p className="font-semibold text-white">
                       Ano {p.t} · Idade {p.idade}
                     </p>
                     <p className="text-muted-foreground mt-0.5">Fase: {p.fase}</p>
-                    <p className="mt-2 text-white">Entradas: {formatarMoedaCompleta(p.entradasTotal)}</p>
-                    <p className="text-white">Saídas: {formatarMoedaCompleta(Math.abs(p.saidasTotal))}</p>
+                    <p className="mt-2 text-[#378ADD]">
+                      Rendimento: {formatarMoedaCompleta(p.rendimento)}
+                    </p>
+                    <p className="text-[#1E5CE6]">Aporte: {formatarMoedaCompleta(p.aporte)}</p>
+                    <p className="text-[#BA7517]">
+                      Objetivos: {formatarMoedaCompleta(Math.abs(p.objetivos))}
+                    </p>
+                    <p className="text-[#E24B4A]">
+                      Retirada: {formatarMoedaCompleta(Math.abs(p.retirada))}
+                    </p>
+                    <p className="text-[#1D9E75]">
+                      Meta renda (ref.): {formatarMoedaCompleta(p.metaRenda)}
+                    </p>
                     <p className="mt-1 font-medium" style={{ color: corLiq }}>
                       Fluxo líquido: {formatarMoedaCompleta(p.fluxoLiquido)}
                     </p>
@@ -109,19 +107,38 @@ export function FluxoAnualChart({
             />
             <Legend
               wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
-              formatter={(value: string) => {
-                const found = [...ENTRADAS, ...SAIDAS].find((s) => s.key === value)
-                return found?.label ?? value
-              }}
+              formatter={(value: string) => LEGENDA_FLUXO[value] ?? value}
             />
             <ReferenceLine y={0} stroke="rgba(255,255,255,0.15)" />
-            {ENTRADAS.map(({ key }) => (
-              <Bar key={key} dataKey={key} stackId="fluxo" fill={CORES_FLUXO[key]} />
-            ))}
-            <Bar dataKey="objetivos" stackId="fluxo" fill={CORES_FLUXO.objetivos} name="objetivos" />
-            <Bar dataKey="dividas" stackId="fluxo" fill={CORES_FLUXO.dividas} name="dividas" />
-            <Bar dataKey="retirada" stackId="fluxo" fill={CORES_FLUXO.retirada} name="retirada" />
-            <Bar dataKey="ir" stackId="fluxo" fill={CORES_FLUXO.ir} name="ir" />
+            <Bar
+              dataKey="rendimento"
+              name="rendimento"
+              stackId="fluxo"
+              fill={CORES_FLUXO.rendimento}
+            />
+            <Bar dataKey="aporte" name="aporte" stackId="fluxo" fill={CORES_FLUXO.aporte} />
+            <Bar
+              dataKey="objetivos"
+              name="objetivos"
+              stackId="fluxo"
+              fill={CORES_FLUXO.objetivos}
+            />
+            <Bar
+              dataKey="retirada"
+              name="retirada"
+              stackId="fluxo"
+              fill={CORES_FLUXO.retirada}
+            />
+            <Line
+              type="monotone"
+              dataKey="metaRenda"
+              name="metaRenda"
+              stroke={CORES_FLUXO.metaRenda}
+              strokeWidth={2}
+              strokeDasharray="6 4"
+              dot={false}
+              isAnimationActive={false}
+            />
             {primeiroAno && (
               <ReferenceDot
                 x={primeiroAno.idade}
@@ -130,7 +147,7 @@ export function FluxoAnualChart({
                 label={{
                   value: formatarMoedaCompleta(primeiroAno.fluxoLiquido),
                   position: primeiroAno.fluxoLiquido >= 0 ? "top" : "bottom",
-                  fill: primeiroAno.fluxoLiquido >= 0 ? "#22C787" : "#EF4444",
+                  fill: primeiroAno.fluxoLiquido >= 0 ? "#1D9E75" : "#E24B4A",
                   fontSize: 11,
                   fontWeight: 600,
                 }}

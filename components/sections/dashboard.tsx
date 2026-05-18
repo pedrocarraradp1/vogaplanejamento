@@ -130,8 +130,27 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
   const dadosFluxo = useMemo(
     () =>
-      buildDadosFluxoGrafico(projecao, fluxoAnual, viewMode, Number(premissas.inflacao) || 0),
-    [projecao, fluxoAnual, viewMode, premissas.inflacao]
+      buildDadosFluxoGrafico(projecao, {
+        taxaLiqAnual: taxaNominalAnual,
+        aporteMensal: aporteM,
+        idadeAtual,
+        idadeApos: Number(premissas.idadeApos) || 0,
+        rendaMensalMeta: Number(premissas.retiradaMensal) || 0,
+        displayMode: viewMode,
+        inflacaoPct: Number(premissas.inflacao) || 0,
+        objetivosPorAno: fluxoAnual.map((r) => r.objetivos),
+      }),
+    [
+      projecao,
+      fluxoAnual,
+      viewMode,
+      premissas.inflacao,
+      premissas.idadeApos,
+      premissas.retiradaMensal,
+      taxaNominalAnual,
+      aporteM,
+      idadeAtual,
+    ]
   )
 
   const dadosRenda = useMemo(
