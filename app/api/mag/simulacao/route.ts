@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getMagAccessToken } from "@/lib/mag/auth"
 
 type SimulacaoBody = {
   dataNascimento?: string
@@ -11,98 +10,69 @@ type SimulacaoBody = {
   anospag?: number
 }
 
-function asNumber(v: unknown): number | null {
-  if (typeof v === "number" && Number.isFinite(v)) return v
-  if (typeof v === "string" && v.trim() !== "") {
-    const n = Number(v.replace(",", "."))
-    return Number.isFinite(n) ? n : null
-  }
-  return null
-}
-
-function extrairPremioMensalMag(magData: unknown): number | null {
-  const root = magData as Record<string, unknown>
-  const sims = root?.simulacoes as unknown[] | undefined
-  const sim0 = (sims?.[0] ?? null) as Record<string, unknown> | null
-  if (!sim0) return null
-
-  const premio = sim0.premio as Record<string, unknown> | number | undefined
-
-  const candidates: unknown[] = [
-    typeof premio === "object" && premio != null ? premio.valorMensal : undefined,
-    typeof premio === "number" ? premio : undefined,
-    sim0.premioMensal,
-    sim0.valorPremio,
-    sim0.custo,
-    sim0.valorContribuicao,
-    sim0.contribuicaoMensal,
-  ]
-
-  for (const c of candidates) {
-    const n = asNumber(c)
-    if (n != null) return n
-  }
-
-  return null
+function baseUrlFromRequest(req: NextRequest): string {
+  const envBase = process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/$/, "")
+  if (envBase) return envBase
+  return req.nextUrl.origin
 }
 
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as SimulacaoBody
-    const {
-      dataNascimento,
-      sexoId,
-      renda,
-      uf,
-      codigoModeloProposta,
-      capitalSegurado,
-      anospag,
-    } = body
+    console.log("SIMULACAO REQUEST BODY:", body)
 
-    if (!codigoModeloProposta || dataNascimento == null) {
+    if (!body.codigoModeloProposta || body.dataNascimento == null) {
       return NextResponse.json(
-        { error: "codigoModeloProposta e dataNascimento são obrigatórios", fonte: "erro" },
+        { erro: "codigoModeloProposta e dataNascimento são obrigatórios" },
         { status: 400 },
       )
     }
 
     const apiUrl = process.env.MAG_API_URL?.replace(/\/$/, "")
     if (!apiUrl) {
-      return NextResponse.json({ error: "MAG_API_URL não configurada", fonte: "erro" }, { status: 500 })
+      return NextResponse.json({ erro: "MAG_API_URL não configurada" }, { status: 500 })
     }
 
-    let token: string
-    try {
-      token = await getMagAccessToken()
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Falha ao obter token"
-      return NextResponse.json({ error: msg, fonte: "erro" }, { status: 502 })
+    const tokenRes = await fetch(`${baseUrlFromRequest(req)}/api/mag/token`, {
+      cache: "no-store",
+    })
+    const tokenData = (await tokenRes.json()) as {
+      token?: string
+      access_token?: string
+      error?: string
+    }
+    console.log("TOKEN RESPONSE:", tokenData)
+
+    const token = tokenData.token ?? tokenData.access_token
+    if (!tokenRes.ok || !token) {
+      return NextResponse.json(
+        { erro: "Falha ao obter token", tokenData, tokenStatus: tokenRes.status },
+        { status: 500 },
+      )
     }
 
     const cnpj = (process.env.MAG_CNPJ || "27945275000154").replace(/\D/g, "")
-    const url = `${apiUrl}/apiseguradora/v3/simulacao?cnpj=${encodeURIComponent(cnpj)}&codigoModeloProposta=${encodeURIComponent(String(codigoModeloProposta))}`
+    const url = `${apiUrl}/apiseguradora/v3/simulacao?cnpj=${encodeURIComponent(cnpj)}&codigoModeloProposta=${encodeURIComponent(String(body.codigoModeloProposta))}`
+    console.log("MAG URL:", url)
 
-    const magBody = {
-      simulacoes: [
-        {
-          ...(capitalSegurado != null && capitalSegurado > 0
-            ? { capitalSegurado: Number(capitalSegurado) }
-            : {}),
-          proponente: {
-            tipoRelacaoSeguradoId: 1,
-            nome: "SIMULACAO VOGA WEALTH",
-            dataNascimento: String(dataNascimento),
-            profissaoCbo: "2410-05",
-            renda: Number(renda ?? 0),
-            sexoId: Number(sexoId ?? 1),
-            uf: String(uf ?? "SP"),
-            declaracaoIRId: 1,
-          },
-          periodicidadeCobrancaId: 30,
-          prazoPagamentoAntecipado: Number(anospag ?? 10),
-          prazoDecrescimo: 10,
-        },
-      ],
+    const simulacaoPayload: Record<string, unknown> = {
+      proponente: {
+        tipoRelacaoSeguradoId: 1,
+        nome: "SIMULACAO VOGA WEALTH",
+        dataNascimento: body.dataNascimento,
+        profissaoCbo: "2410-05",
+        renda: Number(body.renda ?? 0),
+        sexoId: Number(body.sexoId ?? 1),
+        uf: String(body.uf ?? "SP"),
+        declaracaoIRId: 1,
+      },
+      periodicidadeCobrancaId: 30,
+      prazoPagamentoAntecipado: Number(body.anospag ?? 10),
+      prazoDecrescimo: 10,
+    }
+
+    if (body.capitalSegurado != null && body.capitalSegurado > 0) {
+      simulacaoPayload.capitalSegurado = Number(body.capitalSegurado)
     }
 
     const magRes = await fetch(url, {
@@ -111,32 +81,52 @@ export async function POST(req: NextRequest) {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify(magBody),
+      body: JSON.stringify({
+        simulacoes: [simulacaoPayload],
+      }),
       cache: "no-store",
     })
 
+    console.log("MAG STATUS:", magRes.status)
+
     let magData: unknown
+    const rawText = await magRes.text()
     try {
-      magData = await magRes.json()
+      magData = rawText ? JSON.parse(rawText) : {}
     } catch {
-      magData = { parseError: true }
+      magData = { parseError: true, rawText }
     }
 
-    console.log("MAG RAW RESPONSE:", JSON.stringify(magData, null, 2))
-    console.log("MAG STATUS:", magRes.status)
+    console.log("MAG RESPONSE COMPLETO:", JSON.stringify(magData, null, 2))
+
+    if (!magRes.ok) {
+      return NextResponse.json(
+        {
+          erro: "MAG API erro",
+          status: magRes.status,
+          magData,
+        },
+        { status: 500 },
+      )
+    }
 
     const simulacao = (magData as { simulacoes?: unknown[] })?.simulacoes?.[0] as
       | Record<string, unknown>
       | undefined
 
-    console.log("SIMULACAO:", JSON.stringify(simulacao, null, 2))
+    const premioObj =
+      simulacao?.premio && typeof simulacao.premio === "object"
+        ? (simulacao.premio as Record<string, unknown>)
+        : null
+
+    const premioMensal =
+      (typeof premioObj?.valorMensal === "number" ? premioObj.valorMensal : null) ??
+      (typeof simulacao?.premioMensal === "number" ? simulacao.premioMensal : null) ??
+      (typeof simulacao?.valorPremio === "number" ? simulacao.valorPremio : null) ??
+      null
+
     console.log("PREMIO FIELDS:", {
-      "premio.valorMensal":
-        simulacao?.premio &&
-        typeof simulacao.premio === "object" &&
-        simulacao.premio != null
-          ? (simulacao.premio as Record<string, unknown>).valorMensal
-          : undefined,
+      "premio.valorMensal": premioObj?.valorMensal,
       premioMensal: simulacao?.premioMensal,
       valorPremio: simulacao?.valorPremio,
       premio: simulacao?.premio,
@@ -145,18 +135,21 @@ export async function POST(req: NextRequest) {
       contribuicaoMensal: simulacao?.contribuicaoMensal,
     })
 
-    const premioMensal = extrairPremioMensalMag(magData)
-
     return NextResponse.json({
       premioMensal,
       premioAnual: premioMensal != null ? premioMensal * 12 : null,
-      produto: codigoModeloProposta,
-      fonte: premioMensal != null ? "mag_api" : "erro",
       rawResponse: magData,
-      magHttpStatus: magRes.status,
+      fonte: "mag_api",
     })
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "Erro na simulação MAG"
-    return NextResponse.json({ error: msg, fonte: "erro" }, { status: 500 })
+  } catch (error: unknown) {
+    console.error("SIMULACAO ERRO CRITICO:", error)
+    const err = error instanceof Error ? error : new Error(String(error))
+    return NextResponse.json(
+      {
+        erro: err.message,
+        stack: err.stack,
+      },
+      { status: 500 },
+    )
   }
 }

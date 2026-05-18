@@ -25,7 +25,7 @@ import {
   LabelList,
   ResponsiveContainer,
 } from "recharts"
-import { ArrowLeft, ArrowRight, Pencil } from "lucide-react"
+import { ArrowLeft, ArrowRight, Pencil, Plus } from "lucide-react"
 import { usePlano, type Ativo, type Passivo } from "@/lib/plano-context"
 
 interface PatrimonioProps {
@@ -61,7 +61,9 @@ const CATEGORIAS_PASSIVO = [
 ] as const
 
 const CATEGORIAS_LIQUIDO = DESCRICOES_ATIVOS_POR_TIPO["Líquido"]
-const CATEGORIAS_IMOBILIZADO = DESCRICOES_ATIVOS_POR_TIPO["Imobilizado"]
+const CATEGORIAS_IMOBILIZADO_BASE = DESCRICOES_ATIVOS_POR_TIPO["Imobilizado"]
+const CATEGORIA_PARTICIPACOES = "Participações Societárias"
+const CATEGORIAS_IMOBILIZADO = [...CATEGORIAS_IMOBILIZADO_BASE, CATEGORIA_PARTICIPACOES]
 
 const TOOLTIP_STYLE = {
   backgroundColor: "#131929",
@@ -89,6 +91,11 @@ function matchesAtivoCategoria(ativo: Ativo, tipo: string, categoria: string): b
   return desc === categoria
 }
 
+function isAtivoLiquidoCustom(ativo: Ativo): boolean {
+  if ((ativo.tipo ?? "").trim() !== "Líquido") return false
+  return !CATEGORIAS_LIQUIDO.some((cat) => matchesAtivoCategoria(ativo, "Líquido", cat))
+}
+
 function matchesPassivoCategoria(passivo: Passivo, categoria: string): boolean {
   const tipo = (passivo.tipo ?? "").trim()
   if (categoria === "Outros") {
@@ -105,14 +112,14 @@ function PatrimonioCharts({
   totalDonut,
   dataBarrasLiquido,
   alturaBarras,
-  patrimonioLiquido,
+  patrimonioTotal,
   formatCurrency,
 }: {
   dataDonut: DonutSlice[]
   totalDonut: number
   dataBarrasLiquido: BarraLiquido[]
   alturaBarras: number
-  patrimonioLiquido: number
+  patrimonioTotal: number
   formatCurrency: (value: number) => string
 }) {
   const donutAtivo = dataDonut.filter((d) => d.value > 0)
@@ -124,9 +131,7 @@ function PatrimonioCharts({
       </p>
       <div className="flex flex-col lg:flex-row gap-8">
         <div className="w-full lg:w-[40%] flex flex-col">
-          <p className="text-sm font-medium text-foreground mb-3">
-            Distribuição por Categoria Principal
-          </p>
+          <p className="text-sm font-medium text-foreground mb-3">Distribuição de Ativos</p>
           {totalDonut > 0 ? (
             <>
               <div className="h-[260px] w-full">
@@ -156,7 +161,7 @@ function PatrimonioCharts({
                           return (
                             <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
                               <tspan x={cx} dy="-0.55em" fontSize={11} fill="#9CA3AF">
-                                Patrimônio Líquido
+                                Patrimônio Total
                               </tspan>
                               <tspan
                                 x={cx}
@@ -165,7 +170,7 @@ function PatrimonioCharts({
                                 fontWeight={700}
                                 fill="#1E5CE6"
                               >
-                                {formatCurrency(patrimonioLiquido)}
+                                {formatCurrency(patrimonioTotal)}
                               </tspan>
                             </text>
                           )
@@ -197,11 +202,9 @@ function PatrimonioCharts({
                         className="w-2.5 h-2.5 rounded-full shrink-0"
                         style={{ backgroundColor: item.fill }}
                       />
-                      <span className="text-foreground flex-1 min-w-0 truncate">{item.name}</span>
-                      <span className="tabular-nums text-foreground shrink-0">
-                        {formatCurrency(item.value)}
+                      <span className="text-foreground flex-1 min-w-0 truncate">
+                        {item.name}: {formatCurrency(item.value)} | {pct}%
                       </span>
-                      <span className="tabular-nums w-12 text-right shrink-0">{pct}%</span>
                     </li>
                   )
                 })}
@@ -369,22 +372,28 @@ function PatrimonioSection({
   totalLabel,
   totalValue,
   totalClassName = "text-foreground",
+  headerAction,
   children,
 }: {
   title: string
   totalLabel: string
   totalValue: string
   totalClassName?: string
+  headerAction?: ReactNode
   children: ReactNode
 }) {
   return (
     <section className="rounded-xl bg-[#131929] border border-white/10 p-5 md:p-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4 pb-4 border-b border-white/10">
-        <h2 className="text-base font-semibold text-foreground">{title}</h2>
-        <p className={`text-lg md:text-xl font-bold tabular-nums ${totalClassName}`}>
-          {totalLabel}{" "}
-          <span className={totalClassName}>{totalValue}</span>
-        </p>
+      <div className="flex flex-col gap-3 mb-4 pb-4 border-b border-white/10">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <h2 className="text-base font-semibold text-foreground">{title}</h2>
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+            {headerAction}
+            <p className={`text-lg md:text-xl font-bold tabular-nums ${totalClassName}`}>
+              {totalLabel} {totalValue}
+            </p>
+          </div>
+        </div>
       </div>
       <div>{children}</div>
     </section>
@@ -392,8 +401,12 @@ function PatrimonioSection({
 }
 
 export function Patrimonio({ onNavigate }: PatrimonioProps) {
-  const { state, setAtivos, setPassivos, getPatrimonioLiquido } = usePlano()
-  const { ativos, passivos, moeda } = state
+  const { state, setAtivos, setPassivos, setPatrimonio, getPatrimonioLiquido } = usePlano()
+  const { ativos, passivos, patrimonio, moeda } = state
+  const participacoes = patrimonio?.participacoes ?? 0
+
+  const [addLiquidoModalOpen, setAddLiquidoModalOpen] = useState(false)
+  const [novoAtivoLiquido, setNovoAtivoLiquido] = useState({ nome: "", valor: 0 })
 
   const [ativoModalOpen, setAtivoModalOpen] = useState(false)
   const [editingAtivo, setEditingAtivo] = useState<Ativo | null>(null)
@@ -523,40 +536,66 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
     [sumPassivoCategoria],
   )
 
-  const totalAtivosLiquidos = valoresLiquido.reduce((s, x) => s + x.valor, 0)
-  const totalAtivosReais = valoresImobilizado.reduce((s, x) => s + x.valor, 0)
+  const ativosLiquidosCustom = useMemo(
+    () => ativos.filter((a) => isAtivoLiquidoCustom(a)),
+    [ativos],
+  )
+
+  const totalAtivosLiquidos = useMemo(
+    () =>
+      ativos
+        .filter((a) => (a.tipo ?? "").trim() === "Líquido")
+        .reduce((s, a) => s + (Number(a.valor) || 0), 0),
+    [ativos],
+  )
+
+  const totalImobilizadoBase = useMemo(
+    () =>
+      CATEGORIAS_IMOBILIZADO_BASE.reduce(
+        (s, cat) => s + sumAtivoCategoria("Imobilizado", cat),
+        0,
+      ),
+    [sumAtivoCategoria],
+  )
+
+  const totalAtivosReais = totalImobilizadoBase + participacoes
   const totalPassivos = valoresPassivo.reduce((s, x) => s + x.valor, 0)
-  const totalAtivos = ativos.reduce((sum, a) => sum + (a.valor || 0), 0)
-  const patrimonioLiquido = getPatrimonioLiquido()
-  const plConsolidado = patrimonioLiquido
+  const totalAtivos = totalAtivosLiquidos + totalAtivosReais
+  const patrimonioLiquidoResumo = totalAtivos - totalPassivos
+  const plConsolidado = getPatrimonioLiquido()
 
   const ativosLiquidos = totalAtivosLiquidos
-  const imobilizado = totalAtivosReais
-  const passivosTotal = totalPassivos
+  const imobilizado = totalImobilizadoBase
 
   const dataDonut = useMemo(
     () => [
       { name: "Ativos Líquidos", value: ativosLiquidos, fill: "#1E5CE6" },
       { name: "Imobilizado", value: imobilizado, fill: "#1D9E75" },
-      { name: "Passivos", value: passivosTotal, fill: "#E24B4A" },
+      { name: "Participações", value: participacoes, fill: "#7C3AED" },
     ],
-    [ativosLiquidos, imobilizado, passivosTotal],
+    [ativosLiquidos, imobilizado, participacoes],
   )
+
+  const patrimonioTotal = ativosLiquidos + imobilizado + participacoes
 
   const totalDonut = dataDonut.reduce((s, d) => s + d.value, 0)
 
   const dataBarrasLiquido = useMemo(() => {
-    const sorted = valoresLiquido
+    const fixed = valoresLiquido
       .filter((x) => x.valor > 0)
-      .sort((a, b) => b.valor - a.valor)
+      .map((x) => ({ name: x.cat, value: x.valor }))
+    const custom = ativosLiquidosCustom
+      .filter((a) => (a.valor || 0) > 0)
+      .map((a) => ({ name: a.descricao || "Ativo", value: Number(a.valor) || 0 }))
+    const sorted = [...fixed, ...custom].sort((a, b) => b.value - a.value)
     return sorted.map((x, i) => ({
-      name: x.cat,
-      value: x.valor,
+      name: x.name,
+      value: x.value,
       fill: blueShadeByRank(i, sorted.length),
       pctLiquido:
-        totalAtivosLiquidos > 0 ? (x.valor / totalAtivosLiquidos) * 100 : 0,
+        totalAtivosLiquidos > 0 ? (x.value / totalAtivosLiquidos) * 100 : 0,
     }))
-  }, [valoresLiquido, totalAtivosLiquidos])
+  }, [valoresLiquido, ativosLiquidosCustom, totalAtivosLiquidos])
 
   const alturaBarras = Math.max(160, dataBarrasLiquido.length * 48)
 
@@ -630,6 +669,63 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
 
   const handleNext = () => onNavigate("objetivos")
 
+  const saveNovoAtivoLiquido = () => {
+    const nome = novoAtivoLiquido.nome.trim()
+    if (!nome) return
+    setAtivos([
+      ...ativos,
+      {
+        id: Date.now().toString(),
+        tipo: "Líquido",
+        descricao: nome,
+        instituicao: "",
+        valor: novoAtivoLiquido.valor,
+        heranca: false,
+      },
+    ])
+    setNovoAtivoLiquido({ nome: "", valor: 0 })
+    setAddLiquidoModalOpen(false)
+  }
+
+  const openAddPassivo = () => {
+    setEditingPassivo(null)
+    setPassivoForm({
+      tipo: "",
+      modelo: "SAC",
+      descricao: "",
+      valor: 0,
+      taxa: 0,
+      prazo: 0,
+    })
+    setPassivoModalOpen(true)
+  }
+
+  const addAtivoButton = (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      onClick={() => setAddLiquidoModalOpen(true)}
+      className="border border-dashed border-muted-foreground/50 text-muted-foreground hover:text-foreground hover:border-foreground"
+    >
+      <Plus className="w-4 h-4 mr-1" />
+      Adicionar ativo
+    </Button>
+  )
+
+  const addPassivoButton = (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      onClick={openAddPassivo}
+      className="border border-dashed border-muted-foreground/50 text-muted-foreground hover:text-foreground hover:border-foreground"
+    >
+      <Plus className="w-4 h-4 mr-1" />
+      Adicionar dívida
+    </Button>
+  )
+
   return (
     <div className="space-y-6">
       <div className="space-y-1">
@@ -647,6 +743,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
         totalLabel="PL Consolidado"
         totalValue={formatCurrency(plConsolidado)}
         totalClassName="text-[#1E5CE6]"
+        headerAction={addAtivoButton}
       >
         {CATEGORIAS_LIQUIDO.map((cat) => {
           const valor = sumAtivoCategoria("Líquido", cat)
@@ -664,6 +761,31 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
             />
           )
         })}
+        {ativosLiquidosCustom.map((ativo) => (
+          <PatrimonioBarRow
+            key={ativo.id}
+            label={ativo.descricao || "Ativo"}
+            valor={ativo.valor || 0}
+            totalSecao={totalAtivosLiquidos}
+            barColor="#1E5CE6"
+            formatCurrency={formatCurrency}
+            valueClassName="text-foreground"
+            onValueCommit={(v) => {
+              setAtivos(ativos.map((a) => (a.id === ativo.id ? { ...a, valor: v } : a)))
+            }}
+            onEdit={() => {
+              setEditingAtivo(ativo)
+              setAtivoForm({
+                tipo: ativo.tipo,
+                descricao: ativo.descricao,
+                instituicao: ativo.instituicao,
+                valor: ativo.valor,
+                heranca: ativo.heranca === true,
+              })
+              setAtivoModalOpen(true)
+            }}
+          />
+        ))}
       </PatrimonioSection>
 
       <PatrimonioSection
@@ -672,7 +794,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
         totalValue={formatCurrency(totalAtivosReais)}
         totalClassName="text-[#1D9E75]"
       >
-        {CATEGORIAS_IMOBILIZADO.map((cat) => {
+        {CATEGORIAS_IMOBILIZADO_BASE.map((cat) => {
           const valor = sumAtivoCategoria("Imobilizado", cat)
           return (
             <PatrimonioBarRow
@@ -688,13 +810,33 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
             />
           )
         })}
+        <PatrimonioBarRow
+          key={CATEGORIA_PARTICIPACOES}
+          label={CATEGORIA_PARTICIPACOES}
+          valor={participacoes}
+          totalSecao={totalAtivosReais}
+          barColor="#7C3AED"
+          formatCurrency={formatCurrency}
+          valueClassName="text-foreground"
+          onValueCommit={(v) => setPatrimonio({ participacoes: v })}
+        />
       </PatrimonioSection>
+
+      <PatrimonioCharts
+        dataDonut={dataDonut}
+        totalDonut={totalDonut}
+        dataBarrasLiquido={dataBarrasLiquido}
+        alturaBarras={alturaBarras}
+        patrimonioTotal={patrimonioTotal}
+        formatCurrency={formatCurrency}
+      />
 
       <PatrimonioSection
         title="Passivos e Dívidas"
         totalLabel="Total"
         totalValue={formatCurrency(totalPassivos)}
         totalClassName="text-[#E24B4A]"
+        headerAction={addPassivoButton}
       >
         {CATEGORIAS_PASSIVO.map((cat) => {
           const valor = sumPassivoCategoria(cat)
@@ -713,15 +855,6 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
           )
         })}
       </PatrimonioSection>
-
-      <PatrimonioCharts
-        dataDonut={dataDonut}
-        totalDonut={totalDonut}
-        dataBarrasLiquido={dataBarrasLiquido}
-        alturaBarras={alturaBarras}
-        patrimonioLiquido={patrimonioLiquido}
-        formatCurrency={formatCurrency}
-      />
 
       <div className="rounded-xl bg-[#131929] border border-white/10 p-5 md:p-6">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-center sm:text-left">
@@ -744,11 +877,59 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
               Patrimônio Líquido
             </p>
             <p className="text-xl font-bold text-[#1E5CE6] tabular-nums">
-              {formatCurrency(patrimonioLiquido)}
+              {formatCurrency(patrimonioLiquidoResumo)}
             </p>
           </div>
         </div>
       </div>
+
+      <Dialog open={addLiquidoModalOpen} onOpenChange={setAddLiquidoModalOpen}>
+        <DialogContent className="bg-[#131929] border-white/[0.18] rounded-2xl max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Adicionar ativo líquido</DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Informe o nome e o valor do ativo de investimento
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+                Nome do ativo
+              </label>
+              <Input
+                value={novoAtivoLiquido.nome}
+                onChange={(e) => setNovoAtivoLiquido({ ...novoAtivoLiquido, nome: e.target.value })}
+                placeholder="Ex: CDB Banco X"
+                className="bg-[#0D1220] border-white/10 text-foreground"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+                Valor (R$)
+              </label>
+              <Input
+                value={novoAtivoLiquido.valor ? formatCurrency(novoAtivoLiquido.valor) : ""}
+                onChange={(e) =>
+                  setNovoAtivoLiquido({
+                    ...novoAtivoLiquido,
+                    valor: parseCurrency(e.target.value),
+                  })
+                }
+                placeholder="0"
+                className="bg-[#0D1220] border-white/10 text-foreground"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="ghost" onClick={() => setAddLiquidoModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={saveNovoAtivoLiquido} className="bg-primary text-primary-foreground">
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="flex items-center gap-3">
         <Button

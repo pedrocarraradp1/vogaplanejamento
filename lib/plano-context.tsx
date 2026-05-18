@@ -110,11 +110,16 @@ export interface Protecao {
   dividasPend: number
 }
 
+export interface PatrimonioState {
+  participacoes: number
+}
+
 export interface PlanoState {
   moeda: "BRL" | "USD"
   dadosPessoais: DadosPessoais
   ativos: Ativo[]
   passivos: Passivo[]
+  patrimonio: PatrimonioState
   objetivos: Objetivo[]
   premissas: Premissas
   sucessao: Sucessao
@@ -140,6 +145,7 @@ interface PlanoContextType {
   setDadosPessoais: (dados: Partial<DadosPessoais>) => void
   setAtivos: (ativos: Ativo[]) => void
   setPassivos: (passivos: Passivo[]) => void
+  setPatrimonio: (patrimonio: Partial<PatrimonioState>) => void
   setObjetivos: (objetivos: Objetivo[]) => void
   setPremissas: (premissas: Partial<Premissas>) => void
   setSucessao: (sucessao: Partial<Sucessao>) => void
@@ -213,6 +219,7 @@ const initialState: PlanoState = {
   },
   ativos: [],
   passivos: [],
+  patrimonio: { participacoes: 0 },
   objetivos: [],
   premissas: defaultPremissas,
   sucessao: {
@@ -269,6 +276,10 @@ export function PlanoProvider({
       protecao: { ...initialState.protecao, ...(raw?.protecao ?? {}) },
       ativos: Array.isArray(raw?.ativos) ? raw.ativos : [],
       passivos: Array.isArray(raw?.passivos) ? raw.passivos : [],
+      patrimonio: {
+        participacoes:
+          Number((raw as { patrimonio?: PatrimonioState })?.patrimonio?.participacoes) || 0,
+      },
       objetivos: Array.isArray(raw?.objetivos) ? raw.objetivos : [],
       projecao: Array.isArray(raw?.projecao) ? raw.projecao : initialState.projecao,
       kpis: raw?.kpis ?? null,
@@ -312,6 +323,16 @@ export function PlanoProvider({
         observacoes,
       }
     })
+
+    // Migra participações legadas (ativos tipo "Participação Societária") para patrimonio.participacoes
+    if (!merged.patrimonio.participacoes) {
+      const legadoParticipacoes = (merged.ativos ?? [])
+        .filter((a) => (a.tipo ?? "").trim() === "Participação Societária")
+        .reduce((s, a) => s + (Number(a.valor) || 0), 0)
+      if (legadoParticipacoes > 0) {
+        merged.patrimonio.participacoes = legadoParticipacoes
+      }
+    }
 
     // Normaliza rendimento líquido derivado
     const bruto = Number(merged.premissas.rendimentoBruto) || 0
@@ -372,6 +393,13 @@ export function PlanoProvider({
 
   const setPassivos = useCallback((passivos: Passivo[]) => {
     setState(prev => ({ ...prev, passivos }))
+  }, [])
+
+  const setPatrimonio = useCallback((patrimonio: Partial<PatrimonioState>) => {
+    setState(prev => ({
+      ...prev,
+      patrimonio: { ...prev.patrimonio, ...patrimonio },
+    }))
   }, [])
 
   const setObjetivos = useCallback((objetivos: Objetivo[]) => {
@@ -533,7 +561,7 @@ export function PlanoProvider({
       simulacaoMeta,
       setMoeda,
       setSimulacaoMeta: setSimulacaoMetaPartial,
-      setDadosPessoais, setAtivos, setPassivos, setObjetivos,
+      setDadosPessoais, setAtivos, setPassivos, setPatrimonio, setObjetivos,
       setPremissas, setSucessao, setProtecao,
       loadState, clearSimulacaoMeta,
       getPatrimonioLiquido, getAporteMensal, getIdadeAtual,
