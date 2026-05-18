@@ -34,8 +34,11 @@ import {
   TIPOS_ATIVO,
   isTipoAtivoLabel,
   matchesAtivoCategoria,
+  DEFAULT_CATEGORIA_PASSIVO,
   matchesPassivoCategoria,
   normalizeAtivoDescricao,
+  resolveDescricaoAtivo,
+  resolveTipoAtivoLabel,
   sumAtivoCategoria,
   sumPassivoCategoria,
   type SecaoAtivoConfig,
@@ -62,12 +65,19 @@ type LinhaAtivo = {
   bemDeHeranca: boolean
 }
 
+type BemDeHerancaSelect = "sim" | "nao"
+
 type AddAtivoForm = {
   tipo: TipoAtivoLabel
   descricao: string
   valor: number
   instituicao: string
-  bemDeHeranca: boolean
+  bemDeHeranca: BemDeHerancaSelect
+}
+
+type AddPassivoForm = {
+  categoria: string
+  valor: number
 }
 
 const EMPTY_ATIVO_FORM = (): AddAtivoForm => ({
@@ -75,7 +85,12 @@ const EMPTY_ATIVO_FORM = (): AddAtivoForm => ({
   descricao: DESCRICOES_ATIVOS_POR_TIPO["Líquido"][0],
   valor: 0,
   instituicao: "",
-  bemDeHeranca: false,
+  bemDeHeranca: "nao",
+})
+
+const EMPTY_PASSIVO_FORM = (): AddPassivoForm => ({
+  categoria: DEFAULT_CATEGORIA_PASSIVO,
+  valor: 0,
 })
 
 type AddModalState =
@@ -373,8 +388,8 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
   const { ativos, passivos, patrimonio, moeda } = state
 
   const [addModal, setAddModal] = useState<AddModalState>(null)
-  const [addAtivoForm, setAddAtivoForm] = useState<AddAtivoForm>(EMPTY_ATIVO_FORM)
-  const [addPassivoForm, setAddPassivoForm] = useState({ categoria: "", valor: 0 })
+  const [addAtivoForm, setAddAtivoForm] = useState<AddAtivoForm>(() => EMPTY_ATIVO_FORM())
+  const [addPassivoForm, setAddPassivoForm] = useState<AddPassivoForm>(() => EMPTY_PASSIVO_FORM())
 
   const formatCurrency = useCallback(
     (value: number) =>
@@ -395,7 +410,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
   const appendAtivo = useCallback(
     (form: AddAtivoForm) => {
       if (form.valor <= 0 || !form.descricao.trim()) return
-      const bem = form.bemDeHeranca
+      const bem = form.bemDeHeranca === "sim"
       setAtivos(
         ativos.concat({
           id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -527,34 +542,42 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
       descricao: DESCRICOES_ATIVOS_POR_TIPO[tipo][0],
       valor: 0,
       instituicao: "",
-      bemDeHeranca: false,
+      bemDeHeranca: "nao",
     })
     setAddModal({ kind: "ativo", tipoInicial: tipo })
   }
 
   const openAddPassivo = () => {
-    setAddPassivoForm({ categoria: CATEGORIAS_PASSIVO[0], valor: 0 })
+    setAddPassivoForm(EMPTY_PASSIVO_FORM())
     setAddModal({ kind: "passivo" })
   }
 
   const onAtivoTipoChange = (tipo: TipoAtivoLabel) => {
-    setAddAtivoForm({
-      ...addAtivoForm,
+    setAddAtivoForm((prev) => ({
+      ...prev,
       tipo,
       descricao: DESCRICOES_ATIVOS_POR_TIPO[tipo][0],
-    })
+    }))
   }
+
+  const ativoTipoSelect = resolveTipoAtivoLabel(addAtivoForm.tipo)
+  const ativoDescricaoSelect = resolveDescricaoAtivo(ativoTipoSelect, addAtivoForm.descricao)
+  const passivoCategoriaSelect = addPassivoForm.categoria || DEFAULT_CATEGORIA_PASSIVO
 
   const saveAddModal = () => {
     if (!addModal) return
     if (addModal.kind === "ativo") {
-      if (!addAtivoForm.descricao.trim() || addAtivoForm.valor <= 0) return
-      appendAtivo(addAtivoForm)
+      if (!ativoDescricaoSelect || addAtivoForm.valor <= 0) return
+      appendAtivo({
+        ...addAtivoForm,
+        tipo: ativoTipoSelect,
+        descricao: ativoDescricaoSelect,
+      })
       setAddAtivoForm(EMPTY_ATIVO_FORM())
     } else {
-      if (!addPassivoForm.categoria) return
-      setPassivoCategoria(addPassivoForm.categoria, addPassivoForm.valor)
-      setAddPassivoForm({ categoria: "", valor: 0 })
+      if (!passivoCategoriaSelect) return
+      setPassivoCategoria(passivoCategoriaSelect, addPassivoForm.valor)
+      setAddPassivoForm(EMPTY_PASSIVO_FORM())
     }
     setAddModal(null)
   }
@@ -716,7 +739,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                   Tipo
                 </label>
                 <Select
-                  value={addAtivoForm.tipo}
+                  value={ativoTipoSelect}
                   onValueChange={(v) => onAtivoTipoChange(v as TipoAtivoLabel)}
                 >
                   <SelectTrigger className="bg-[#0D1220] border-white/10 text-foreground">
@@ -736,14 +759,16 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                   Descrição
                 </label>
                 <Select
-                  value={addAtivoForm.descricao}
-                  onValueChange={(descricao) => setAddAtivoForm({ ...addAtivoForm, descricao })}
+                  value={ativoDescricaoSelect}
+                  onValueChange={(descricao) =>
+                    setAddAtivoForm((prev) => ({ ...prev, descricao }))
+                  }
                 >
                   <SelectTrigger className="bg-[#0D1220] border-white/10 text-foreground">
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
                   <SelectContent className="bg-[#131929] border-white/10">
-                    {DESCRICOES_ATIVOS_POR_TIPO[addAtivoForm.tipo].map((d) => (
+                    {DESCRICOES_ATIVOS_POR_TIPO[ativoTipoSelect].map((d) => (
                       <SelectItem key={d} value={d}>
                         {d}
                       </SelectItem>
@@ -780,9 +805,12 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                   Bem de Herança
                 </label>
                 <Select
-                  value={addAtivoForm.bemDeHeranca ? "sim" : "nao"}
+                  value={addAtivoForm.bemDeHeranca}
                   onValueChange={(v) =>
-                    setAddAtivoForm({ ...addAtivoForm, bemDeHeranca: v === "sim" })
+                    setAddAtivoForm((prev) => ({
+                      ...prev,
+                      bemDeHeranca: v === "sim" ? "sim" : "nao",
+                    }))
                   }
                 >
                   <SelectTrigger className="bg-[#0D1220] border-white/10 text-foreground">
@@ -805,8 +833,10 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                   Categoria
                 </label>
                 <Select
-                  value={addPassivoForm.categoria}
-                  onValueChange={(value) => setAddPassivoForm({ ...addPassivoForm, categoria: value })}
+                  value={passivoCategoriaSelect}
+                  onValueChange={(value) =>
+                    setAddPassivoForm((prev) => ({ ...prev, categoria: value }))
+                  }
                 >
                   <SelectTrigger className="bg-[#0D1220] border-white/10 text-foreground">
                     <SelectValue placeholder="Selecione" />
@@ -845,7 +875,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                 addModal?.kind === "ativo"
                   ? addAtivoForm.valor <= 0 || !addAtivoForm.descricao
                   : addModal?.kind === "passivo"
-                    ? !addPassivoForm.categoria || addPassivoForm.valor <= 0
+                    ? !passivoCategoriaSelect || addPassivoForm.valor <= 0
                     : true
               }
               className="bg-primary text-primary-foreground"

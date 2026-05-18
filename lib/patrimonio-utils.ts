@@ -39,12 +39,29 @@ export function isTipoAtivoLabel(tipo: string): tipo is TipoAtivoLabel {
   return (TIPOS_ATIVO as readonly string[]).includes(tipo)
 }
 
+export function resolveTipoAtivoLabel(tipo: string | undefined | null): TipoAtivoLabel {
+  const t = (tipo ?? "").trim()
+  return isTipoAtivoLabel(t) ? t : "Líquido"
+}
+
+export function resolveDescricaoAtivo(
+  tipo: TipoAtivoLabel,
+  descricao: string | undefined | null,
+): string {
+  const cats = DESCRICOES_ATIVOS_POR_TIPO[tipo]
+  const d = (descricao ?? "").trim()
+  if (cats.includes(d)) return d
+  return cats[0]
+}
+
 export const CATEGORIAS_PASSIVO = [
   "Financiamento Imóvel",
   "Financiamento Veículo",
   "Empréstimo Pessoal",
   "Outros",
 ] as const
+
+export const DEFAULT_CATEGORIA_PASSIVO = CATEGORIAS_PASSIVO[0]
 
 export const SECAO_LIQUIDO = {
   id: "liquidos",

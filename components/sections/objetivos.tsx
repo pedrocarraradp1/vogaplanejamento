@@ -434,7 +434,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                   Duração
                 </label>
                 <Select
-                  value={form.duracaoTipo}
+                  value={form.duracaoTipo ?? "total"}
                   onValueChange={(v) => {
                     const duracaoTipo = (v === "personalizado" ? "personalizado" : "total") as "total" | "personalizado"
                     setForm((prev) => ({

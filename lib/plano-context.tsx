@@ -217,14 +217,14 @@ const initialState: PlanoState = {
     conjuge:     "",
     profissao:   "",
     nascimento:  "",
-    estadoCivil: "",
-    regime:      "",
+    estadoCivil: "solteiro",
+    regime:      "Comunhão Parcial de Bens",
     filhos:      [],
     renda:       0,
     despesa:     0,
-    sexo:        "",
+    sexo:        "M",
     genero:      "",
-    uf:          "",
+    uf:          "SP",
   },
   ativos: [],
   passivos: [],
@@ -312,6 +312,16 @@ export function PlanoProvider({
       }))
     } else {
       merged.dadosPessoais.filhos = []
+    }
+
+    const dp = merged.dadosPessoais
+    if (dp.sexo !== "M" && dp.sexo !== "F") dp.sexo = "M"
+    if (!dp.estadoCivil?.trim()) dp.estadoCivil = "solteiro"
+    if (!dp.regime?.trim()) dp.regime = "Comunhão Parcial de Bens"
+    if (!dp.uf?.trim()) dp.uf = "SP"
+
+    if (merged.premissas.aporteModo !== "fixo" && merged.premissas.aporteModo !== "periodos") {
+      merged.premissas.aporteModo = "fixo"
     }
 
     // Normaliza objetivos (compatibilidade com modelos antigos: prazo/aCada)

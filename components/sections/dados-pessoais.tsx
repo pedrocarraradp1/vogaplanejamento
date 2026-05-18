@@ -197,7 +197,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
                 Estado Civil
               </Label>
               <Select
-                value={dadosPessoais.estadoCivil}
+                value={dadosPessoais.estadoCivil || "solteiro"}
                 onValueChange={(value) => {
                   setDadosPessoais({ estadoCivil: value })
                   // Limpa o campo de cônjuge se não for casado
@@ -227,7 +227,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
                 Regime de Bens
               </Label>
               <Select
-                value={dadosPessoais.regime}
+                value={dadosPessoais.regime || "Comunhão Parcial de Bens"}
                 onValueChange={(value) => setDadosPessoais({ regime: value })}
               >
                 <SelectTrigger className="h-11 bg-[#131929] border-[rgba(255,255,255,0.14)] text-foreground focus:border-primary focus:ring-1 focus:ring-primary/30">
@@ -254,7 +254,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
                 value={
                   dadosPessoais.sexo === "M" || dadosPessoais.sexo === "F"
                     ? dadosPessoais.sexo
-                    : undefined
+                    : "M"
                 }
                 onValueChange={(value) => setDadosPessoais({ sexo: value as "M" | "F" })}
               >

@@ -7,9 +7,18 @@ import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 function Select({
+  value,
+  defaultValue,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Root>) {
-  return <SelectPrimitive.Root data-slot="select" {...props} />
+  const rootProps: React.ComponentProps<typeof SelectPrimitive.Root> = { ...props }
+  if (value !== undefined) {
+    rootProps.value = value ?? ''
+  }
+  if (defaultValue !== undefined) {
+    rootProps.defaultValue = defaultValue ?? ''
+  }
+  return <SelectPrimitive.Root data-slot="select" {...rootProps} />
 }
 
 function SelectGroup({

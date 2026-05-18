@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { getMAGToken } from "@/lib/mag/auth"
 
 type SimulacaoBody = {
   dataNascimento?: string
@@ -8,12 +9,6 @@ type SimulacaoBody = {
   codigoModeloProposta?: string
   capitalSegurado?: number
   anospag?: number
-}
-
-function baseUrlFromRequest(req: NextRequest): string {
-  const envBase = process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/$/, "")
-  if (envBase) return envBase
-  return req.nextUrl.origin
 }
 
 export async function POST(req: NextRequest) {
@@ -33,23 +28,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ erro: "MAG_API_URL não configurada" }, { status: 500 })
     }
 
-    const tokenRes = await fetch(`${baseUrlFromRequest(req)}/api/mag/token`, {
-      cache: "no-store",
-    })
-    const tokenData = (await tokenRes.json()) as {
-      token?: string
-      access_token?: string
-      error?: string
-    }
-    console.log("TOKEN RESPONSE:", tokenData)
-
-    const token = tokenData.token ?? tokenData.access_token
-    if (!tokenRes.ok || !token) {
-      return NextResponse.json(
-        { erro: "Falha ao obter token", tokenData, tokenStatus: tokenRes.status },
-        { status: 500 },
-      )
-    }
+    const token = await getMAGToken()
 
     const cnpj = (process.env.MAG_CNPJ || "27945275000154").replace(/\D/g, "")
     const url = `${apiUrl}/apiseguradora/v3/simulacao?cnpj=${encodeURIComponent(cnpj)}&codigoModeloProposta=${encodeURIComponent(String(body.codigoModeloProposta))}`

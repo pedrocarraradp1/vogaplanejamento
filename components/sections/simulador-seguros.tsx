@@ -114,6 +114,17 @@ const UFS_BR = [
   "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO",
 ] as const
 
+type SexoSelect = "M" | "F"
+
+function resolveSexoSelect(sexo: string | undefined | null): SexoSelect {
+  return sexo === "M" || sexo === "F" ? sexo : "M"
+}
+
+function resolveUfSelect(uf: string | undefined | null): string {
+  const u = (uf ?? "").trim().toUpperCase()
+  return (UFS_BR as readonly string[]).includes(u) ? u : "SP"
+}
+
 const LABEL_CAMPO: Record<CampoKey, string> = {
   dataNascimento: "Data de nascimento",
   sexo: "Sexo",
@@ -193,6 +204,10 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
   const [fontePremio, setFontePremio] = useState<"mag_api" | "estimativa">("estimativa")
   const [loadingMag, setLoadingMag] = useState(false)
   const [localInputs, setLocalInputs] = useState<Partial<Record<CampoKey, string>>>({})
+  const [localSexo, setLocalSexo] = useState<SexoSelect>(() =>
+    resolveSexoSelect(dadosPessoais.sexo),
+  )
+  const [localUf, setLocalUf] = useState<string>(() => resolveUfSelect(dadosPessoais.uf))
 
   const ativosLiquidosGlobal = useMemo(() => {
     const rows = (ativos ?? []).filter((a) => (a.tipo ?? "").trim() === "Líquido")
@@ -227,6 +242,15 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
 
   const getValue = useCallback(
     (campo: CampoKey): string | number | null => {
+      if (campo === "sexo") {
+        const g = variaveis.sexo
+        return g === "M" || g === "F" ? g : localSexo
+      }
+      if (campo === "uf") {
+        const g = variaveis.uf
+        return typeof g === "string" && g ? g : localUf
+      }
+
       const g = variaveis[campo]
       const l = localInputs[campo]
       const useLocal = l !== undefined && l !== ""
@@ -255,7 +279,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
           return null
       }
     },
-    [variaveis, localInputs],
+    [variaveis, localInputs, localSexo, localUf],
   )
 
   const faltando = useMemo(
@@ -613,8 +637,8 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
                 ) : null}
                 {campo === "sexo" ? (
                   <Select
-                    value={localInputs.sexo ?? undefined}
-                    onValueChange={(v) => setLocalInputs((p) => ({ ...p, sexo: v }))}
+                    value={localSexo}
+                    onValueChange={(v) => setLocalSexo(resolveSexoSelect(v))}
                   >
                     <SelectTrigger className="h-10 bg-background/80 border-amber-500/40">
                       <SelectValue placeholder="Selecione" />
@@ -627,8 +651,8 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
                 ) : null}
                 {campo === "uf" ? (
                   <Select
-                    value={localInputs.uf ?? undefined}
-                    onValueChange={(v) => setLocalInputs((p) => ({ ...p, uf: v }))}
+                    value={localUf}
+                    onValueChange={(v) => setLocalUf(resolveUfSelect(v))}
                   >
                     <SelectTrigger className="h-10 bg-background/80 border-amber-500/40">
                       <SelectValue placeholder="UF" />
@@ -798,7 +822,10 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
               <Label className="text-xs text-muted-foreground uppercase tracking-wide">
                 IR previdência no resgate
               </Label>
-              <Select value={irPrevKey} onValueChange={(v) => setIrPrevKey(v as typeof irPrevKey)}>
+              <Select
+                value={irPrevKey ?? "15"}
+                onValueChange={(v) => setIrPrevKey((v || "15") as (typeof IR_PREV_OPCOES)[number]["v"])}
+              >
                 <SelectTrigger className="h-11 bg-[#0D1220] border-white/10">
                   <SelectValue />
                 </SelectTrigger>

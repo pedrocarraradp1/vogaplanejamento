@@ -364,7 +364,7 @@ export function Sucessorio({ onNavigate }: SucessorioProps) {
             <div className="space-y-2">
               <Label className="text-sm text-muted-foreground">Produto</Label>
               <Select
-                value={produtoSelecionado || undefined}
+                value={produtoSelecionado}
                 onValueChange={setProdutoSelecionado}
               >
                 <SelectTrigger className="bg-[#131929] border-white/10 text-foreground focus:border-primary focus:ring-1 focus:ring-primary">
@@ -398,7 +398,7 @@ export function Sucessorio({ onNavigate }: SucessorioProps) {
                 value={
                   dadosPessoais.sexo === "M" || dadosPessoais.sexo === "F"
                     ? dadosPessoais.sexo
-                    : undefined
+                    : "M"
                 }
                 onValueChange={(v) => setDadosPessoais({ sexo: v as "M" | "F" })}
               >
