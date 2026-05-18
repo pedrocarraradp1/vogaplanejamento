@@ -5,16 +5,26 @@ type MagTokenResponse = {
   error_description?: string
 }
 
-/** Obtém token OAuth direto na MAG (sem fetch interno à app). */
-export async function fetchTokenFromMag(): Promise<{ access_token: string; expires_in: number }> {
+export type MagTokenAuthResult =
+  | { ok: true; token: string; expires_in: number }
+  | { ok: false; status: number; body: string }
+
+/** Requisição OAuth à MAG com log de status e body bruto (debug). */
+export async function requestMAGToken(): Promise<MagTokenAuthResult> {
   const base = process.env.MAG_AUTH_URL?.replace(/\/$/, "")
   const clientId = process.env.MAG_CLIENT_ID
   const clientSecret = process.env.MAG_CLIENT_SECRET
   if (!base || !clientId || !clientSecret) {
-    throw new Error("MAG_AUTH_URL, MAG_CLIENT_ID ou MAG_CLIENT_SECRET não configurados")
+    return {
+      ok: false,
+      status: 500,
+      body: JSON.stringify({
+        error: "MAG_AUTH_URL, MAG_CLIENT_ID ou MAG_CLIENT_SECRET não configurados",
+      }),
+    }
   }
 
-  const res = await fetch(`${base}/connect/token`, {
+  const tokenRes = await fetch(`${base}/connect/token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -25,18 +35,50 @@ export async function fetchTokenFromMag(): Promise<{ access_token: string; expir
     }),
   })
 
-  const data = (await res.json()) as MagTokenResponse
+  console.log("TOKEN STATUS:", tokenRes.status)
+  const tokenText = await tokenRes.text()
+  console.log("TOKEN BODY RAW:", tokenText)
+
+  if (!tokenRes.ok) {
+    return { ok: false, status: tokenRes.status, body: tokenText }
+  }
+
+  let data: MagTokenResponse
+  try {
+    data = tokenText ? (JSON.parse(tokenText) as MagTokenResponse) : {}
+  } catch {
+    return {
+      ok: false,
+      status: tokenRes.status,
+      body: tokenText || "Resposta do token não é JSON válido",
+    }
+  }
+
   console.log("TOKEN RESPONSE:", data)
 
-  if (!res.ok || !data.access_token) {
-    const msg = data.error_description ?? data.error ?? `HTTP ${res.status}`
-    throw new Error(`Token MAG inválido: ${msg}`)
+  if (!data.access_token) {
+    return {
+      ok: false,
+      status: tokenRes.status,
+      body: tokenText || JSON.stringify({ error: "Resposta sem access_token" }),
+    }
   }
 
   return {
-    access_token: data.access_token,
+    ok: true,
+    token: data.access_token,
     expires_in: Number(data.expires_in) || 3600,
   }
+}
+
+/** Obtém token OAuth direto na MAG (sem fetch interno à app). */
+export async function fetchTokenFromMag(): Promise<{ access_token: string; expires_in: number }> {
+  const result = await requestMAGToken()
+  if (!result.ok) {
+    const msg = result.body
+    throw new Error(`Token MAG inválido (HTTP ${result.status}): ${msg}`)
+  }
+  return { access_token: result.token, expires_in: result.expires_in }
 }
 
 export async function getMAGToken(): Promise<string> {

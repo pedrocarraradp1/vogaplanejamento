@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getMAGToken } from "@/lib/mag/auth"
+import { requestMAGToken } from "@/lib/mag/auth"
 
 type SimulacaoBody = {
   dataNascimento?: string
@@ -28,7 +28,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ erro: "MAG_API_URL não configurada" }, { status: 500 })
     }
 
-    const token = await getMAGToken()
+    const tokenResult = await requestMAGToken()
+    if (!tokenResult.ok) {
+      return NextResponse.json(
+        {
+          erro: "Falha autenticacao MAG",
+          status: tokenResult.status,
+          body: tokenResult.body,
+        },
+        { status: 500 },
+      )
+    }
+    const token = tokenResult.token
 
     const cnpj = (process.env.MAG_CNPJ || "27945275000154").replace(/\D/g, "")
     const url = `${apiUrl}/apiseguradora/v3/simulacao?cnpj=${encodeURIComponent(cnpj)}&codigoModeloProposta=${encodeURIComponent(String(body.codigoModeloProposta))}`
