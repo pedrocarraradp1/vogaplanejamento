@@ -123,11 +123,11 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
               />
             </div>
 
-            {/* Nome do Cônjuge - aparece apenas quando Estado Civil = Casado(a) */}
+            {/* Nome do Cônjuge - aparece quando Casado(a) ou União Estável */}
             <div 
               className={`space-y-2 transition-all duration-300 ease-in-out ${
                 isCasado 
-                  ? "opacity-100 max-h-24 translate-y-0" 
+                  ? "opacity-100 max-h-32 translate-y-0" 
                   : "opacity-0 max-h-0 overflow-hidden -translate-y-2 pointer-events-none"
               }`}
             >
@@ -228,7 +228,6 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
                 value={dadosPessoais.estadoCivil || "solteiro"}
                 onValueChange={(value) => {
                   setDadosPessoais({ estadoCivil: value })
-                  // Limpa o campo de cônjuge se não for casado
                   if (value !== "casado") {
                     setDadosPessoais({ conjuge: "" })
                   }

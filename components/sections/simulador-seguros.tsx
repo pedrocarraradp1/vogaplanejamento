@@ -13,7 +13,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts"
-import { AlertTriangle, ArrowLeft, ArrowRight, ShieldCheck } from "lucide-react"
+import { ArrowLeft, ArrowRight, ShieldCheck } from "lucide-react"
 import { usePlano } from "@/lib/plano-context"
 import { getSaldoDevedorPassivo } from "@/lib/patrimonio-utils"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -86,18 +86,6 @@ type CampoKey =
   | "rentabilidadePrev"
   | "inflacao"
 
-const CAMPOS_SEM_IR: CampoKey[] = [
-  "cpf",
-  "dataNascimento",
-  "sexo",
-  "uf",
-  "rendaMensal",
-  "idadeAposentadoria",
-  "ativosLiquidos",
-  "passivos",
-  "rentabilidadePrev",
-  "inflacao",
-]
 
 const UFS_BR = [
   "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ",
@@ -115,18 +103,6 @@ function resolveUfSelect(uf: string | undefined | null): string {
   return (UFS_BR as readonly string[]).includes(u) ? u : "SP"
 }
 
-const LABEL_CAMPO: Record<CampoKey, string> = {
-  cpf: "CPF",
-  dataNascimento: "Data de nascimento",
-  sexo: "Sexo",
-  uf: "UF (estado)",
-  rendaMensal: "Renda mensal",
-  idadeAposentadoria: "Idade na aposentadoria",
-  ativosLiquidos: "Ativos líquidos",
-  passivos: "Passivos",
-  rentabilidadePrev: "Rentabilidade previdência (% a.a.)",
-  inflacao: "Inflação (% a.a.)",
-}
 
 function idadeFromNascimentoStr(nasc: string): number {
   const t = nasc?.trim()
@@ -141,45 +117,6 @@ function idadeFromNascimentoStr(nasc: string): number {
   return Math.max(0, idade)
 }
 
-function campoEstaPreenchido(campo: CampoKey, val: string | number | null): boolean {
-  if (val === null || val === undefined) return false
-  switch (campo) {
-    case "cpf": {
-      const digits = String(val).replace(/\D/g, "")
-      return digits.length === 11
-    }
-    case "dataNascimento":
-      if (typeof val !== "string" || !val.trim()) return false
-      return idadeFromNascimentoStr(val) > 0
-    case "sexo":
-      return val === "M" || val === "F"
-    case "uf": {
-      const u = String(val).trim().toUpperCase()
-      return (UFS_BR as readonly string[]).includes(u)
-    }
-    case "rendaMensal":
-      return typeof val === "number" && val > 0
-    case "idadeAposentadoria": {
-      const n = typeof val === "number" ? val : Number(val)
-      return Number.isFinite(n) && n >= 50 && n <= 80
-    }
-    case "ativosLiquidos":
-    case "passivos": {
-      const n = typeof val === "number" ? val : Number(val)
-      return Number.isFinite(n) && n >= 0
-    }
-    case "rentabilidadePrev": {
-      const n = typeof val === "number" ? val : Number(val)
-      return Number.isFinite(n) && n > 0
-    }
-    case "inflacao": {
-      const n = typeof val === "number" ? val : Number(val)
-      return Number.isFinite(n) && n > 0
-    }
-    default:
-      return false
-  }
-}
 
 export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
   const { state, getIdadeAtual, getPatrimonioLiquido } = usePlano()
@@ -279,10 +216,6 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
     [variaveis, localInputs, localSexo, localUf],
   )
 
-  const faltando = useMemo(
-    () => CAMPOS_SEM_IR.filter((c) => !campoEstaPreenchido(c, getValue(c))),
-    [getValue],
-  )
 
   const idadeAtualEff = useMemo(() => {
     const dn = String(getValue("dataNascimento") ?? "").trim()
@@ -330,12 +263,6 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const buscarMag = useCallback(async () => {
-    if (faltando.length > 0) {
-      setPm0(premioFallback(capitalSegurado, Math.max(18, idadeAtualEff || 35), produto.mult))
-      setFontePremio("estimativa")
-      return
-    }
-
     const dataNascimento = String(getValue("dataNascimento") ?? "").trim()
     const sexoVal = getValue("sexo")
     const rendaMensal = Number(getValue("rendaMensal")) || 0
@@ -392,7 +319,6 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
     capitalSegurado,
     codigoMag,
     produto.mult,
-    faltando,
     getValue,
     idadeAtualEff,
   ])
@@ -608,202 +534,6 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
           </ToggleGroup>
         </div>
       </div>
-
-      {faltando.length > 0 ? (
-        <Card className="border-amber-500/50 bg-amber-500/10 shadow-none">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-medium text-amber-950 dark:text-amber-100 flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600" aria-hidden />
-              Alguns dados não estão preenchidos no plano. Complete abaixo para simular:
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {faltando.map((campo) => (
-              <div key={campo} className="space-y-1.5">
-                <Label className="text-xs text-amber-950/80 dark:text-amber-100/90">{LABEL_CAMPO[campo]}</Label>
-                {campo === "cpf" ? (
-                  <Input
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={14}
-                    placeholder="000.000.000-00"
-                    value={localInputs.cpf ?? ""}
-                    onChange={(e) =>
-                      setLocalInputs((p) => ({ ...p, cpf: e.target.value }))
-                    }
-                    className="h-10 bg-background/80 border-amber-500/40 tabular-nums"
-                  />
-                ) : null}
-                {campo === "dataNascimento" ? (
-                  <Input
-                    type="date"
-                    value={localInputs.dataNascimento ?? ""}
-                    onChange={(e) =>
-                      setLocalInputs((p) => ({ ...p, dataNascimento: e.target.value }))
-                    }
-                    className="h-10 bg-background/80 border-amber-500/40"
-                  />
-                ) : null}
-                {campo === "sexo" ? (
-                  <Select
-                    value={localSexo}
-                    onValueChange={(v) => setLocalSexo(resolveSexoSelect(v))}
-                  >
-                    <SelectTrigger className="h-10 bg-background/80 border-amber-500/40">
-                      <SelectValue placeholder="Selecione" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-card border-border">
-                      <SelectItem value="M">Masculino</SelectItem>
-                      <SelectItem value="F">Feminino</SelectItem>
-                    </SelectContent>
-                  </Select>
-                ) : null}
-                {campo === "uf" ? (
-                  <Select
-                    value={localUf}
-                    onValueChange={(v) => setLocalUf(resolveUfSelect(v))}
-                  >
-                    <SelectTrigger className="h-10 bg-background/80 border-amber-500/40">
-                      <SelectValue placeholder="UF" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-card border-border max-h-60">
-                      {UFS_BR.map((uf) => (
-                        <SelectItem key={uf} value={uf}>
-                          {uf}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : null}
-                {campo === "rendaMensal" ? (
-                  <div className="relative">
-                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                      R$
-                    </span>
-                    <Input
-                      type="number"
-                      min={0}
-                      step={100}
-                      placeholder="0"
-                    value={localInputs.rendaMensal ?? ""}
-                    onChange={(e) =>
-                      setLocalInputs((p) => ({
-                        ...p,
-                        rendaMensal: e.target.value,
-                      }))
-                    }
-                      className="h-10 pl-10 bg-background/80 border-amber-500/40 tabular-nums"
-                    />
-                  </div>
-                ) : null}
-                {campo === "idadeAposentadoria" ? (
-                  <Input
-                    type="number"
-                    min={50}
-                    max={80}
-                    step={1}
-                    placeholder="65"
-                    value={localInputs.idadeAposentadoria ?? ""}
-                    onChange={(e) =>
-                      setLocalInputs((p) => ({
-                        ...p,
-                        idadeAposentadoria: e.target.value,
-                      }))
-                    }
-                    className="h-10 bg-background/80 border-amber-500/40 tabular-nums"
-                  />
-                ) : null}
-                {campo === "ativosLiquidos" ? (
-                  <div className="relative">
-                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                      R$
-                    </span>
-                    <Input
-                      type="number"
-                      min={0}
-                      step={1000}
-                      placeholder="0"
-                      value={localInputs.ativosLiquidos ?? ""}
-                      onChange={(e) =>
-                        setLocalInputs((p) => ({
-                          ...p,
-                          ativosLiquidos: e.target.value,
-                        }))
-                      }
-                      className="h-10 pl-10 bg-background/80 border-amber-500/40 tabular-nums"
-                    />
-                  </div>
-                ) : null}
-                {campo === "passivos" ? (
-                  <div className="relative">
-                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                      R$
-                    </span>
-                    <Input
-                      type="number"
-                      min={0}
-                      step={1000}
-                      placeholder="0"
-                      value={localInputs.passivos ?? ""}
-                      onChange={(e) =>
-                        setLocalInputs((p) => ({
-                          ...p,
-                          passivos: e.target.value,
-                        }))
-                      }
-                      className="h-10 pl-10 bg-background/80 border-amber-500/40 tabular-nums"
-                    />
-                  </div>
-                ) : null}
-                {campo === "rentabilidadePrev" ? (
-                  <div className="relative">
-                    <Input
-                      type="number"
-                      min={0.5}
-                      max={30}
-                      step={0.5}
-                      placeholder="7"
-                      value={localInputs.rentabilidadePrev ?? ""}
-                      onChange={(e) =>
-                        setLocalInputs((p) => ({
-                          ...p,
-                          rentabilidadePrev: e.target.value,
-                        }))
-                      }
-                      className="h-10 pr-14 bg-background/80 border-amber-500/40 tabular-nums"
-                    />
-                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                      % a.a.
-                    </span>
-                  </div>
-                ) : null}
-                {campo === "inflacao" ? (
-                  <div className="relative">
-                    <Input
-                      type="number"
-                      min={0.1}
-                      max={25}
-                      step={0.1}
-                      placeholder="4"
-                      value={localInputs.inflacao ?? ""}
-                      onChange={(e) =>
-                        setLocalInputs((p) => ({
-                          ...p,
-                          inflacao: e.target.value,
-                        }))
-                      }
-                      className="h-10 pr-14 bg-background/80 border-amber-500/40 tabular-nums"
-                    />
-                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                      % a.a.
-                    </span>
-                  </div>
-                ) : null}
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      ) : null}
 
       {/* SEÇÃO 1 */}
       <Card className="bg-[#131929] border-white/10">
