@@ -344,6 +344,8 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          nome: dadosPessoais.nome || "SIMULACAO VOGA WEALTH",
+          cpf: (dadosPessoais.cpf ?? "").replace(/\D/g, "") || undefined,
           dataNascimento,
           sexoId: sexoVal === "M" ? 1 : 2,
           renda: rendaMensal,

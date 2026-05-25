@@ -36,6 +36,8 @@ export interface DadosPessoais {
   genero?: string | number | ""
   /** UF (2 letras) para simulações de seguro */
   uf?: string
+  /** CPF (só números) para simulações MAG */
+  cpf?: string
 }
 
 export interface Ativo {
