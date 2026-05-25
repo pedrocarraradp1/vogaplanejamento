@@ -24,9 +24,15 @@ export async function requestMAGToken(): Promise<MagTokenAuthResult> {
     }
   }
 
+  const MAG_AFFINITY_COOKIE =
+    "IdentidadeHmgAffinity=ec749dbec5b6f62e1eb4865e2fc7b9f9; IdentidadeHmgAffinityCORS=ec749dbec5b6f62e1eb4865e2fc7b9f9"
+
   const tokenParams = {
     method: "POST" as const,
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Cookie: MAG_AFFINITY_COOKIE,
+    },
     body: new URLSearchParams({
       client_id: clientId,
       client_secret: clientSecret,
