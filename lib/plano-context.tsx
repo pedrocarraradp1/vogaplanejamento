@@ -12,7 +12,11 @@ import {
   type InventarioResult,
   type ProtecaoResult,
 } from "@/lib/engine"
-import { computePatrimonioTotals } from "@/lib/patrimonio-utils"
+import {
+  computePatrimonioTotals,
+  getSaldoDevedorPassivo,
+  normalizePassivo,
+} from "@/lib/patrimonio-utils"
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
@@ -51,12 +55,20 @@ export interface Ativo {
 
 export interface Passivo {
   id: string
-  tipo: string
-  modelo: "SAC" | "PRICE" | "AMERICANA"
+  categoria: string
   descricao: string
-  valor: number
-  taxa: number
-  prazo: number
+  saldoDevedor: number
+  parcelaMensal: number
+  taxaJurosMensal: number
+  prazoRestanteMeses: number
+  instituicao: string
+  bemVinculado: string
+  /** Legado: espelha `saldoDevedor` para compatibilidade com simulação antiga. */
+  valor?: number
+  tipo?: string
+  modelo?: "SAC" | "PRICE" | "AMERICANA"
+  taxa?: number
+  prazo?: number
 }
 
 export interface Objetivo {
@@ -364,6 +376,8 @@ export function PlanoProvider({
       ]
     }
 
+    merged.passivos = (merged.passivos ?? []).map((p: any) => normalizePassivo(p))
+
     merged.patrimonio = computePatrimonioTotals(merged.ativos, merged.passivos)
 
     // Normaliza rendimento líquido derivado
@@ -383,7 +397,7 @@ export function PlanoProvider({
   }, [state.ativos])
 
   const getTotalPassivos = useCallback(() => {
-    return (state.passivos ?? []).reduce((s, p) => s + (Number(p.valor) || 0), 0)
+    return (state.passivos ?? []).reduce((s, p) => s + getSaldoDevedorPassivo(p), 0)
   }, [state.passivos])
 
   const getPatrimonioLiquido = useCallback(() => {
@@ -431,10 +445,11 @@ export function PlanoProvider({
   }, [])
 
   const setPassivos = useCallback((passivos: Passivo[]) => {
-    setState(prev => ({
+    const normalized = (passivos ?? []).map((p) => normalizePassivo(p))
+    setState((prev) => ({
       ...prev,
-      passivos,
-      patrimonio: computePatrimonioTotals(prev.ativos, passivos),
+      passivos: normalized,
+      patrimonio: computePatrimonioTotals(prev.ativos, normalized),
     }))
   }, [])
 
@@ -541,7 +556,7 @@ export function PlanoProvider({
       state.dadosPessoais.despesa
     )
 
-    const totalPassivosInv = state.passivos.reduce((s, p) => s + (p.valor || 0), 0)
+    const totalPassivosInv = state.passivos.reduce((s, p) => s + getSaldoDevedorPassivo(p), 0)
     const plInventario =
       state.sucessao.plEditavel > 0 ? state.sucessao.plEditavel : saldoInicial
     const regimeInventario =

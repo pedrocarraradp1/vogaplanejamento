@@ -57,9 +57,13 @@ export function resolveDescricaoAtivo(
 export const CATEGORIAS_PASSIVO = [
   "Financiamento Imóvel",
   "Financiamento Veículo",
+  "Cartão de Crédito",
   "Empréstimo Pessoal",
-  "Outros",
+  "Consórcio",
+  "Outro",
 ] as const
+
+export type CategoriaPassivo = (typeof CATEGORIAS_PASSIVO)[number]
 
 export const DEFAULT_CATEGORIA_PASSIVO = CATEGORIAS_PASSIVO[0]
 
@@ -104,16 +108,81 @@ export function matchesAtivoCategoria(ativo: Ativo, tipo: string, categoria: str
   return desc === categoria
 }
 
+export function resolvePassivoCategoria(passivo: Passivo): string {
+  const cat = (passivo.categoria ?? passivo.tipo ?? "").trim()
+  if (cat && (CATEGORIAS_PASSIVO as readonly string[]).includes(cat)) return cat
+  if (cat === "Outros") return "Outro"
+  return cat || DEFAULT_CATEGORIA_PASSIVO
+}
+
 export function matchesPassivoCategoria(passivo: Passivo, categoria: string): boolean {
-  const tipo = (passivo.tipo ?? "").trim()
-  if (categoria === "Outros") {
-    return (
-      tipo === "Outros" ||
-      (tipo !== "" &&
-        !CATEGORIAS_PASSIVO.slice(0, -1).includes(tipo as (typeof CATEGORIAS_PASSIVO)[number]))
-    )
+  const cat = resolvePassivoCategoria(passivo)
+  if (categoria === "Outro" || categoria === "Outros") {
+    return cat === "Outro" || cat === "Outros"
   }
-  return tipo === categoria
+  return cat === categoria
+}
+
+/** Normaliza passivos legados (tipo/valor) para o modelo completo. */
+export function normalizePassivo(raw: Partial<Passivo> & Record<string, unknown>): Passivo {
+  const saldo =
+    Number(raw.saldoDevedor) > 0
+      ? Number(raw.saldoDevedor)
+      : Number(raw.valor) > 0
+        ? Number(raw.valor)
+        : 0
+  const prazoRestante =
+    Number(raw.prazoRestanteMeses) > 0
+      ? Number(raw.prazoRestanteMeses)
+      : Number(raw.prazo) > 0
+        ? Number(raw.prazo)
+        : 0
+  const taxaJuros =
+    Number(raw.taxaJurosMensal) > 0
+      ? Number(raw.taxaJurosMensal)
+      : Number(raw.taxa) > 0
+        ? Number(raw.taxa)
+        : 0
+  let parcelaMensal = Number(raw.parcelaMensal) || 0
+  if (parcelaMensal <= 0 && saldo > 0 && prazoRestante <= 0) {
+    parcelaMensal = saldo / 120
+  }
+
+  const categoria = resolvePassivoCategoria({
+    ...raw,
+    categoria: String(raw.categoria ?? raw.tipo ?? DEFAULT_CATEGORIA_PASSIVO),
+  } as Passivo)
+
+  return {
+    id: String(raw.id ?? `passivo-${Date.now()}`),
+    categoria,
+    descricao: String(raw.descricao ?? categoria).trim() || categoria,
+    saldoDevedor: saldo,
+    parcelaMensal,
+    taxaJurosMensal: taxaJuros,
+    prazoRestanteMeses: prazoRestante,
+    instituicao: String(raw.instituicao ?? "").trim(),
+    bemVinculado: String(raw.bemVinculado ?? "").trim(),
+    valor: saldo,
+    tipo: categoria,
+    modelo: raw.modelo,
+    taxa: taxaJuros,
+    prazo: prazoRestante,
+  }
+}
+
+export function getSaldoDevedorPassivo(passivo: Passivo): number {
+  const saldo = Number(passivo.saldoDevedor)
+  if (saldo > 0) return saldo
+  return Math.max(0, Number(passivo.valor) || 0)
+}
+
+export function getParcelaMensalPassivo(passivo: Passivo): number {
+  const parcela = Number(passivo.parcelaMensal)
+  if (parcela > 0) return parcela
+  const saldo = getSaldoDevedorPassivo(passivo)
+  if (saldo > 0) return saldo / 120
+  return 0
 }
 
 export function sumAtivoTipo(ativos: Ativo[], tipo: string): number {
@@ -127,7 +196,7 @@ export function computePatrimonioTotals(ativos: Ativo[], passivos: Passivo[]): P
     ativosLiquidos: sumAtivoTipo(ativos, "Líquido"),
     imobilizado: sumAtivoTipo(ativos, "Imobilizado"),
     participacoes: sumAtivoTipo(ativos, "Participação Societária"),
-    passivos: (passivos ?? []).reduce((s, p) => s + (Number(p.valor) || 0), 0),
+    passivos: (passivos ?? []).reduce((s, p) => s + getSaldoDevedorPassivo(p), 0),
   }
 }
 
@@ -140,5 +209,5 @@ export function sumAtivoCategoria(ativos: Ativo[], tipo: string, categoria: stri
 export function sumPassivoCategoria(passivos: Passivo[], categoria: string): number {
   return passivos
     .filter((p) => matchesPassivoCategoria(p, categoria))
-    .reduce((s, p) => s + (Number(p.valor) || 0), 0)
+    .reduce((s, p) => s + getSaldoDevedorPassivo(p), 0)
 }

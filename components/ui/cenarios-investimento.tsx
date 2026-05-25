@@ -57,7 +57,10 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
     const ativosLiquidos = (ativos ?? [])
       .filter((a) => (a.tipo ?? "").trim() === "Líquido")
       .reduce((s, a) => s + (Number(a.valor) || 0), 0)
-    const totalPassivos = (passivos ?? []).reduce((s, p) => s + (Number(p.valor) || 0), 0)
+    const totalPassivos = (passivos ?? []).reduce(
+      (s, p) => s + (Number(p.saldoDevedor) > 0 ? Number(p.saldoDevedor) : Number(p.valor) || 0),
+      0
+    )
     return ativosLiquidos - totalPassivos
   }, [ativos, passivos])
 

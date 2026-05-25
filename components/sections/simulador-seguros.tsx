@@ -15,6 +15,7 @@ import {
 } from "recharts"
 import { AlertTriangle, ArrowLeft, ArrowRight, ShieldCheck } from "lucide-react"
 import { usePlano } from "@/lib/plano-context"
+import { getSaldoDevedorPassivo } from "@/lib/patrimonio-utils"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -217,7 +218,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
 
   const passivosGlobal = useMemo(() => {
     const rows = passivos ?? []
-    const sum = rows.reduce((s, p) => s + (Number(p.valor) || 0), 0)
+    const sum = rows.reduce((s, p) => s + getSaldoDevedorPassivo(p), 0)
     return { sum, temLinha: rows.length > 0 }
   }, [passivos])
 

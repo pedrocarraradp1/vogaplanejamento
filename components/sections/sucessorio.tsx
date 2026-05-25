@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, ArrowRight } from "lucide-react"
 import { usePlano } from "@/lib/plano-context"
+import { getSaldoDevedorPassivo } from "@/lib/patrimonio-utils"
 import { calcularInventario } from "@/lib/engine"
 import { MAG_PRODUTO_META, taxaFaixaEtaria } from "@/lib/mag/produtos"
 
@@ -63,7 +64,7 @@ export function Sucessorio({ onNavigate }: SucessorioProps) {
     }).format(v)
 
   const totalPassivosInv = useMemo(
-    () => passivos.reduce((s, p) => s + (p.valor || 0), 0),
+    () => passivos.reduce((s, p) => s + getSaldoDevedorPassivo(p), 0),
     [passivos]
   )
 

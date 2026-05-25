@@ -35,12 +35,13 @@ import {
   isTipoAtivoLabel,
   matchesAtivoCategoria,
   DEFAULT_CATEGORIA_PASSIVO,
-  matchesPassivoCategoria,
   normalizeAtivoDescricao,
+  normalizePassivo,
   resolveDescricaoAtivo,
+  resolvePassivoCategoria,
   resolveTipoAtivoLabel,
+  getSaldoDevedorPassivo,
   sumAtivoCategoria,
-  sumPassivoCategoria,
   type SecaoAtivoConfig,
   type TipoAtivoLabel,
 } from "@/lib/patrimonio-utils"
@@ -77,7 +78,13 @@ type AddAtivoForm = {
 
 type AddPassivoForm = {
   categoria: string
-  valor: number
+  descricao: string
+  saldoDevedor: number
+  parcelaMensal: number
+  taxaJurosMensal: number
+  prazoRestanteMeses: number
+  instituicao: string
+  bemVinculado: string
 }
 
 const EMPTY_ATIVO_FORM = (): AddAtivoForm => ({
@@ -90,7 +97,13 @@ const EMPTY_ATIVO_FORM = (): AddAtivoForm => ({
 
 const EMPTY_PASSIVO_FORM = (): AddPassivoForm => ({
   categoria: DEFAULT_CATEGORIA_PASSIVO,
-  valor: 0,
+  descricao: "",
+  saldoDevedor: 0,
+  parcelaMensal: 0,
+  taxaJurosMensal: 0,
+  prazoRestanteMeses: 0,
+  instituicao: "",
+  bemVinculado: "",
 })
 
 type AddModalState =
@@ -100,6 +113,7 @@ type AddModalState =
 
 function PatrimonioBarRow({
   label,
+  sublabel,
   valor,
   totalSecao,
   barColor,
@@ -108,6 +122,7 @@ function PatrimonioBarRow({
   onValueCommit,
 }: {
   label: string
+  sublabel?: string
   valor: number
   totalSecao: number
   barColor: string
@@ -135,7 +150,12 @@ function PatrimonioBarRow({
   return (
     <div className="py-3 border-b border-white/5 last:border-0 space-y-2">
       <div className="flex items-center gap-3">
-        <span className="text-sm text-foreground flex-1 min-w-0 truncate">{label}</span>
+        <div className="flex-1 min-w-0">
+          <span className="text-sm text-foreground block truncate">{label}</span>
+          {sublabel ? (
+            <span className="text-xs text-muted-foreground block truncate">{sublabel}</span>
+          ) : null}
+        </div>
         <div className="flex items-center gap-1 shrink-0">
           <Button
             type="button"
@@ -437,29 +457,37 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
     [ativos, setAtivos],
   )
 
-  const setPassivoCategoria = useCallback(
-    (categoria: string, valor: number) => {
-      const kept = passivos.filter((p) => !matchesPassivoCategoria(p, categoria))
-      if (valor <= 0) {
-        setPassivos(kept)
+  const appendPassivo = useCallback(
+    (form: AddPassivoForm) => {
+      const novo = normalizePassivo({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        categoria: form.categoria,
+        descricao: form.descricao.trim() || form.categoria,
+        saldoDevedor: form.saldoDevedor,
+        parcelaMensal: form.parcelaMensal,
+        taxaJurosMensal: form.taxaJurosMensal,
+        prazoRestanteMeses: form.prazoRestanteMeses,
+        instituicao: form.instituicao,
+        bemVinculado: form.bemVinculado,
+      })
+      setPassivos([...passivos, novo])
+    },
+    [passivos, setPassivos],
+  )
+
+  const updatePassivoSaldo = useCallback(
+    (id: string, saldoDevedor: number) => {
+      if (saldoDevedor <= 0) {
+        setPassivos(passivos.filter((p) => p.id !== id))
         return
       }
-      const existing = passivos.find((p) => matchesPassivoCategoria(p, categoria))
-      if (existing) {
-        setPassivos(kept.concat({ ...existing, valor, tipo: categoria }))
-      } else {
-        setPassivos(
-          kept.concat({
-            id: Date.now().toString(),
-            tipo: categoria,
-            modelo: "SAC",
-            descricao: categoria,
-            valor,
-            taxa: 0,
-            prazo: 0,
-          }),
-        )
-      }
+      setPassivos(
+        passivos.map((p) =>
+          p.id === id
+            ? normalizePassivo({ ...p, saldoDevedor, valor: saldoDevedor })
+            : p,
+        ),
+      )
     },
     [passivos, setPassivos],
   )
@@ -488,11 +516,20 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
 
   const linhasPassivo = useMemo(
     () =>
-      CATEGORIAS_PASSIVO.map((cat) => ({
-        id: `passivo-${cat}`,
-        label: cat,
-        valor: sumPassivoCategoria(passivos, cat),
-      })).filter((l) => l.valor > 0),
+      passivos
+        .map((p) => {
+          const saldo = getSaldoDevedorPassivo(p)
+          const cat = resolvePassivoCategoria(p)
+          const parts = [cat, p.instituicao?.trim(), p.bemVinculado?.trim()].filter(Boolean)
+          return {
+            id: p.id,
+            label: p.descricao?.trim() || cat,
+            sublabel: parts.length > 1 ? parts.join(" · ") : cat !== p.descricao?.trim() ? cat : undefined,
+            valor: saldo,
+          }
+        })
+        .filter((l) => l.valor > 0)
+        .sort((a, b) => b.valor - a.valor),
     [passivos],
   )
 
@@ -575,8 +612,9 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
       })
       setAddAtivoForm(EMPTY_ATIVO_FORM())
     } else {
-      if (!passivoCategoriaSelect) return
-      setPassivoCategoria(passivoCategoriaSelect, addPassivoForm.valor)
+      if (!passivoCategoriaSelect || !addPassivoForm.descricao.trim()) return
+      if (addPassivoForm.saldoDevedor <= 0) return
+      appendPassivo({ ...addPassivoForm, categoria: passivoCategoriaSelect })
       setAddPassivoForm(EMPTY_PASSIVO_FORM())
     }
     setAddModal(null)
@@ -684,12 +722,13 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
             <PatrimonioBarRow
               key={linha.id}
               label={linha.label}
+              sublabel={linha.sublabel}
               valor={linha.valor}
               totalSecao={totalPassivos}
               barColor="#E24B4A"
               formatCurrency={formatCurrency}
               valueClassName="text-[#E24B4A]"
-              onValueCommit={(v) => setPassivoCategoria(linha.label, v)}
+              onValueCommit={(v) => updatePassivoSaldo(linha.id, v)}
             />
           ))
         )}
@@ -721,14 +760,18 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
       </div>
 
       <Dialog open={addModal != null} onOpenChange={(open) => !open && setAddModal(null)}>
-        <DialogContent className="bg-[#131929] border-white/[0.18] rounded-2xl max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogContent
+          className={`bg-[#131929] border-white/[0.18] rounded-2xl max-h-[90vh] overflow-y-auto ${
+            addModal?.kind === "passivo" ? "max-w-lg" : "max-w-md"
+          }`}
+        >
           <DialogHeader>
             <DialogTitle className="text-foreground">
               {addModal?.kind === "passivo" ? "Adicionar dívida" : "Adicionar Ativo"}
             </DialogTitle>
             <DialogDescription className="text-muted-foreground">
               {addModal?.kind === "passivo"
-                ? "Selecione a categoria e informe o valor"
+                ? "Informe os dados do financiamento ou dívida"
                 : "Preencha os dados do bem patrimonial"}
             </DialogDescription>
           </DialogHeader>
@@ -852,14 +895,112 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
               </div>
               <div className="space-y-2">
                 <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
-                  Valor (R$)
+                  Descrição
                 </label>
                 <Input
-                  value={addPassivoForm.valor ? formatCurrency(addPassivoForm.valor) : ""}
+                  value={addPassivoForm.descricao}
                   onChange={(e) =>
-                    setAddPassivoForm({ ...addPassivoForm, valor: parseCurrency(e.target.value) })
+                    setAddPassivoForm((prev) => ({ ...prev, descricao: e.target.value }))
+                  }
+                  placeholder="Ex: Financiamento Apto SP"
+                  className="bg-[#0D1220] border-white/10 text-foreground"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+                  Saldo devedor (R$)
+                </label>
+                <Input
+                  value={addPassivoForm.saldoDevedor ? formatCurrency(addPassivoForm.saldoDevedor) : ""}
+                  onChange={(e) =>
+                    setAddPassivoForm((prev) => ({
+                      ...prev,
+                      saldoDevedor: parseCurrency(e.target.value),
+                    }))
                   }
                   placeholder="0"
+                  className="bg-[#0D1220] border-white/10 text-foreground tabular-nums"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+                  Parcela mensal (R$)
+                </label>
+                <Input
+                  value={addPassivoForm.parcelaMensal ? formatCurrency(addPassivoForm.parcelaMensal) : ""}
+                  onChange={(e) =>
+                    setAddPassivoForm((prev) => ({
+                      ...prev,
+                      parcelaMensal: parseCurrency(e.target.value),
+                    }))
+                  }
+                  placeholder="0"
+                  className="bg-[#0D1220] border-white/10 text-foreground tabular-nums"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+                    Taxa de juros (% a.m.)
+                  </label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    value={addPassivoForm.taxaJurosMensal || ""}
+                    onChange={(e) =>
+                      setAddPassivoForm((prev) => ({
+                        ...prev,
+                        taxaJurosMensal: parseFloat(e.target.value) || 0,
+                      }))
+                    }
+                    placeholder="0"
+                    className="bg-[#0D1220] border-white/10 text-foreground"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+                    Prazo restante (meses)
+                  </label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={addPassivoForm.prazoRestanteMeses || ""}
+                    onChange={(e) =>
+                      setAddPassivoForm((prev) => ({
+                        ...prev,
+                        prazoRestanteMeses: parseInt(e.target.value, 10) || 0,
+                      }))
+                    }
+                    placeholder="0"
+                    className="bg-[#0D1220] border-white/10 text-foreground"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+                  Instituição
+                </label>
+                <Input
+                  value={addPassivoForm.instituicao}
+                  onChange={(e) =>
+                    setAddPassivoForm((prev) => ({ ...prev, instituicao: e.target.value }))
+                  }
+                  placeholder="Ex: Caixa Econômica, Itaú"
+                  className="bg-[#0D1220] border-white/10 text-foreground"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+                  Bem vinculado
+                </label>
+                <Input
+                  value={addPassivoForm.bemVinculado}
+                  onChange={(e) =>
+                    setAddPassivoForm((prev) => ({ ...prev, bemVinculado: e.target.value }))
+                  }
+                  placeholder="Opcional — Ex: Apartamento SP"
                   className="bg-[#0D1220] border-white/10 text-foreground"
                 />
               </div>
@@ -875,7 +1016,9 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                 addModal?.kind === "ativo"
                   ? addAtivoForm.valor <= 0 || !addAtivoForm.descricao
                   : addModal?.kind === "passivo"
-                    ? !passivoCategoriaSelect || addPassivoForm.valor <= 0
+                    ? !passivoCategoriaSelect ||
+                      !addPassivoForm.descricao.trim() ||
+                      addPassivoForm.saldoDevedor <= 0
                     : true
               }
               className="bg-primary text-primary-foreground"

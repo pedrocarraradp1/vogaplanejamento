@@ -7,7 +7,10 @@ export function patrimonioTotalFromDados(dados: unknown): number {
   const ativos = Array.isArray(d?.ativos) ? d.ativos : []
   const passivos = Array.isArray(d?.passivos) ? d.passivos : []
   const totalAtivos = ativos.reduce((s: number, a: any) => s + (Number(a?.valor) || 0), 0)
-  const totalPassivos = passivos.reduce((s: number, p: any) => s + (Number(p?.valor) || 0), 0)
+  const totalPassivos = passivos.reduce((s: number, p: any) => {
+    const saldo = Number(p?.saldoDevedor)
+    return s + (saldo > 0 ? saldo : Number(p?.valor) || 0)
+  }, 0)
   return totalAtivos - totalPassivos
 }
 

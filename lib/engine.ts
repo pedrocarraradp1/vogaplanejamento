@@ -33,11 +33,33 @@ export interface Objetivo {
 
 export interface Passivo {
   id: string
+  categoria?: string
   descricao: string
-  valor: number              // valor original do financiamento
-  prazo: number              // prazo em meses
-  taxa: number               // taxa mensal em % ex: 1.5 para 1.5% a.m.
-  modelo: "SAC" | "PRICE" | "AMERICANA"
+  saldoDevedor?: number
+  parcelaMensal?: number
+  taxaJurosMensal?: number
+  prazoRestanteMeses?: number
+  instituicao?: string
+  bemVinculado?: string
+  /** Legado */
+  valor?: number
+  prazo?: number
+  taxa?: number
+  tipo?: string
+  modelo?: "SAC" | "PRICE" | "AMERICANA"
+}
+
+function saldoDevedorEngine(p: Passivo): number {
+  const saldo = Number(p.saldoDevedor)
+  if (saldo > 0) return saldo
+  return Math.max(0, Number(p.valor) || 0)
+}
+
+function parcelaMensalEngine(p: Passivo): number {
+  const parcela = Number(p.parcelaMensal)
+  if (parcela > 0) return parcela
+  const saldo = saldoDevedorEngine(p)
+  return saldo > 0 ? saldo / 120 : 0
 }
 
 export interface ProjecaoAno {
@@ -137,9 +159,19 @@ function saqueObjetivosAno(t: number, objetivos: Objetivo[], inf: number, prazoT
  * t = mês relativo ao início (0-indexed). Retorna 0 se t >= prazo.
  */
 export function calcularParcelaDivida(passivo: Passivo, t: number): number {
-  const { valor, prazo, taxa, modelo } = passivo
+  const parcelaInformada = parcelaMensalEngine(passivo)
+  if (parcelaInformada > 0) {
+    const prazoRest = Number(passivo.prazoRestanteMeses ?? passivo.prazo) || 0
+    if (prazoRest > 0 && t >= prazoRest) return 0
+    return parcelaInformada
+  }
+
+  const valor = saldoDevedorEngine(passivo)
+  const prazo = Number(passivo.prazoRestanteMeses ?? passivo.prazo) || 0
+  const taxa = Number(passivo.taxaJurosMensal ?? passivo.taxa) || 0
+  const modelo = passivo.modelo ?? "SAC"
   const taxaDec = taxa / 100
-  if (t >= prazo) return 0
+  if (prazo <= 0 || t >= prazo) return 0
 
   if (modelo === "PRICE") {
     if (taxaDec === 0) return valor / prazo
@@ -166,27 +198,17 @@ function pagamentoDividaAno(passivo: Passivo, anoT: number): number {
   return total
 }
 
-/** Parcela mensal estimada (valor/120) quando financiamento não está modelado. */
-function parcelaMensalEstimada(passivo: Passivo): number {
-  const valor = Math.max(0, Number(passivo.valor) || 0)
-  return valor > 0 ? valor / 120 : 0
-}
-
-function passivoTemFinanciamentoModelado(passivo: Passivo): boolean {
-  const prazo = Number(passivo.prazo) || 0
-  const valor = Number(passivo.valor) || 0
-  return valor > 0 && prazo > 0 && Boolean(passivo.modelo)
-}
-
 /**
- * Pagamento anual de um passivo: soma das parcelas mensais (SAC/PRICE/AMERICANA)
- * ou estimativa valor/120 × 12 (amortização em 10 anos).
+ * Pagamento anual: parcelaMensal × 12 (prioridade) ou soma SAC/PRICE/estimativa.
  */
 export function calcularPagamentoPassivosAno(passivo: Passivo, anoT: number): number {
-  if (passivoTemFinanciamentoModelado(passivo)) {
-    return pagamentoDividaAno(passivo, anoT)
+  const parcela = parcelaMensalEngine(passivo)
+  if (parcela > 0) {
+    const prazoRest = Number(passivo.prazoRestanteMeses ?? passivo.prazo) || 0
+    if (prazoRest > 0 && anoT * 12 >= prazoRest) return 0
+    return parcela * 12
   }
-  return parcelaMensalEstimada(passivo) * 12
+  return pagamentoDividaAno(passivo, anoT)
 }
 
 /** Série anual (t = 0..numAnos) do pagamento de todos os passivos. */

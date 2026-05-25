@@ -23,6 +23,7 @@ import {
   calcularPassivosPorAnoSeries,
   type ProjecaoAno,
 } from "@/lib/engine"
+import { getSaldoDevedorPassivo } from "@/lib/patrimonio-utils"
 
 interface DashboardProps {
   onNavigate: (section: string) => void
@@ -86,7 +87,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   , [projecao, premissasCompletas, dadosPessoais.renda, dadosPessoais.despesa])
 
   const totalPassivosInv = useMemo(
-    () => state.passivos.reduce((s, p) => s + (p.valor || 0), 0),
+    () => state.passivos.reduce((s, p) => s + getSaldoDevedorPassivo(p), 0),
     [state.passivos]
   )
 
@@ -134,18 +135,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const taxaRealMensal = Math.pow(1 + taxaReal, 1 / 12) - 1
 
   const passivosPorAno = useMemo(
-    () =>
-      calcularPassivosPorAnoSeries(
-        state.passivos.map((p) => ({
-          id: p.id,
-          descricao: p.descricao,
-          valor: Number(p.valor) || 0,
-          prazo: Number(p.prazo) || 0,
-          taxa: Number(p.taxa) || 0,
-          modelo: p.modelo,
-        })),
-        premissasCompletas.prazo
-      ),
+    () => calcularPassivosPorAnoSeries(state.passivos, premissasCompletas.prazo),
     [state.passivos, premissasCompletas.prazo]
   )
 
@@ -257,7 +247,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
   const patrimonioTotalCentro = useMemo(() => {
     const totalAtivos = state.ativos.reduce((s, a) => s + (a.valor || 0), 0)
-    const totalPassivos = state.passivos.reduce((s, p) => s + (p.valor || 0), 0)
+    const totalPassivos = state.passivos.reduce((s, p) => s + getSaldoDevedorPassivo(p), 0)
     return totalAtivos - totalPassivos
   }, [state.ativos, state.passivos])
 
