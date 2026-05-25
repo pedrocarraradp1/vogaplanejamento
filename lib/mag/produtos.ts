@@ -1,15 +1,62 @@
-/** Metadados de exibição e fallback — alinhados ao comparador MAG. */
+/** Produtos reais MAG Vida Inteira Resgatável (A7Z) com prazos de pagamento distintos. */
+
+export interface MagProduto {
+  codigo: string
+  nome: string
+  subtitulo: string
+  anospag: number
+  mult: number
+  descricao: string
+}
+
+export const MAG_PRODUTOS: MagProduto[] = [
+  {
+    codigo: "A7Z",
+    nome: "Vida Inteira Resgatável",
+    subtitulo: "5 anos",
+    anospag: 5,
+    mult: 4.2,
+    descricao:
+      "Cobertura vitalícia com reserva resgatável. Prêmio pago em 5 anos. Maior prêmio mensal, menor prazo de pagamento.",
+  },
+  {
+    codigo: "A7Z",
+    nome: "Vida Inteira Resgatável",
+    subtitulo: "10 anos",
+    anospag: 10,
+    mult: 2.7,
+    descricao:
+      "Cobertura vitalícia com reserva resgatável. Prêmio pago em 10 anos. Resgate disponível a partir do 25º mês.",
+  },
+  {
+    codigo: "A7Z",
+    nome: "Vida Inteira Resgatável",
+    subtitulo: "20 anos",
+    anospag: 20,
+    mult: 1.8,
+    descricao:
+      "Cobertura vitalícia com reserva resgatável. Prêmio pago em 20 anos. Prêmio mensal mais acessível com prazo estendido.",
+  },
+  {
+    codigo: "A7Z",
+    nome: "Vida Inteira Resgatável",
+    subtitulo: "30 anos",
+    anospag: 30,
+    mult: 1.4,
+    descricao:
+      "Cobertura vitalícia com reserva resgatável. Prêmio pago em 30 anos. Menor prêmio mensal, prazo máximo de pagamento.",
+  },
+]
 
 export const MAG_PRODUTO_META: Record<
   string,
   { nome: string; mult: number; anospag: number }
-> = {
-  WL10: { nome: "Whole Life Integral 10 anos", mult: 2.7, anospag: 10 },
-  WL5: { nome: "Whole Life 5 anos", mult: 3.8, anospag: 5 },
-  TL10: { nome: "Term Life 10 anos", mult: 1.0, anospag: 10 },
-  TL20: { nome: "Term Life 20 anos", mult: 1.0, anospag: 20 },
-  TL30: { nome: "Term Life 30 anos", mult: 1.0, anospag: 30 },
-}
+> = Object.fromEntries(
+  MAG_PRODUTOS.map((p) => [
+    `${p.codigo}_${p.anospag}`,
+    { nome: `${p.nome} ${p.subtitulo}`, mult: p.mult, anospag: p.anospag },
+  ]),
+)
 
 /** Taxa mensal de referência (fração do capital segurado) por idade. */
 export function taxaFaixaEtaria(idade: number): number {

@@ -24,7 +24,7 @@ import { Slider } from "@/components/ui/slider"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import { MAG_PRODUTO_META, nomeProdutoMag, taxaFaixaEtaria } from "@/lib/mag/produtos"
+import { MAG_PRODUTOS, taxaFaixaEtaria } from "@/lib/mag/produtos"
 import { cn } from "@/lib/utils"
 
 interface SimuladorSegurosProps {
@@ -41,21 +41,8 @@ const IR_PREV_OPCOES = [
   { v: "27.5", pct: 0.275, label: "27,5%" },
 ] as const
 
-function codigoProdutoMag(tipo: "prazo" | "inteira", anosPrazo: 10 | 20 | 30): string {
-  if (tipo === "inteira") return "WL10"
-  return anosPrazo === 10 ? "TL10" : anosPrazo === 20 ? "TL20" : "TL30"
-}
-
-function getAnospag(codigo: string): number {
-  return MAG_PRODUTO_META[codigo]?.anospag ?? 10
-}
-
-function multProduto(codigo: string): number {
-  return MAG_PRODUTO_META[codigo]?.mult ?? 1
-}
-
-function premioFallback(cs: number, idade: number, codigo: string) {
-  return cs * taxaFaixaEtaria(idade) * multProduto(codigo)
+function premioFallback(cs: number, idade: number, mult: number) {
+  return cs * taxaFaixaEtaria(idade) * mult
 }
 
 function custoNominalPremiosAcumulado(pm: number, anosPag: number, inf: number, ateAno: number): number {
@@ -199,8 +186,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
   const [irPrevKey, setIrPrevKey] = useState<(typeof IR_PREV_OPCOES)[number]["v"]>("15")
   const [rpPct, setRpPct] = useState(7)
   const [riPct, setRiPct] = useState(11)
-  const [tipoSeguro, setTipoSeguro] = useState<"prazo" | "inteira">("prazo")
-  const [anosPrazo, setAnosPrazo] = useState<10 | 20 | 30>(20)
+  const [produtoIdx, setProdutoIdx] = useState(1)
   const [pm0, setPm0] = useState(0)
   const [fontePremio, setFontePremio] = useState<"mag_api" | "estimativa">("estimativa")
   const [loadingMag, setLoadingMag] = useState(false)
@@ -320,8 +306,9 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
 
   const irAliq = IR_PREV_OPCOES.find((o) => o.v === irPrevKey)?.pct ?? 0.15
 
-  const codigoMag = useMemo(() => codigoProdutoMag(tipoSeguro, anosPrazo), [tipoSeguro, anosPrazo])
-  const ANOSPAG = getAnospag(codigoMag)
+  const produto = MAG_PRODUTOS[produtoIdx] ?? MAG_PRODUTOS[0]
+  const codigoMag = produto.codigo
+  const ANOSPAG = produto.anospag
 
   useEffect(() => {
     setPatTotal(getPatrimonioLiquido())
@@ -334,7 +321,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
 
   const buscarMag = useCallback(async () => {
     if (faltando.length > 0) {
-      setPm0(premioFallback(capitalSegurado, Math.max(18, idadeAtualEff || 35), codigoMag))
+      setPm0(premioFallback(capitalSegurado, Math.max(18, idadeAtualEff || 35), produto.mult))
       setFontePremio("estimativa")
       return
     }
@@ -345,7 +332,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
     const ufVal = (String(getValue("uf") ?? "SP").trim() || "SP").slice(0, 2).toUpperCase()
 
     if (!dataNascimento || capitalSegurado <= 0) {
-      const fb = premioFallback(capitalSegurado, idadeAtualEff || 35, codigoMag)
+      const fb = premioFallback(capitalSegurado, idadeAtualEff || 35, produto.mult)
       setPm0(fb)
       setFontePremio("estimativa")
       return
@@ -376,13 +363,13 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
         setFontePremio("mag_api")
         return
       }
-      const fb = premioFallback(capitalSegurado, idadeAtualEff || 35, codigoMag)
+      const fb = premioFallback(capitalSegurado, idadeAtualEff || 35, produto.mult)
       setPm0(fb)
       setFontePremio("estimativa")
       // eslint-disable-next-line no-console
       console.log("MAG fallback / raw:", data.rawResponse ?? data)
     } catch {
-      const fb = premioFallback(capitalSegurado, idadeAtualEff || 35, codigoMag)
+      const fb = premioFallback(capitalSegurado, idadeAtualEff || 35, produto.mult)
       setPm0(fb)
       setFontePremio("estimativa")
     } finally {
@@ -392,6 +379,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
     ANOSPAG,
     capitalSegurado,
     codigoMag,
+    produto.mult,
     faltando,
     getValue,
     idadeAtualEff,
@@ -438,8 +426,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
       const premAcum = custoNominalPremiosAcumulado(pm0, ANOSPAG, inf, t)
       const rawBvivo = sb - Math.max(sb - patTotal, 0) * 0.15 - premAcum
 
-      const coberto = tipoSeguro === "inteira" ? true : t < ANOSPAG
-      const rawBmorte = rawBvivo + (coberto ? capitalSegurado : 0)
+      const rawBmorte = rawBvivo + capitalSegurado
 
       rows.push({
         idade,
@@ -462,7 +449,6 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
     pm0,
     ANOSPAG,
     inf,
-    tipoSeguro,
     capitalSegurado,
     modoRN,
   ])
@@ -561,10 +547,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
     return `No último ano, o Cenário B com seguro (se falecer) supera o Cenário A em cerca ${fmtMoney(-diff, moeda)} aos herdeiros — a proteção do capital segurado compensa a trajetória líquida.`
   }, [finais.liqAF, finais.liqBmorteF, moeda])
 
-  const descricaoSeguro =
-    tipoSeguro === "inteira"
-      ? `${nomeProdutoMag("WL10")} — cobertura vitalícia (modelo WL10).`
-      : `${nomeProdutoMag(codigoMag)} — cobertura por ${anosPrazo} anos.`
+  const descricaoSeguro = `${produto.nome} (${produto.codigo}) — ${produto.descricao}`
 
   const investPct = 100 - allocPrevPct
 
@@ -938,44 +921,31 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
         </Card>
       </div>
 
-      {/* SEÇÃO 3 */}
+      {/* SEÇÃO 3 — Produto MAG */}
       <Card className="bg-[#131929] border-white/10">
-        <CardHeader className="pb-2 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <CardTitle className="text-base font-medium text-foreground">Tipo de seguro</CardTitle>
-          <ToggleGroup
-            type="single"
-            value={tipoSeguro}
-            onValueChange={(v) => v && setTipoSeguro(v as "prazo" | "inteira")}
-            className="rounded-lg border border-white/10 bg-[#0D1220] p-1"
-          >
-            <ToggleGroupItem value="prazo" className="data-[state=on]:bg-[#1E5CE6] data-[state=on]:text-white px-3 py-1.5 text-xs">
-              Vida por Prazo
-            </ToggleGroupItem>
-            <ToggleGroupItem value="inteira" className="data-[state=on]:bg-[#1E5CE6] data-[state=on]:text-white px-3 py-1.5 text-xs">
-              Vida Inteira
-            </ToggleGroupItem>
-          </ToggleGroup>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base font-medium text-foreground">Vida Inteira Resgatável — Prazo de pagamento</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {tipoSeguro === "prazo" && (
-            <div className="flex flex-wrap gap-2">
-              {([10, 20, 30] as const).map((a) => (
-                <Button
-                  key={a}
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setAnosPrazo(a)}
-                  className={cn(
-                    "border-white/10 bg-[#0D1220]",
-                    anosPrazo === a && "border-[#1E5CE6] bg-[#1E5CE6]/15 ring-1 ring-[#1E5CE6]/40",
-                  )}
-                >
-                  {a} anos
-                </Button>
-              ))}
-            </div>
-          )}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {MAG_PRODUTOS.map((p, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => setProdutoIdx(i)}
+                className={cn(
+                  "rounded-lg border px-3 py-3 text-center transition-all",
+                  "bg-[#0D1220] hover:bg-[#0D1220]/80",
+                  produtoIdx === i
+                    ? "border-[#1E5CE6] ring-2 ring-[#1E5CE6]/40"
+                    : "border-white/10",
+                )}
+              >
+                <p className="text-sm font-semibold text-foreground">Resgatável</p>
+                <p className="text-xs text-[#1E5CE6] font-medium tabular-nums">{p.subtitulo}</p>
+              </button>
+            ))}
+          </div>
           <p className="text-sm text-muted-foreground">{descricaoSeguro}</p>
           <div className="flex flex-wrap items-center gap-3">
             <div className="text-sm">
@@ -1199,15 +1169,9 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
               <Badge variant="secondary" className="text-[10px] bg-zinc-700/80">
                 Isento IR/ITCMD (simplificado)
               </Badge>
-              {tipoSeguro === "prazo" ? (
-                <Badge variant="secondary" className="text-[10px] bg-zinc-700/80">
-                  Encerra ano {ANOSPAG}
-                </Badge>
-              ) : (
-                <Badge variant="secondary" className="text-[10px] bg-zinc-700/80">
-                  CS vitalício
-                </Badge>
-              )}
+              <Badge variant="secondary" className="text-[10px] bg-zinc-700/80">
+                CS vitalício · {produto.nome}
+              </Badge>
             </div>
           </CardContent>
         </Card>

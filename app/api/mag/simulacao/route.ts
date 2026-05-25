@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requestMAGToken } from "@/lib/mag/auth"
+import { extrairPremiosMag } from "@/lib/mag/extract-premio"
 
 type SimulacaoBody = {
   dataNascimento?: string
@@ -100,41 +101,13 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const magRoot = magData as {
-      Valor?: { simulacoes?: unknown[] }
-      simulacoes?: unknown[]
-    }
+    const { premioMensal, premioAnual: premioAnualExtr } = extrairPremiosMag(magData)
 
-    // Estrutura real: { Valor: { simulacoes: [...] } } ou { simulacoes: [...] }
-    const simulacao = (magRoot?.Valor?.simulacoes?.[0] ?? magRoot?.simulacoes?.[0]) as
-      | Record<string, unknown>
-      | undefined
-
-    const premioNested =
-      simulacao?.premio && typeof simulacao.premio === "object"
-        ? (simulacao.premio as { valorMensal?: number })
-        : null
-
-    const valorWrapper =
-      simulacao?.Valor && typeof simulacao.Valor === "object"
-        ? (simulacao.Valor as { premio?: { valorMensal?: number } })
-        : null
-
-    const premioMensal =
-      (typeof premioNested?.valorMensal === "number" ? premioNested.valorMensal : null) ??
-      (typeof simulacao?.premioMensal === "number" ? simulacao.premioMensal : null) ??
-      (typeof valorWrapper?.premio?.valorMensal === "number"
-        ? valorWrapper.premio.valorMensal
-        : null) ??
-      (typeof simulacao?.valorPremio === "number" ? simulacao.valorPremio : null) ??
-      null
-
-    console.log("SIMULACAO EXTRAIDA:", JSON.stringify(simulacao, null, 2))
-    console.log("PREMIO MENSAL:", premioMensal)
+    console.log("PREMIO EXTRAIDO:", { premioMensal, premioAnualExtr })
 
     return NextResponse.json({
-      premioMensal,
-      premioAnual: premioMensal != null ? premioMensal * 12 : null,
+      premioMensal: premioMensal ?? null,
+      premioAnual: premioAnualExtr ?? (premioMensal != null ? premioMensal * 12 : null),
       rawResponse: magData,
       fonte: "mag_api",
     })
