@@ -32,6 +32,14 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    const cpfLimpo = (body.cpf ?? "").replace(/\D/g, "")
+    if (!cpfLimpo || cpfLimpo.length !== 11) {
+      return NextResponse.json(
+        { error: "CPF obrigatório e deve ter 11 dígitos", cpfRecebido: body.cpf },
+        { status: 400 },
+      )
+    }
+
     const apiUrl = process.env.MAG_API_URL?.replace(/\/$/, "")
     if (!apiUrl) {
       return NextResponse.json({ erro: "MAG_API_URL não configurada" }, { status: 500 })
@@ -54,7 +62,6 @@ export async function POST(req: NextRequest) {
     const url = `${apiUrl}/apiseguradora/v3/simulacao?cnpj=${encodeURIComponent(cnpj)}&codigoModeloProposta=${encodeURIComponent(String(body.codigoModeloProposta))}&canalVenda=4`
     console.log("MAG URL:", url)
 
-    const cpfLimpo = (body.cpf ?? "").replace(/\D/g, "") || undefined
     const renda = Number(body.rendaMensal ?? body.renda ?? 0)
     const prazo = Number(body.prazo ?? body.anospag ?? 30)
 
@@ -68,7 +75,7 @@ export async function POST(req: NextRequest) {
     const proponente: Record<string, unknown> = {
       tipoRelacaoSeguradoId: 1,
       nome: body.nome || "SIMULACAO VOGA",
-      cpf: cpfLimpo ?? "",
+      cpf: cpfLimpo,
       dataNascimento: body.dataNascimento,
       profissaoCbo: body.profissaoCbo ?? "2410-05",
       renda,
@@ -126,9 +133,10 @@ export async function POST(req: NextRequest) {
 
     console.log("MAG simulacao response:", JSON.stringify(magData, null, 2))
 
-    const { premioMensal, premioAnual: premioAnualExtr } = extrairPremiosMag(magData)
+    const cs = Number(body.capitalSegurado ?? 0)
+    const { premioMensal, premioAnual: premioAnualExtr, premioBaseMorte } = extrairPremiosMag(magData, cs)
 
-    console.log("PREMIO EXTRAIDO:", { premioMensal, premioAnualExtr })
+    console.log("PREMIO EXTRAIDO:", { premioMensal, premioAnualExtr, premioBaseMorte, capitalSegurado: cs })
 
     return NextResponse.json({
       premioMensal: premioMensal ?? null,

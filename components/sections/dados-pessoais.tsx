@@ -95,6 +95,34 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
               />
             </div>
 
+            {/* CPF */}
+            <div className="space-y-2">
+              <Label
+                htmlFor="cpf"
+                className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground"
+              >
+                CPF
+              </Label>
+              <Input
+                id="cpf"
+                inputMode="numeric"
+                maxLength={14}
+                value={
+                  ((dadosPessoais.cpf ?? "").replace(/\D/g, "")).replace(
+                    /^(\d{0,3})(\d{0,3})(\d{0,3})(\d{0,2})$/,
+                    (_m, a, b, c, d) =>
+                      [a, b, c].filter(Boolean).join(".") + (d ? `-${d}` : ""),
+                  )
+                }
+                onChange={(e) => {
+                  const digits = e.target.value.replace(/\D/g, "").slice(0, 11)
+                  setDadosPessoais({ cpf: digits })
+                }}
+                placeholder="000.000.000-00"
+                className="h-11 bg-[#131929] border-[rgba(255,255,255,0.14)] text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30 tabular-nums"
+              />
+            </div>
+
             {/* Nome do Cônjuge - aparece apenas quando Estado Civil = Casado(a) */}
             <div 
               className={`space-y-2 transition-all duration-300 ease-in-out ${

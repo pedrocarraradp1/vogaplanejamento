@@ -75,6 +75,7 @@ function fmtShort(v: number, moeda: "BRL" | "USD") {
 }
 
 type CampoKey =
+  | "cpf"
   | "dataNascimento"
   | "sexo"
   | "uf"
@@ -86,6 +87,7 @@ type CampoKey =
   | "inflacao"
 
 const CAMPOS_SEM_IR: CampoKey[] = [
+  "cpf",
   "dataNascimento",
   "sexo",
   "uf",
@@ -114,6 +116,7 @@ function resolveUfSelect(uf: string | undefined | null): string {
 }
 
 const LABEL_CAMPO: Record<CampoKey, string> = {
+  cpf: "CPF",
   dataNascimento: "Data de nascimento",
   sexo: "Sexo",
   uf: "UF (estado)",
@@ -141,6 +144,10 @@ function idadeFromNascimentoStr(nasc: string): number {
 function campoEstaPreenchido(campo: CampoKey, val: string | number | null): boolean {
   if (val === null || val === undefined) return false
   switch (campo) {
+    case "cpf": {
+      const digits = String(val).replace(/\D/g, "")
+      return digits.length === 11
+    }
     case "dataNascimento":
       if (typeof val !== "string" || !val.trim()) return false
       return idadeFromNascimentoStr(val) > 0
@@ -215,6 +222,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
     const infG = Number(premissas.inflacao)
     const ia = Number(premissas.idadeApos)
     return {
+      cpf: (dadosPessoais.cpf ?? "").replace(/\D/g, "") || null,
       dataNascimento: dadosPessoais.nascimento?.trim() || null,
       sexo: dadosPessoais.sexo === "M" || dadosPessoais.sexo === "F" ? dadosPessoais.sexo : null,
       uf: dadosPessoais.uf?.trim() ? dadosPessoais.uf.trim().toUpperCase() : null,
@@ -256,6 +264,8 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
           if (!Number.isFinite(n)) return null
           return n
         }
+        case "cpf":
+          return String(raw).replace(/\D/g, "")
         case "uf":
           return String(raw).trim().toUpperCase()
         case "dataNascimento":
@@ -345,7 +355,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           nome: dadosPessoais.nome || "SIMULACAO VOGA WEALTH",
-          cpf: (dadosPessoais.cpf ?? "").replace(/\D/g, "") || undefined,
+          cpf: (dadosPessoais.cpf ?? "").replace(/\D/g, ""),
           dataNascimento,
           sexoId: sexoVal === "M" ? 1 : 2,
           renda: rendaMensal,
@@ -611,6 +621,19 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
             {faltando.map((campo) => (
               <div key={campo} className="space-y-1.5">
                 <Label className="text-xs text-amber-950/80 dark:text-amber-100/90">{LABEL_CAMPO[campo]}</Label>
+                {campo === "cpf" ? (
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={14}
+                    placeholder="000.000.000-00"
+                    value={localInputs.cpf ?? ""}
+                    onChange={(e) =>
+                      setLocalInputs((p) => ({ ...p, cpf: e.target.value }))
+                    }
+                    className="h-10 bg-background/80 border-amber-500/40 tabular-nums"
+                  />
+                ) : null}
                 {campo === "dataNascimento" ? (
                   <Input
                     type="date"
