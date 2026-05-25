@@ -1,3 +1,5 @@
+export const runtime = "edge"
+
 import { NextRequest, NextResponse } from "next/server"
 import { requestMAGToken } from "@/lib/mag/auth"
 import { extrairPremiosMag } from "@/lib/mag/extract-premio"

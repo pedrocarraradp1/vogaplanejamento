@@ -9,8 +9,19 @@ export type MagTokenAuthResult =
   | { ok: true; token: string; expires_in: number }
   | { ok: false; status: number; body: string }
 
-/** Requisição OAuth à MAG com log de status e body bruto (debug). */
+let cachedToken: string | null = null
+let cacheExpiresAt = 0
+
+const MAG_AFFINITY_COOKIE =
+  "IdentidadeHmgAffinity=ec749dbec5b6f62e1eb4865e2fc7b9f9; IdentidadeHmgAffinityCORS=ec749dbec5b6f62e1eb4865e2fc7b9f9"
+
+/** Requisição OAuth à MAG com cache em memória (reusa até 50 min antes do expiry). */
 export async function requestMAGToken(): Promise<MagTokenAuthResult> {
+  if (cachedToken && Date.now() < cacheExpiresAt) {
+    console.log("TOKEN CACHE HIT (expires in", Math.round((cacheExpiresAt - Date.now()) / 1000), "s)")
+    return { ok: true, token: cachedToken, expires_in: Math.round((cacheExpiresAt - Date.now()) / 1000) }
+  }
+
   const base = process.env.MAG_AUTH_URL?.replace(/\/$/, "")
   const clientId = process.env.MAG_CLIENT_ID
   const clientSecret = process.env.MAG_CLIENT_SECRET
@@ -24,11 +35,8 @@ export async function requestMAGToken(): Promise<MagTokenAuthResult> {
     }
   }
 
-  const MAG_AFFINITY_COOKIE =
-    "IdentidadeHmgAffinity=ec749dbec5b6f62e1eb4865e2fc7b9f9; IdentidadeHmgAffinityCORS=ec749dbec5b6f62e1eb4865e2fc7b9f9"
-
-  const tokenParams = {
-    method: "POST" as const,
+  const tokenRes = await fetch(`${base}/connect/token`, {
+    method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
       Cookie: MAG_AFFINITY_COOKIE,
@@ -39,20 +47,14 @@ export async function requestMAGToken(): Promise<MagTokenAuthResult> {
       scope: "apiseguradora",
       grant_type: "client_credentials",
     }),
-  }
-
-  // Tenta primeiro com T maiúsculo (padrão em alguns ambientes MAG), depois minúsculo
-  let tokenRes = await fetch(`${base}/connect/Token`, tokenParams)
-  if (!tokenRes.ok) {
-    console.log("TOKEN /connect/Token falhou, tentando /connect/token...")
-    tokenRes = await fetch(`${base}/connect/token`, tokenParams)
-  }
+  })
 
   console.log("TOKEN STATUS:", tokenRes.status)
   const tokenText = await tokenRes.text()
-  console.log("TOKEN BODY:", tokenText)
 
   if (!tokenRes.ok) {
+    cachedToken = null
+    cacheExpiresAt = 0
     return { ok: false, status: tokenRes.status, body: tokenText }
   }
 
@@ -67,8 +69,6 @@ export async function requestMAGToken(): Promise<MagTokenAuthResult> {
     }
   }
 
-  console.log("TOKEN RESPONSE:", data)
-
   if (!data.access_token) {
     return {
       ok: false,
@@ -77,11 +77,12 @@ export async function requestMAGToken(): Promise<MagTokenAuthResult> {
     }
   }
 
-  return {
-    ok: true,
-    token: data.access_token,
-    expires_in: Number(data.expires_in) || 3600,
-  }
+  const expiresIn = Number(data.expires_in) || 3600
+  cachedToken = data.access_token
+  cacheExpiresAt = Date.now() + Math.max(0, expiresIn - 3000) * 1000
+  console.log("TOKEN FRESH — cached for", Math.round((cacheExpiresAt - Date.now()) / 1000), "s")
+
+  return { ok: true, token: data.access_token, expires_in: expiresIn }
 }
 
 /** Obtém token OAuth direto na MAG (sem fetch interno à app). */
