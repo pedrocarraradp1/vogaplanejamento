@@ -9,11 +9,15 @@ type SimulacaoBody = {
   cpf?: string
   dataNascimento?: string
   sexoId?: number
+  sexo?: string
   renda?: number
+  rendaMensal?: number
   uf?: string
   codigoModeloProposta?: string
   capitalSegurado?: number
   anospag?: number
+  prazo?: number
+  profissaoCbo?: string
 }
 
 export async function POST(req: NextRequest) {
@@ -51,23 +55,33 @@ export async function POST(req: NextRequest) {
     console.log("MAG URL:", url)
 
     const cpfLimpo = (body.cpf ?? "").replace(/\D/g, "") || undefined
+    const renda = Number(body.rendaMensal ?? body.renda ?? 0)
+    const prazo = Number(body.prazo ?? body.anospag ?? 30)
+
+    let sexoId = 1
+    if (body.sexoId != null) {
+      sexoId = Number(body.sexoId)
+    } else if (body.sexo) {
+      sexoId = body.sexo.toLowerCase() === "feminino" || body.sexo === "F" ? 2 : 1
+    }
 
     const proponente: Record<string, unknown> = {
       tipoRelacaoSeguradoId: 1,
-      nome: body.nome || "SIMULACAO VOGA WEALTH",
+      nome: body.nome || "SIMULACAO VOGA",
+      cpf: cpfLimpo ?? "",
       dataNascimento: body.dataNascimento,
-      profissaoCbo: "2410-05",
-      renda: Number(body.renda ?? 0),
-      sexoId: Number(body.sexoId ?? 1),
-      uf: String(body.uf ?? "SP"),
+      profissaoCbo: body.profissaoCbo ?? "2410-05",
+      renda,
+      sexoId,
+      uf: String(body.uf ?? "DF"),
       declaracaoIRId: 1,
     }
-    if (cpfLimpo) proponente.cpf = cpfLimpo
 
     const simulacaoPayload: Record<string, unknown> = {
       proponente,
       periodicidadeCobrancaId: 30,
-      prazoPagamentoAntecipado: Number(body.anospag ?? 10),
+      prazoCerto: prazo,
+      prazoPagamentoAntecipado: 10,
       prazoDecrescimo: 10,
     }
 
@@ -93,8 +107,17 @@ export async function POST(req: NextRequest) {
 
     console.log("MAG STATUS:", magRes.status)
 
-    let magData: unknown
     const rawText = await magRes.text()
+
+    if (!magRes.ok) {
+      console.error("MAG ERROR BODY (HTTP", magRes.status + "):", rawText)
+      return NextResponse.json(
+        { error: "MAG simulacao failed", details: rawText, status: magRes.status },
+        { status: 500 },
+      )
+    }
+
+    let magData: unknown
     try {
       magData = rawText ? JSON.parse(rawText) : {}
     } catch {
@@ -102,17 +125,6 @@ export async function POST(req: NextRequest) {
     }
 
     console.log("MAG simulacao response:", JSON.stringify(magData, null, 2))
-
-    if (!magRes.ok) {
-      return NextResponse.json(
-        {
-          erro: "MAG API erro",
-          status: magRes.status,
-          magData,
-        },
-        { status: 500 },
-      )
-    }
 
     const { premioMensal, premioAnual: premioAnualExtr } = extrairPremiosMag(magData)
 
