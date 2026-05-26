@@ -12,6 +12,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
+  ReferenceLine,
 } from "recharts"
 import { ArrowLeft, ArrowRight, ShieldCheck } from "lucide-react"
 import { usePlano } from "@/lib/plano-context"
@@ -31,14 +32,21 @@ interface SimuladorSegurosProps {
   onNavigate: (section: string) => void
 }
 
-const CS_MIN = 500_000
-const CS_MAX = 25_000_000
+const CS_MIN = 0
+const CS_MAX = 20_000_000
 
 const IR_PREV_OPCOES = [
   { v: "10", pct: 0.1, label: "10%" },
   { v: "15", pct: 0.15, label: "15%" },
   { v: "20", pct: 0.2, label: "20%" },
   { v: "27.5", pct: 0.275, label: "27,5%" },
+] as const
+
+const IR_INV_OPCOES = [
+  { v: "15", pct: 0.15, label: "15% (longo prazo > 2 anos)" },
+  { v: "15cp", pct: 0.15, label: "15% (curto prazo)" },
+  { v: "20", pct: 0.2, label: "20%" },
+  { v: "22.5", pct: 0.225, label: "22,5%" },
 ] as const
 
 function premioFallback(cs: number, idade: number, mult: number) {
@@ -126,8 +134,16 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
   const [modoRN, setModoRN] = useState<"nominal" | "real">("nominal")
   const [patTotal, setPatTotal] = useState(0)
   const [allocPrevPct, setAllocPrevPct] = useState(40)
-  const [capitalSegurado, setCapitalSegurado] = useState(3_000_000)
+  const [capitalSegurado, setCapitalSegurado] = useState(() => {
+    const pat = getPatrimonioLiquido()
+    if (pat > 0) {
+      const rounded = Math.round(pat / 50_000) * 50_000
+      return Math.min(CS_MAX, Math.max(CS_MIN, rounded))
+    }
+    return 500_000
+  })
   const [irPrevKey, setIrPrevKey] = useState<(typeof IR_PREV_OPCOES)[number]["v"]>("15")
+  const [irInvKey, setIrInvKey] = useState<(typeof IR_INV_OPCOES)[number]["v"]>("15")
   const [rpPct, setRpPct] = useState(7)
   const [riPct, setRiPct] = useState(11)
   const [produtoIdx, setProdutoIdx] = useState(1)
@@ -248,6 +264,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
   const ri = riPct / 100
 
   const irAliq = IR_PREV_OPCOES.find((o) => o.v === irPrevKey)?.pct ?? 0.15
+  const irInvAliq = IR_INV_OPCOES.find((o) => o.v === irInvKey)?.pct ?? 0.15
 
   const produto = MAG_PRODUTOS[produtoIdx] ?? MAG_PRODUTOS[0]
   const codigoMag = produto.codigo
@@ -357,12 +374,12 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
       const siA = patI * Math.pow(1 + ri, t)
       const rawA =
         t === H
-          ? spA - spA * irAliq + (siA - Math.max(siA - patI, 0) * 0.15)
+          ? spA - spA * irAliq + (siA - Math.max(siA - patI, 0) * irInvAliq)
           : spA + siA
 
       const sb = patTotal * Math.pow(1 + ri, t)
       const premAcum = custoNominalPremiosAcumulado(pm0, ANOSPAG, inf, t)
-      const rawBvivo = sb - Math.max(sb - patTotal, 0) * 0.15 - premAcum
+      const rawBvivo = sb - Math.max(sb - patTotal, 0) * irInvAliq - premAcum
 
       const rawBmorte = rawBvivo + capitalSegurado
 
@@ -384,6 +401,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
     rp,
     ri,
     irAliq,
+    irInvAliq,
     pm0,
     ANOSPAG,
     inf,
@@ -391,42 +409,46 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
     modoRN,
   ])
 
-  const barrasRendimentoMensal = useMemo(() => {
-    const rows: { idade: number; stackPrev: number; stackPrem: number; stackInv: number; brutoInv: number }[] = []
+  const comparativoAnual = useMemo(() => {
+    const rows: { idade: number; rendPrev: number; rendInvLiq: number }[] = []
     for (let t = 1; t <= H; t++) {
       const idade = idadeAtualEff + t
-      const spA = patP * Math.pow(1 + rp, t)
-      const stackPrev = (spA * rp) / 12
+      const saldoPrev = patP * Math.pow(1 + rp, t)
+      const rendPrev = saldoPrev * rp
 
-      const stackPrem =
-        t <= ANOSPAG ? pm0 * Math.pow(1 + inf, Math.max(0, t - 1)) : 0
+      const saldoInv = patTotal * Math.pow(1 + ri, t)
+      const rendBrutoInv = saldoInv * ri
+      const irAnual = Math.max(0, saldoInv - patTotal) * irInvAliq / H
+      const premioAnual = t <= ANOSPAG ? pm0 * 12 * Math.pow(1 + inf, Math.max(0, t - 1)) : 0
+      const rendInvLiq = Math.max(0, rendBrutoInv - irAnual - premioAnual)
 
-      const sb = patTotal * Math.pow(1 + ri, t)
-      const rendBrutoM = (sb * ri) / 12
-      const stackInv = Math.max(rendBrutoM - stackPrem, 0)
-
-      const rawBruto = stackPrem + stackInv
       rows.push({
         idade,
-        stackPrev: modoRN === "real" ? stackPrev / deflator(t) : stackPrev,
-        stackPrem: modoRN === "real" ? stackPrem / deflator(t) : stackPrem,
-        stackInv: modoRN === "real" ? stackInv / deflator(t) : stackInv,
-        brutoInv: modoRN === "real" ? rawBruto / deflator(t) : rawBruto,
+        rendPrev: modoRN === "real" ? rendPrev / deflator(t) : rendPrev,
+        rendInvLiq: modoRN === "real" ? rendInvLiq / deflator(t) : rendInvLiq,
       })
     }
     return rows
-  }, [
-    H,
-    idadeAtualEff,
-    patP,
-    patTotal,
-    rp,
-    ri,
-    pm0,
-    ANOSPAG,
-    inf,
-    modoRN,
-  ])
+  }, [H, idadeAtualEff, patP, patTotal, rp, ri, pm0, ANOSPAG, inf, modoRN, deflator, irInvAliq])
+
+  const custoAnualSeguro = useMemo(() => {
+    const rows: { ano: number; custoAnual: number; acumulado: number }[] = []
+    let acum = 0
+    for (let a = 1; a <= ANOSPAG; a++) {
+      const custoAno = pm0 * 12 * Math.pow(1 + inf, Math.max(0, a - 1))
+      acum += custoAno
+      rows.push({
+        ano: a,
+        custoAnual: modoRN === "real" ? custoAno / deflator(a) : custoAno,
+        acumulado: modoRN === "real" ? acum / deflator(a) : acum,
+      })
+    }
+    return rows
+  }, [ANOSPAG, pm0, inf, modoRN, deflator])
+
+  const totalPagoSeguro = custoAnualSeguro.length > 0
+    ? custoAnualSeguro[custoAnualSeguro.length - 1].acumulado
+    : 0
 
   const finais = useMemo(() => {
     const t = H
@@ -434,11 +456,11 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
     const spAF = patP * Math.pow(1 + rp, t)
     const siAF = patI * Math.pow(1 + ri, t)
     const liqAF_nom =
-      spAF - spAF * irAliq + (siAF - Math.max(siAF - patI, 0) * 0.15)
+      spAF - spAF * irAliq + (siAF - Math.max(siAF - patI, 0) * irInvAliq)
 
     const sbF = patTotal * Math.pow(1 + ri, t)
     const premF = custoNominalPremiosTotal(pm0, ANOSPAG, inf)
-    const liqBsobrev_nom = sbF - Math.max(sbF - patTotal, 0) * 0.15 - premF
+    const liqBsobrev_nom = sbF - Math.max(sbF - patTotal, 0) * irInvAliq - premF
     const rendB = Math.max(0, sbF - patTotal - premF)
     const liqBmorte_nom = liqBsobrev_nom + capitalSegurado
 
@@ -452,7 +474,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
       liqBsobrevF: toDisp(liqBsobrev_nom),
       liqBmorteF: toDisp(liqBmorte_nom),
       rendB,
-      rendBIr: toDisp(rendB * 0.15),
+      rendBIr: toDisp(rendB * irInvAliq),
       csDisp: toDisp(capitalSegurado),
     }
   }, [
@@ -463,6 +485,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
     rp,
     ri,
     irAliq,
+    irInvAliq,
     pm0,
     ANOSPAG,
     inf,
@@ -557,26 +580,6 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
                 cenários.
               </p>
             </div>
-            <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground uppercase tracking-wide">
-                IR previdência no resgate
-              </Label>
-              <Select
-                value={irPrevKey ?? "15"}
-                onValueChange={(v) => setIrPrevKey((v || "15") as (typeof IR_PREV_OPCOES)[number]["v"])}
-              >
-                <SelectTrigger className="h-11 bg-[#0D1220] border-white/10">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-card border-border">
-                  {IR_PREV_OPCOES.map((o) => (
-                    <SelectItem key={o.v} value={o.v}>
-                      {o.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
           </div>
 
           <div className="space-y-2">
@@ -656,22 +659,62 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-[#1E5CE6]">Previdência % a.a. líquida</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">{rpPctResolved}% a.a.</span>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">{rpPctResolved}% a.a.</span>
+              </div>
+              <Slider value={[rpPct]} onValueChange={(v) => setRpPct(v[0] ?? 7)} min={4} max={15} step={0.5} />
             </div>
-            <Slider value={[rpPct]} onValueChange={(v) => setRpPct(v[0] ?? 7)} min={4} max={15} step={0.5} />
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground uppercase tracking-wide">IR no resgate</Label>
+              <Select
+                value={irPrevKey ?? "15"}
+                onValueChange={(v) => setIrPrevKey((v || "15") as (typeof IR_PREV_OPCOES)[number]["v"])}
+              >
+                <SelectTrigger className="h-9 bg-[#0D1220] border-white/10 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-card border-border">
+                  {IR_PREV_OPCOES.map((o) => (
+                    <SelectItem key={o.v} value={o.v}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </CardContent>
         </Card>
         <Card className="bg-[#131929] border-emerald-500/30">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-emerald-400">Investimento % a.a. líquida</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">{riPct}% a.a.</span>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">{riPct}% a.a.</span>
+              </div>
+              <Slider value={[riPct]} onValueChange={(v) => setRiPct(v[0] ?? 11)} min={4} max={18} step={0.5} />
             </div>
-            <Slider value={[riPct]} onValueChange={(v) => setRiPct(v[0] ?? 11)} min={4} max={18} step={0.5} />
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground uppercase tracking-wide">IR sobre rendimento</Label>
+              <Select
+                value={irInvKey ?? "15"}
+                onValueChange={(v) => setIrInvKey((v || "15") as (typeof IR_INV_OPCOES)[number]["v"])}
+              >
+                <SelectTrigger className="h-9 bg-[#0D1220] border-white/10 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-card border-border">
+                  {IR_INV_OPCOES.map((o) => (
+                    <SelectItem key={o.v} value={o.v}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -803,33 +846,90 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
         </CardContent>
       </Card>
 
-      {/* SEÇÃO 7 */}
+      {/* SEÇÃO 7A — Comparativo rentabilidade anual */}
       <Card className="bg-[#131929] border-white/10">
         <CardHeader>
-          <CardTitle className="text-base font-medium text-foreground">Rendimento mensal bruto</CardTitle>
-          <p className="text-xs text-muted-foreground font-normal">Barras empilhadas por idade (a partir do 2º ano do horizonte).</p>
+          <CardTitle className="text-base font-medium text-foreground">
+            Comparativo: Previdência vs Investimento Livre (após IR e seguro)
+          </CardTitle>
+          <p className="text-xs text-muted-foreground font-normal">
+            Rendimento anual bruto de cada cenário, por idade.
+          </p>
         </CardHeader>
-        <CardContent className="h-[320px] w-full">
+        <CardContent className="h-[360px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={barrasRendimentoMensal} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+            <BarChart data={comparativoAnual} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
               <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
               <XAxis dataKey="idade" tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 11 }} />
-              <YAxis tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 11 }} width={52} />
+              <YAxis
+                tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 11 }}
+                width={64}
+                tickFormatter={(v: number) => fmtShort(v, moeda)}
+              />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: "#131929",
+                  backgroundColor: "#0D1220",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  borderRadius: 8,
+                }}
+                formatter={(value: number | string) => fmtMoney(Number(value), moeda)}
+              />
+              <Legend />
+              <Bar dataKey="rendPrev" name="Prev" fill="#1E5CE6" radius={[3, 3, 0, 0]} />
+              <Bar dataKey="rendInvLiq" name="Inv. Líquido (− IR − Seguro)" fill="#4CAF7D" radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* SEÇÃO 7B — Custo anual do seguro */}
+      <Card className="bg-[#131929] border-white/10">
+        <CardHeader>
+          <CardTitle className="text-base font-medium text-foreground">
+            Pagamento anual do seguro — prazo de {ANOSPAG} anos
+          </CardTitle>
+          <p className="text-xs text-muted-foreground font-normal">
+            Prêmio anual pago por ano. Total ao final: {fmtMoney(totalPagoSeguro, moeda)}.
+          </p>
+        </CardHeader>
+        <CardContent className="h-[300px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={custoAnualSeguro} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+              <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
+              <XAxis dataKey="ano" tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 11 }} />
+              <YAxis
+                tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 11 }}
+                width={64}
+                tickFormatter={(v: number) => fmtShort(v, moeda)}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "#0D1220",
                   border: "1px solid rgba(255,255,255,0.1)",
                   borderRadius: 8,
                 }}
                 formatter={(value: number | string, _n, p) => {
-                  if (p?.dataKey === "brutoInv") return [fmtMoney(Number(value), moeda), "Invest. bruto (laranja+verde)"]
+                  const row = p?.payload as { acumulado?: number } | undefined
+                  const acum = row?.acumulado ?? 0
+                  if (p?.dataKey === "custoAnual") {
+                    return [`${fmtMoney(Number(value), moeda)} | Acumulado: ${fmtMoney(acum, moeda)}`, "Custo anual"]
+                  }
                   return [fmtMoney(Number(value), moeda), String(p?.name ?? "")]
                 }}
               />
-              <Legend />
-              <Bar dataKey="stackPrev" name="Prev (rp/12)" stackId="s" fill="#1E5CE6" />
-              <Bar dataKey="stackPrem" name="Prêmio" stackId="s" fill="#f59e0b" />
-              <Bar dataKey="stackInv" name="Rend. livre inv." stackId="s" fill="#22C787" />
+              <ReferenceLine
+                y={totalPagoSeguro}
+                stroke="#F59E0B"
+                strokeDasharray="6 4"
+                strokeWidth={1.5}
+                label={{
+                  value: `Total: ${fmtShort(totalPagoSeguro, moeda)}`,
+                  position: "right",
+                  fill: "#F59E0B",
+                  fontSize: 11,
+                }}
+              />
+              <Bar dataKey="custoAnual" name="Prêmio anual" fill="#F59E0B" radius={[3, 3, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>
