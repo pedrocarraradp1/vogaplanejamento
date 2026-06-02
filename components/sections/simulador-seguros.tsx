@@ -168,7 +168,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
   const moeda = state.moeda ?? "BRL"
 
   const [modoRN, setModoRN] = useState<"nominal" | "real">("nominal")
-  const [modoProjecaoMag, setModoProjecaoMag] = useState<"nominal" | "real">("nominal")
+  const [modoProjecaoMag, setModoProjecaoMag] = useState<"nominal" | "real">("real")
   const [patTotal, setPatTotal] = useState(0)
   const [allocPrevPct, setAllocPrevPct] = useState(40)
   const [capitalSegurado, setCapitalSegurado] = useState(() => {
@@ -898,7 +898,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
               Projeção ano a ano — MAG
             </CardTitle>
             <div className="flex gap-2 self-start sm:self-auto">
-              {(["nominal", "real"] as const).map((modo) => (
+              {(["real", "nominal"] as const).map((modo) => (
                 <button
                   key={modo}
                   type="button"
@@ -956,8 +956,8 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
           </div>
           <p className="text-xs text-zinc-500 leading-relaxed">
             {modoProjecaoMag === "real"
-              ? "Valores em reais de hoje, sem correção monetária."
-              : `Valores corrigidos por IPCA de ${inflacaoPctDisplay}% a.a. (estimado). Meramente ilustrativo.`}
+              ? "Valores em reais de hoje, poder de compra constante."
+              : `Valores nominais futuros, corrigidos por IPCA de ${inflacaoPctDisplay}% a.a. (estimado).`}
           </p>
         </CardContent>
       </Card>
