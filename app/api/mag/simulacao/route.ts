@@ -59,18 +59,12 @@ export async function POST(req: NextRequest) {
     const token = tokenResult.token
 
     const cnpj = (process.env.MAG_CNPJ || "27945275000154").replace(/\D/g, "")
-    const codigoModeloUrl =
-      body.codigoModeloProposta === "A75" || body.codigoModeloProposta === "A7Z"
-        ? "A75"
-        : String(body.codigoModeloProposta)
-    const url = `${apiUrl}/apiseguradora/v3/simulacao?cnpj=${encodeURIComponent(cnpj)}&codigoModeloProposta=${encodeURIComponent(codigoModeloUrl)}&canalVenda=4`
+    const url = `${apiUrl}/apiseguradora/v3/simulacao?cnpj=${encodeURIComponent(cnpj)}&codigoModeloProposta=A75&canalVenda=4`
     console.log("MAG URL:", url)
 
     const renda = Number(body.rendaMensal ?? body.renda ?? 0)
     const prazo = Number(body.prazo ?? body.anospag ?? 30)
     const prazoFinal = [10, 20, 30].includes(prazo) ? prazo : 10
-    const isA75 =
-      body.codigoModeloProposta === "A75" || body.codigoModeloProposta === "A7Z"
 
     let sexoId = 1
     if (body.sexoId != null) {
@@ -96,24 +90,14 @@ export async function POST(req: NextRequest) {
       periodicidadeCobrancaId: 30,
       prazoPagamentoAntecipado: prazoFinal,
       prazoDecrescimo: prazoFinal,
-    }
-
-    if (!isA75) {
-      simulacaoPayload.prazoCerto = prazo
+      idProduto: 2111,
     }
 
     if (body.capitalSegurado != null && body.capitalSegurado > 0) {
       simulacaoPayload.capitalSegurado = Number(body.capitalSegurado)
     }
 
-    if (isA75) {
-      simulacaoPayload.codigoModeloProposta = "A75"
-      simulacaoPayload.idProduto = 2111
-    }
-
-    if (isA75) {
-      console.log("PRODUTO USADO:", { codigo: "A75", idProduto: 2111, prazo: prazoFinal })
-    }
+    console.log("PRODUTO USADO:", { codigo: "A75", idProduto: 2111, prazo: prazoFinal })
     console.log("MAG SIMULACAO PAYLOAD:", JSON.stringify({ simulacoes: [simulacaoPayload] }, null, 2))
 
     const magRes = await fetch(url, {
@@ -161,8 +145,8 @@ export async function POST(req: NextRequest) {
       premioAnual: premioAnualExtr ?? (premioMensal != null ? premioMensal * 12 : null),
       premioBaseMorte: premioBaseMorte ?? null,
       capitalSegurado: cs,
-      codigoModeloProposta: codigoModeloUrl,
-      idProduto: isA75 ? 2111 : null,
+      codigoModeloProposta: "A75",
+      idProduto: 2111,
       prazo: prazoFinal,
     }
 
