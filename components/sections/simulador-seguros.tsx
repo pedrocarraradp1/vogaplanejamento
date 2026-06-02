@@ -339,7 +339,27 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
 
   const produto = MAG_PRODUTOS[produtoIdx] ?? MAG_PRODUTOS[0]
   const codigoMag = produto.codigo
-  const ANOSPAG = produto.anospag
+  const prazoSelecionado = produto.anospag
+  const ANOSPAG = prazoSelecionado
+
+  const dadosCliente = useMemo(() => {
+    const dataNascimento = String(getValue("dataNascimento") ?? "").trim()
+    const cpf = (dadosPessoais.cpf ?? "").replace(/\D/g, "")
+    const sexoVal = getValue("sexo")
+    return {
+      dataNascimento,
+      cpf,
+      nome: dadosPessoais.nome || "SIMULACAO VOGA WEALTH",
+      sexoId: sexoVal === "M" ? 1 : 2,
+      renda: Number(getValue("rendaMensal")) || 0,
+      uf: (String(getValue("uf") ?? "SP").trim() || "SP").slice(0, 2).toUpperCase(),
+    }
+  }, [getValue, dadosPessoais.nome, dadosPessoais.cpf])
+
+  const dadosClienteOk =
+    Boolean(dadosCliente.dataNascimento) &&
+    dadosCliente.cpf.length === 11 &&
+    capitalSegurado > 0
 
   useEffect(() => {
     setPatTotal(getPatrimonioLiquido())
@@ -350,15 +370,9 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const magAbortRef = useRef<AbortController | null>(null)
-  const lastAnospagRef = useRef(ANOSPAG)
 
-  const buscarMag = useCallback(async () => {
-    const dataNascimento = String(getValue("dataNascimento") ?? "").trim()
-    const sexoVal = getValue("sexo")
-    const rendaMensal = Number(getValue("rendaMensal")) || 0
-    const ufVal = (String(getValue("uf") ?? "SP").trim() || "SP").slice(0, 2).toUpperCase()
-
-    if (!dataNascimento || capitalSegurado <= 0) {
+  const fetchSimulacao = useCallback(async () => {
+    if (!dadosClienteOk) {
       magAbortRef.current?.abort()
       const fb = premioFallback(capitalSegurado, idadeAtualEff || 35, produto.mult)
       setPm0(fb)
@@ -378,16 +392,11 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
         headers: { "Content-Type": "application/json" },
         signal: ac.signal,
         body: JSON.stringify({
-          nome: dadosPessoais.nome || "SIMULACAO VOGA WEALTH",
-          cpf: (dadosPessoais.cpf ?? "").replace(/\D/g, ""),
-          dataNascimento,
-          sexoId: sexoVal === "M" ? 1 : 2,
-          renda: rendaMensal,
-          uf: ufVal,
+          ...dadosCliente,
           codigoModeloProposta: codigoMag,
           capitalSegurado,
-          anospag: ANOSPAG,
-          prazo: ANOSPAG,
+          anospag: prazoSelecionado,
+          prazo: prazoSelecionado,
         }),
       })
       const data = (await res.json()) as {
@@ -414,31 +423,39 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
       if (!ac.signal.aborted) setLoadingMag(false)
     }
   }, [
-    ANOSPAG,
+    dadosCliente,
+    dadosClienteOk,
+    prazoSelecionado,
     capitalSegurado,
     codigoMag,
     produto.mult,
-    dadosPessoais.nome,
-    dadosPessoais.cpf,
-    getValue,
     idadeAtualEff,
   ])
 
-  // Refaz simulação ao mudar prazo (imediato) ou outros inputs (debounce)
+  const fetchSimulacaoRef = useRef(fetchSimulacao)
+  fetchSimulacaoRef.current = fetchSimulacao
+
+  // Sempre que o prazo mudar, refaz a simulação MAG (imediato)
   useEffect(() => {
-    const prazoMudou = lastAnospagRef.current !== ANOSPAG
-    lastAnospagRef.current = ANOSPAG
+    if (!dadosClienteOk) {
+      setPm0(premioFallback(capitalSegurado, idadeAtualEff || 35, produto.mult))
+      setFontePremio("estimativa")
+      return
+    }
+    void fetchSimulacaoRef.current()
+  }, [prazoSelecionado, dadosClienteOk, capitalSegurado, idadeAtualEff, produto.mult])
 
+  // Capital, dados pessoais etc. — debounce (sem re-disparar por prazo)
+  useEffect(() => {
+    if (!dadosClienteOk) return
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    const delay = prazoMudou ? 0 : 500
     debounceRef.current = setTimeout(() => {
-      void buscarMag()
-    }, delay)
-
+      void fetchSimulacaoRef.current()
+    }, 500)
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
-  }, [buscarMag, ANOSPAG, produtoIdx])
+  }, [capitalSegurado, dadosCliente, dadosClienteOk, idadeAtualEff])
 
   const custoNomTotal = useMemo(
     () => custoNominalPremiosTotal(pm0, ANOSPAG, inf),
@@ -841,7 +858,9 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
               <button
                 key={i}
                 type="button"
-                onClick={() => setProdutoIdx(i)}
+                onClick={() => {
+                  if (produtoIdx !== i) setProdutoIdx(i)
+                }}
                 className={cn(
                   "rounded-lg border px-3 py-3 text-center transition-all",
                   "bg-[#0D1220] hover:bg-[#0D1220]/80",
