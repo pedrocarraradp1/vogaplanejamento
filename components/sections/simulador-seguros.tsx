@@ -349,6 +349,8 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
   const patI = (patTotal * (100 - allocPrevPct)) / 100
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const magAbortRef = useRef<AbortController | null>(null)
+  const lastAnospagRef = useRef(ANOSPAG)
 
   const buscarMag = useCallback(async () => {
     const dataNascimento = String(getValue("dataNascimento") ?? "").trim()
@@ -357,17 +359,24 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
     const ufVal = (String(getValue("uf") ?? "SP").trim() || "SP").slice(0, 2).toUpperCase()
 
     if (!dataNascimento || capitalSegurado <= 0) {
+      magAbortRef.current?.abort()
       const fb = premioFallback(capitalSegurado, idadeAtualEff || 35, produto.mult)
       setPm0(fb)
       setFontePremio("estimativa")
+      setLoadingMag(false)
       return
     }
 
+    magAbortRef.current?.abort()
+    const ac = new AbortController()
+    magAbortRef.current = ac
     setLoadingMag(true)
+
     try {
       const res = await fetch("/api/mag/simulacao", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: ac.signal,
         body: JSON.stringify({
           nome: dadosPessoais.nome || "SIMULACAO VOGA WEALTH",
           cpf: (dadosPessoais.cpf ?? "").replace(/\D/g, ""),
@@ -378,6 +387,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
           codigoModeloProposta: codigoMag,
           capitalSegurado,
           anospag: ANOSPAG,
+          prazo: ANOSPAG,
         }),
       })
       const data = (await res.json()) as {
@@ -395,31 +405,40 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
       setFontePremio("estimativa")
       // eslint-disable-next-line no-console
       console.log("MAG fallback / raw:", data.rawResponse ?? data)
-    } catch {
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") return
       const fb = premioFallback(capitalSegurado, idadeAtualEff || 35, produto.mult)
       setPm0(fb)
       setFontePremio("estimativa")
     } finally {
-      setLoadingMag(false)
+      if (!ac.signal.aborted) setLoadingMag(false)
     }
   }, [
     ANOSPAG,
     capitalSegurado,
     codigoMag,
     produto.mult,
+    dadosPessoais.nome,
+    dadosPessoais.cpf,
     getValue,
     idadeAtualEff,
   ])
 
+  // Refaz simulação ao mudar prazo (imediato) ou outros inputs (debounce)
   useEffect(() => {
+    const prazoMudou = lastAnospagRef.current !== ANOSPAG
+    lastAnospagRef.current = ANOSPAG
+
     if (debounceRef.current) clearTimeout(debounceRef.current)
+    const delay = prazoMudou ? 0 : 500
     debounceRef.current = setTimeout(() => {
       void buscarMag()
-    }, 500)
+    }, delay)
+
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
-  }, [buscarMag])
+  }, [buscarMag, ANOSPAG, produtoIdx])
 
   const custoNomTotal = useMemo(
     () => custoNominalPremiosTotal(pm0, ANOSPAG, inf),
@@ -840,16 +859,27 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
           <div className="flex flex-wrap items-center gap-3">
             <div className="text-sm">
               <span className="text-muted-foreground">Prêmio mensal (ano 1): </span>
-              <span className="font-semibold tabular-nums text-foreground">{fmtMoney(pm0, moeda)}</span>
+              {loadingMag ? (
+                <span className="inline-block font-semibold tabular-nums text-muted-foreground animate-pulse">
+                  …
+                </span>
+              ) : (
+                <span className="font-semibold tabular-nums text-foreground">{fmtMoney(pm0, moeda)}</span>
+              )}
             </div>
-            {fontePremio === "mag_api" ? (
-              <Badge className="border-transparent bg-[#1E5CE6] text-white hover:bg-[#1E5CE6]">Cotação MAG</Badge>
+            {loadingMag ? (
+              <Badge variant="secondary" className="border-transparent bg-zinc-700 text-zinc-300">
+                Atualizando…
+              </Badge>
+            ) : fontePremio === "mag_api" ? (
+              <Badge className="border-transparent bg-[#1E5CE6] text-white hover:bg-[#1E5CE6]">
+                Cotação MAG · {ANOSPAG}a
+              </Badge>
             ) : (
               <Badge variant="secondary" className="border-transparent bg-zinc-600 text-zinc-100">
-                Estimativa
+                Estimativa · {ANOSPAG}a
               </Badge>
             )}
-            {loadingMag && <span className="text-xs text-muted-foreground">Atualizando…</span>}
           </div>
         </CardContent>
       </Card>
