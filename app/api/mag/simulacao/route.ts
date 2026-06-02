@@ -59,7 +59,11 @@ export async function POST(req: NextRequest) {
     const token = tokenResult.token
 
     const cnpj = (process.env.MAG_CNPJ || "27945275000154").replace(/\D/g, "")
-    const url = `${apiUrl}/apiseguradora/v3/simulacao?cnpj=${encodeURIComponent(cnpj)}&codigoModeloProposta=${encodeURIComponent(String(body.codigoModeloProposta))}&canalVenda=4`
+    const codigoModeloUrl =
+      body.codigoModeloProposta === "A75" || body.codigoModeloProposta === "A7Z"
+        ? "A75"
+        : String(body.codigoModeloProposta)
+    const url = `${apiUrl}/apiseguradora/v3/simulacao?cnpj=${encodeURIComponent(cnpj)}&codigoModeloProposta=${encodeURIComponent(codigoModeloUrl)}&canalVenda=4`
     console.log("MAG URL:", url)
 
     const renda = Number(body.rendaMensal ?? body.renda ?? 0)
@@ -94,6 +98,12 @@ export async function POST(req: NextRequest) {
 
     if (body.capitalSegurado != null && body.capitalSegurado > 0) {
       simulacaoPayload.capitalSegurado = Number(body.capitalSegurado)
+    }
+
+    // Para A75, especifica o produto WHOLE LIFE 2019 (id 2111)
+    if (body.codigoModeloProposta === "A75" || body.codigoModeloProposta === "A7Z") {
+      simulacaoPayload.codigoModeloProposta = "A75"
+      simulacaoPayload.idProduto = 2111
     }
 
     console.log("MAG SIMULACAO PAYLOAD:", JSON.stringify({ simulacoes: [simulacaoPayload] }, null, 2))
@@ -136,11 +146,18 @@ export async function POST(req: NextRequest) {
     const cs = Number(body.capitalSegurado ?? 0)
     const { premioMensal, premioAnual: premioAnualExtr, premioBaseMorte } = extrairPremiosMag(magData, cs)
 
-    console.log("PREMIO EXTRAIDO:", { premioMensal, premioAnualExtr, premioBaseMorte, capitalSegurado: cs })
-
-    return NextResponse.json({
+    const premioExtraido = {
       premioMensal: premioMensal ?? null,
       premioAnual: premioAnualExtr ?? (premioMensal != null ? premioMensal * 12 : null),
+      premioBaseMorte: premioBaseMorte ?? null,
+      capitalSegurado: cs,
+      codigoModeloProposta: codigoModeloUrl,
+      idProduto: body.codigoModeloProposta === "A75" || body.codigoModeloProposta === "A7Z" ? 2111 : null,
+    }
+    console.log("PREMIO EXTRAIDO:", premioExtraido)
+
+    return NextResponse.json({
+      ...premioExtraido,
       rawResponse: magData,
       fonte: "mag_api",
     })

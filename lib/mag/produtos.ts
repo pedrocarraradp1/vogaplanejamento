@@ -1,4 +1,4 @@
-/** Produtos reais MAG Vida Inteira Resgatável (A7Z) com prazos de pagamento distintos. */
+/** Produtos MAG PR Solutions Private (A75) / WHOLE LIFE 2019 — prazos de pagamento distintos. */
 
 export interface MagProduto {
   codigo: string
@@ -11,7 +11,7 @@ export interface MagProduto {
 
 export const MAG_PRODUTOS: MagProduto[] = [
   {
-    codigo: "A7Z",
+    codigo: "A75",
     nome: "Vida Inteira Resgatável",
     subtitulo: "5 anos",
     anospag: 5,
@@ -20,7 +20,7 @@ export const MAG_PRODUTOS: MagProduto[] = [
       "Cobertura vitalícia com reserva resgatável. Prêmio pago em 5 anos. Maior prêmio mensal, menor prazo de pagamento.",
   },
   {
-    codigo: "A7Z",
+    codigo: "A75",
     nome: "Vida Inteira Resgatável",
     subtitulo: "10 anos",
     anospag: 10,
@@ -29,7 +29,7 @@ export const MAG_PRODUTOS: MagProduto[] = [
       "Cobertura vitalícia com reserva resgatável. Prêmio pago em 10 anos. Resgate disponível a partir do 25º mês.",
   },
   {
-    codigo: "A7Z",
+    codigo: "A75",
     nome: "Vida Inteira Resgatável",
     subtitulo: "20 anos",
     anospag: 20,
@@ -38,7 +38,7 @@ export const MAG_PRODUTOS: MagProduto[] = [
       "Cobertura vitalícia com reserva resgatável. Prêmio pago em 20 anos. Prêmio mensal mais acessível com prazo estendido.",
   },
   {
-    codigo: "A7Z",
+    codigo: "A75",
     nome: "Vida Inteira Resgatável",
     subtitulo: "30 anos",
     anospag: 30,

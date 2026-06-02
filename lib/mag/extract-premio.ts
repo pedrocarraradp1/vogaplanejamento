@@ -28,7 +28,11 @@ export function extrairPremiosMag(
 
     if (typeof rec.idProduto === "number" && Array.isArray(rec.coberturas)) {
       const desc = String(rec.descricao ?? "").toUpperCase()
-      if (desc.includes("MORTE") && !desc.includes("ACIDENTAL") && !desc.includes("DECRESCENTE")) {
+      // Produto 2111 = WHOLE LIFE 2019 (PR Solutions)
+      if (
+        (typeof rec.idProduto === "number" && rec.idProduto === 2111) ||
+        (desc.includes("WHOLE LIFE") && !desc.includes("DECRESCENTE"))
+      ) {
         const cob = rec.coberturas[0] as Record<string, unknown> | undefined
         if (cob && typeof cob.premioBase === "number" && cob.premioBase > 0) {
           premioBaseMorte = cob.premioBase
