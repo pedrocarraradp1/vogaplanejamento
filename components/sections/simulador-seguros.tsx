@@ -610,7 +610,8 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
     const ipca = inf
 
     return anos.map((ano) => {
-      if (modoProjecaoMag === "nominal") {
+      // Nominal = valores corrigidos por IPCA | Real = fixos em reais de hoje (ano 1)
+      if (modoProjecaoMag === "real") {
         return {
           ano,
           idade: idadeAtualEff + ano - 1,
@@ -954,7 +955,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
             </Table>
           </div>
           <p className="text-xs text-zinc-500 leading-relaxed">
-            {modoProjecaoMag === "nominal"
+            {modoProjecaoMag === "real"
               ? "Valores em reais de hoje, sem correção monetária."
               : `Valores corrigidos por IPCA de ${inflacaoPctDisplay}% a.a. (estimado). Meramente ilustrativo.`}
           </p>
