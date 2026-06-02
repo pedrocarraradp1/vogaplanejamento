@@ -75,55 +75,6 @@ function custoNominalPremiosTotal(pm: number, anosPag: number, inf: number): num
   return custoNominalPremiosAcumulado(pm, anosPag, inf, anosPag)
 }
 
-/** Calibrado com cotação MAG: Pedro 28 anos, R$2,5M, pagamento 10 anos — (ano, % do CS). */
-const RESERVA_PONTOS: [number, number][] = [
-  [1, 0],
-  [2, 0],
-  [3, 0.003724],
-  [4, 0.01717],
-  [5, 0.042471],
-  [6, 0.101207],
-  [7, 0.19777],
-  [8, 0.282756],
-  [9, 0.322353],
-  [10, 0.36296],
-  [11, 0.371107],
-  [12, 0.379434],
-  [13, 0.387933],
-  [14, 0.39659],
-  [15, 0.405392],
-  [16, 0.41436],
-  [17, 0.423489],
-  [18, 0.432781],
-  [19, 0.442226],
-  [20, 0.451818],
-  [25, 0.501425],
-  [30, 0.553105],
-  [35, 0.608972],
-  [40, 0.661456],
-  [45, 0.711545],
-  [50, 0.769574],
-  [55, 0.817554],
-  [60, 0.85812],
-  [65, 0.875427],
-  [70, 0.683859],
-  [72, 0.926599],
-]
-
-function reservaResgatavel(ano: number, cs: number): number {
-  const xs = RESERVA_PONTOS.map((p) => p[0])
-  const ys = RESERVA_PONTOS.map((p) => p[1])
-  if (ano <= xs[0]) return 0
-  if (ano >= xs[xs.length - 1]) return ys[ys.length - 1] * cs
-  for (let i = 0; i < xs.length - 1; i++) {
-    if (ano >= xs[i] && ano <= xs[i + 1]) {
-      const t = (ano - xs[i]) / (xs[i + 1] - xs[i])
-      return (ys[i] + t * (ys[i + 1] - ys[i])) * cs
-    }
-  }
-  return 0
-}
-
 function contribuicaoAcumulada(ano: number, premioMensal: number, anospag: number): number {
   return premioMensal * 12 * Math.min(ano, anospag)
 }
@@ -659,14 +610,11 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
     const ipca = inf
 
     return anos.map((ano) => {
-      const reservaNominal = reservaResgatavel(ano, cs)
-
       if (modoProjecaoMag === "nominal") {
         return {
           ano,
           idade: idadeAtualEff + ano - 1,
           contribAcum: contribuicaoAcumulada(ano, pm0, ANOSPAG),
-          reserva: reservaNominal,
           capital: cs,
           destaque: destaques.has(ano),
         }
@@ -677,7 +625,6 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
         ano,
         idade: idadeAtualEff + ano - 1,
         contribAcum: contribuicaoAcumuladaReal(ano, pm0, ANOSPAG, ipca),
-        reserva: reservaNominal * fatorIpca,
         capital: cs * fatorIpca,
         destaque: destaques.has(ano),
       }
@@ -981,7 +928,6 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
                   <TableHead className="text-muted-foreground">Ano de vigência</TableHead>
                   <TableHead className="text-muted-foreground">Idade</TableHead>
                   <TableHead className="text-right text-muted-foreground">Contribuições realizadas</TableHead>
-                  <TableHead className="text-right text-muted-foreground">Reserva resgatável</TableHead>
                   <TableHead className="text-right text-muted-foreground">Capital segurado</TableHead>
                 </TableRow>
               </TableHeader>
@@ -998,9 +944,6 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
                     <TableCell className="tabular-nums text-muted-foreground">{row.idade}</TableCell>
                     <TableCell className="text-right tabular-nums text-foreground">
                       {fmtMoney(row.contribAcum, moeda)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-[#1E5CE6]">
-                      {fmtMoney(row.reserva, moeda)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums text-emerald-400">
                       {fmtMoney(row.capital, moeda)}
