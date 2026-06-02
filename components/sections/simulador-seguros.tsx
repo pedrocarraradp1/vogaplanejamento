@@ -146,7 +146,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
   const [irInvKey, setIrInvKey] = useState<(typeof IR_INV_OPCOES)[number]["v"]>("15")
   const [rpPct, setRpPct] = useState(7)
   const [riPct, setRiPct] = useState(11)
-  const [produtoIdx, setProdutoIdx] = useState(1)
+  const [produtoIdx, setProdutoIdx] = useState(0)
   const [pm0, setPm0] = useState(0)
   const [fontePremio, setFontePremio] = useState<"mag_api" | "estimativa">("estimativa")
   const [loadingMag, setLoadingMag] = useState(false)
@@ -381,7 +381,8 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
       const premAcum = custoNominalPremiosAcumulado(pm0, ANOSPAG, inf, t)
       const rawBvivo = sb - Math.max(sb - patTotal, 0) * irInvAliq - premAcum
 
-      const rawBmorte = rawBvivo + capitalSegurado
+      const csCorrigido = capitalSegurado * Math.pow(1 + inf, t)
+      const rawBmorte = rawBvivo + csCorrigido
 
       rows.push({
         idade,
@@ -462,7 +463,8 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
     const premF = custoNominalPremiosTotal(pm0, ANOSPAG, inf)
     const liqBsobrev_nom = sbF - Math.max(sbF - patTotal, 0) * irInvAliq - premF
     const rendB = Math.max(0, sbF - patTotal - premF)
-    const liqBmorte_nom = liqBsobrev_nom + capitalSegurado
+    const csCorrigidoFinal = capitalSegurado * Math.pow(1 + inf, t)
+    const liqBmorte_nom = liqBsobrev_nom + csCorrigidoFinal
 
     const toDisp = (v: number) => (modoRN === "real" ? v / d : v)
 
@@ -475,7 +477,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
       liqBmorteF: toDisp(liqBmorte_nom),
       rendB,
       rendBIr: toDisp(rendB * irInvAliq),
-      csDisp: toDisp(capitalSegurado),
+      csDisp: toDisp(csCorrigidoFinal),
     }
   }, [
     H,
@@ -494,6 +496,11 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
   ])
 
   const kpiPremioAno1 = pm0 + (patTotal * ri) / 12
+
+  const expectativaVida = 80
+  const anosAteExpectativa = Math.max(0, expectativaVida - idadeAtualEff)
+  const capitalCorrigidoExpectativa = capitalSegurado * Math.pow(1 + inf, anosAteExpectativa)
+  const capitalCorrigidoHorizonte = capitalSegurado * Math.pow(1 + inf, H)
 
   const veredicto = useMemo(() => {
     const a = finais.liqAF
@@ -788,6 +795,16 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Custo total prêmios ({ANOSPAG}a)</p>
             <p className="text-xl font-semibold tabular-nums text-foreground">{fmtMoney(custoNomTotal, moeda)}</p>
             <p className="text-xs text-zinc-500 tabular-nums">Real (ref.): {fmtMoney(custoRealTotal, moeda)}</p>
+            <p className="text-xs text-zinc-500">(prêmio corrigido por IPCA de {inflacaoPctDisplay}% a.a.)</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-[#131929] border-emerald-500/20">
+          <CardContent className="pt-6 space-y-1">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Capital segurado aos {expectativaVida} anos</p>
+            <p className="text-xl font-semibold tabular-nums text-emerald-400">{fmtMoney(capitalCorrigidoExpectativa, moeda)}</p>
+            <p className="text-xs text-zinc-500 tabular-nums">
+              Hoje: {fmtMoney(capitalSegurado, moeda)} × (1+{inflacaoPctDisplay}%)^{anosAteExpectativa}
+            </p>
           </CardContent>
         </Card>
       </div>

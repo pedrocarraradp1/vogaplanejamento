@@ -1,4 +1,4 @@
-/** Produtos MAG PR Solutions Private (A75) / WHOLE LIFE 2019 — prazos de pagamento distintos. */
+/** Produtos MAG PR Solutions Private (A75) / WHOLE LIFE 2019 (id 2111). Prazos: 10, 20, 30 anos. */
 
 export interface MagProduto {
   codigo: string
@@ -10,15 +10,6 @@ export interface MagProduto {
 }
 
 export const MAG_PRODUTOS: MagProduto[] = [
-  {
-    codigo: "A75",
-    nome: "Vida Inteira Resgatável",
-    subtitulo: "5 anos",
-    anospag: 5,
-    mult: 4.2,
-    descricao:
-      "Cobertura vitalícia com reserva resgatável. Prêmio pago em 5 anos. Maior prêmio mensal, menor prazo de pagamento.",
-  },
   {
     codigo: "A75",
     nome: "Vida Inteira Resgatável",

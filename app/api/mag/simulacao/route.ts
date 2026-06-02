@@ -68,6 +68,9 @@ export async function POST(req: NextRequest) {
 
     const renda = Number(body.rendaMensal ?? body.renda ?? 0)
     const prazo = Number(body.prazo ?? body.anospag ?? 30)
+    const prazoFinal = [10, 20, 30].includes(prazo) ? prazo : 10
+    const isA75 =
+      body.codigoModeloProposta === "A75" || body.codigoModeloProposta === "A7Z"
 
     let sexoId = 1
     if (body.sexoId != null) {
@@ -91,21 +94,26 @@ export async function POST(req: NextRequest) {
     const simulacaoPayload: Record<string, unknown> = {
       proponente,
       periodicidadeCobrancaId: 30,
-      prazoCerto: prazo,
-      prazoPagamentoAntecipado: 10,
-      prazoDecrescimo: 10,
+      prazoPagamentoAntecipado: prazoFinal,
+      prazoDecrescimo: prazoFinal,
+    }
+
+    if (!isA75) {
+      simulacaoPayload.prazoCerto = prazo
     }
 
     if (body.capitalSegurado != null && body.capitalSegurado > 0) {
       simulacaoPayload.capitalSegurado = Number(body.capitalSegurado)
     }
 
-    // Para A75, especifica o produto WHOLE LIFE 2019 (id 2111)
-    if (body.codigoModeloProposta === "A75" || body.codigoModeloProposta === "A7Z") {
+    if (isA75) {
       simulacaoPayload.codigoModeloProposta = "A75"
       simulacaoPayload.idProduto = 2111
     }
 
+    if (isA75) {
+      console.log("PRODUTO USADO:", { codigo: "A75", idProduto: 2111, prazo: prazoFinal })
+    }
     console.log("MAG SIMULACAO PAYLOAD:", JSON.stringify({ simulacoes: [simulacaoPayload] }, null, 2))
 
     const magRes = await fetch(url, {
@@ -146,15 +154,17 @@ export async function POST(req: NextRequest) {
     const cs = Number(body.capitalSegurado ?? 0)
     const { premioMensal, premioAnual: premioAnualExtr, premioBaseMorte } = extrairPremiosMag(magData, cs)
 
+    console.log("PREMIO EXTRAIDO:", { premioMensal, premioBaseMorte, capitalSegurado: cs })
+
     const premioExtraido = {
       premioMensal: premioMensal ?? null,
       premioAnual: premioAnualExtr ?? (premioMensal != null ? premioMensal * 12 : null),
       premioBaseMorte: premioBaseMorte ?? null,
       capitalSegurado: cs,
       codigoModeloProposta: codigoModeloUrl,
-      idProduto: body.codigoModeloProposta === "A75" || body.codigoModeloProposta === "A7Z" ? 2111 : null,
+      idProduto: isA75 ? 2111 : null,
+      prazo: prazoFinal,
     }
-    console.log("PREMIO EXTRAIDO:", premioExtraido)
 
     return NextResponse.json({
       ...premioExtraido,

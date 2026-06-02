@@ -28,14 +28,24 @@ export function extrairPremiosMag(
 
     if (typeof rec.idProduto === "number" && Array.isArray(rec.coberturas)) {
       const desc = String(rec.descricao ?? "").toUpperCase()
-      // Produto 2111 = WHOLE LIFE 2019 (PR Solutions)
+      // Produto 2111 = WHOLE LIFE 2019 (PR Solutions), não 2011 (VIR)
       if (
-        (typeof rec.idProduto === "number" && rec.idProduto === 2111) ||
+        rec.idProduto === 2111 ||
         (desc.includes("WHOLE LIFE") && !desc.includes("DECRESCENTE"))
       ) {
-        const cob = rec.coberturas[0] as Record<string, unknown> | undefined
-        if (cob && typeof cob.premioBase === "number" && cob.premioBase > 0) {
-          premioBaseMorte = cob.premioBase
+        for (const item of rec.coberturas) {
+          const cob = item as Record<string, unknown>
+          const cobDesc = String(cob.descricao ?? cob.nome ?? "").toUpperCase()
+          if (
+            cobDesc.includes("MORTE") &&
+            !cobDesc.includes("ACIDENTAL") &&
+            !cobDesc.includes("DECRESCENTE")
+          ) {
+            if (typeof cob.premioBase === "number" && cob.premioBase > 0) {
+              premioBaseMorte = cob.premioBase
+              break
+            }
+          }
         }
       }
     }
