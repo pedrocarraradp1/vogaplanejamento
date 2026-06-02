@@ -518,17 +518,23 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
   ])
 
   const comparativoAnual = useMemo(() => {
+    // Mesmo patrimônio base (Em Previdência) nos dois cenários — comparação hipotética
+    const patrimonioBase = patP
+    const taxaPrevLiquida = rp * (1 - irAliq)
+    const custoSeguroSobreBase =
+      patrimonioBase > 0 ? (pm0 * 12) / patrimonioBase : 0
+    const taxaInvLiquida = Math.max(0, ri * (1 - irInvAliq) - custoSeguroSobreBase)
+
     const rows: { idade: number; rendPrev: number; rendInvLiq: number }[] = []
     for (let t = 1; t <= H; t++) {
-      const idade = idadeAtualEff + t
-      const saldoPrev = patP * Math.pow(1 + rp, t)
-      const rendPrev = saldoPrev * rp
+      const anosDecorridos = t
+      const idade = idadeAtualEff + anosDecorridos
 
-      const saldoInv = patTotal * Math.pow(1 + ri, t)
-      const rendBrutoInv = saldoInv * ri
-      const irAnual = Math.max(0, saldoInv - patTotal) * irInvAliq / H
-      const premioAnual = t <= ANOSPAG ? pm0 * 12 * Math.pow(1 + inf, Math.max(0, t - 1)) : 0
-      const rendInvLiq = Math.max(0, rendBrutoInv - irAnual - premioAnual)
+      const patrimonioAcumPrev = patrimonioBase * Math.pow(1 + taxaPrevLiquida, anosDecorridos)
+      const rendPrev = patrimonioAcumPrev * taxaPrevLiquida
+
+      const patrimonioAcumInv = patrimonioBase * Math.pow(1 + taxaInvLiquida, anosDecorridos)
+      const rendInvLiq = patrimonioAcumInv * taxaInvLiquida
 
       rows.push({
         idade,
@@ -537,7 +543,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
       })
     }
     return rows
-  }, [H, idadeAtualEff, patP, patTotal, rp, ri, pm0, ANOSPAG, inf, modoRN, deflator, irInvAliq])
+  }, [H, idadeAtualEff, patP, rp, ri, pm0, irAliq, irInvAliq, modoRN, deflator])
 
   const custoAnualSeguro = useMemo(() => {
     const rows: { ano: number; custoAnual: number; acumulado: number }[] = []
@@ -1059,7 +1065,8 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
             Comparativo: Previdência vs Investimento Livre (após IR e seguro)
           </CardTitle>
           <p className="text-xs text-muted-foreground font-normal">
-            Rendimento anual bruto de cada cenário, por idade.
+            Mesmo patrimônio base ({fmtMoney(patP, moeda)} em previdência). Rendimento anual líquido de cada
+            cenário, por idade.
           </p>
         </CardHeader>
         <CardContent className="h-[360px] w-full">
