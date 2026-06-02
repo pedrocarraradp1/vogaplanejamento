@@ -128,6 +128,20 @@ function contribuicaoAcumulada(ano: number, premioMensal: number, anospag: numbe
   return premioMensal * 12 * Math.min(ano, anospag)
 }
 
+function contribuicaoAcumuladaReal(
+  ano: number,
+  premioMensal: number,
+  anospag: number,
+  ipca: number,
+): number {
+  let total = 0
+  const n = Math.min(ano, anospag)
+  for (let i = 1; i <= n; i++) {
+    total += premioMensal * Math.pow(1 + ipca, i - 1) * 12
+  }
+  return total
+}
+
 function anosVigenciaProjecaoMag(anospag: number, idadeAtual: number): number[] {
   const anos = new Set<number>()
   for (let a = 1; a <= anospag; a++) anos.add(a)
@@ -203,6 +217,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
   const moeda = state.moeda ?? "BRL"
 
   const [modoRN, setModoRN] = useState<"nominal" | "real">("nominal")
+  const [modoProjecaoMag, setModoProjecaoMag] = useState<"nominal" | "real">("nominal")
   const [patTotal, setPatTotal] = useState(0)
   const [allocPrevPct, setAllocPrevPct] = useState(40)
   const [capitalSegurado, setCapitalSegurado] = useState(() => {
@@ -641,15 +656,33 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
     const anos = anosVigenciaProjecaoMag(ANOSPAG, idadeAtualEff)
     const destaques = new Set([1, ANOSPAG, 10, 20, 25, 30, 40, 50, 65, 70])
     const cs = capitalSegurado
-    return anos.map((ano) => ({
-      ano,
-      idade: idadeAtualEff + ano - 1,
-      contribAcum: contribuicaoAcumulada(ano, pm0, ANOSPAG),
-      reserva: reservaResgatavel(ano, cs),
-      capital: cs,
-      destaque: destaques.has(ano),
-    }))
-  }, [idadeAtualEff, ANOSPAG, pm0, capitalSegurado])
+    const ipca = inf
+
+    return anos.map((ano) => {
+      const reservaNominal = reservaResgatavel(ano, cs)
+
+      if (modoProjecaoMag === "nominal") {
+        return {
+          ano,
+          idade: idadeAtualEff + ano - 1,
+          contribAcum: contribuicaoAcumulada(ano, pm0, ANOSPAG),
+          reserva: reservaNominal,
+          capital: cs,
+          destaque: destaques.has(ano),
+        }
+      }
+
+      const fatorIpca = Math.pow(1 + ipca, ano - 1)
+      return {
+        ano,
+        idade: idadeAtualEff + ano - 1,
+        contribAcum: contribuicaoAcumuladaReal(ano, pm0, ANOSPAG, ipca),
+        reserva: reservaNominal * fatorIpca,
+        capital: cs * fatorIpca,
+        destaque: destaques.has(ano),
+      }
+    })
+  }, [idadeAtualEff, ANOSPAG, pm0, capitalSegurado, inf, modoProjecaoMag])
 
   const dataNascimentoEfetiva = String(getValue("dataNascimento") ?? "").trim()
 
@@ -911,10 +944,30 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
 
       {/* Projeção MAG ano a ano */}
       <Card className="bg-[#131929] border-white/10">
-        <CardHeader className="pb-2 space-y-2">
-          <CardTitle className="text-base font-medium text-foreground">
-            Projeção ano a ano — MAG
-          </CardTitle>
+        <CardHeader className="pb-2 space-y-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle className="text-base font-medium text-foreground">
+              Projeção ano a ano — MAG
+            </CardTitle>
+            <div className="flex gap-2 self-start sm:self-auto">
+              {(["nominal", "real"] as const).map((modo) => (
+                <button
+                  key={modo}
+                  type="button"
+                  onClick={() => setModoProjecaoMag(modo)}
+                  className={cn(
+                    "rounded-lg border px-4 py-2 text-sm font-medium transition-all capitalize",
+                    "bg-[#0D1220] hover:bg-[#0D1220]/80",
+                    modoProjecaoMag === modo
+                      ? "border-[#1E5CE6] ring-2 ring-[#1E5CE6]/40 text-foreground"
+                      : "border-white/10 text-muted-foreground",
+                  )}
+                >
+                  {modo === "nominal" ? "Nominal" : "Real"}
+                </button>
+              ))}
+            </div>
+          </div>
           <p className="text-xs text-muted-foreground font-normal">
             Pagamento em {ANOSPAG} anos · Prêmio ano 1: {fmtMoney(pm0, moeda)} · Capital:{" "}
             {fmtMoney(capitalSegurado, moeda)}
@@ -958,8 +1011,9 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
             </Table>
           </div>
           <p className="text-xs text-zinc-500 leading-relaxed">
-            Valores em reais de hoje (prêmio fixo do ano 1, sem IPCA). Reserva resgatável interpolada a partir da
-            projeção oficial MAG (cotação de referência WHOLE LIFE 10 anos).
+            {modoProjecaoMag === "nominal"
+              ? "Valores em reais de hoje, sem correção monetária."
+              : `Valores corrigidos por IPCA de ${inflacaoPctDisplay}% a.a. (estimado). Meramente ilustrativo.`}
           </p>
         </CardContent>
       </Card>
