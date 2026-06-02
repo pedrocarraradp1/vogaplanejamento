@@ -12,7 +12,6 @@ export async function GET(req: NextRequest) {
 
   const url = `${apiUrl}/apiseguradora/v3/proposta?cnpj=${cnpj}&codigoModeloProposta=A7Z&canalVenda=4`
 
-  // Payload completo de proposta MAG com todos os campos obrigatórios conhecidos
   const payload = {
     DADOS_SEGURADO: {
       TIPO_RELACAO_SEGURADO_ID: 1,
@@ -48,6 +47,10 @@ export async function GET(req: NextRequest) {
     body: JSON.stringify(payload),
   })
 
+  // Lê o body completo sem truncar
   const text = await res.text()
-  return NextResponse.json({ status: res.status, body: text }, { status: 200 })
+  let parsed: unknown
+  try { parsed = JSON.parse(text) } catch { parsed = text }
+
+  return NextResponse.json({ status: res.status, body: parsed }, { status: 200 })
 }
