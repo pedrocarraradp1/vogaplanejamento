@@ -109,15 +109,14 @@ export function buildDadosRendaGrafico(
   const inf = inflacaoPct / 100
 
   return projecao.map((p) => {
-    const t = p.t
+    const t = Number(p.t) || 0
     const patrimonioAno = Number(p.saldoNominal) || 0
     const def = Math.pow(1 + inf, Math.max(0, t))
-    const patrimonioReal = patrimonioAno / def
+    const patrimonioReal =
+      Number(p.saldoReal) > 0 ? Number(p.saldoReal) : patrimonioAno / def
 
     const rendaNominal = Math.round(Math.max(0, patrimonioAno * taxaMensalLiq))
-    const rendaPoderCompra = Math.round(
-      Math.max(0, (patrimonioAno * taxaMensalLiq) / def)
-    )
+    const rendaPoderCompra = Math.round(Math.max(0, rendaNominal / def))
     const rendaReal = Math.round(Math.max(0, patrimonioReal * taxaRealMensal))
 
     const metaNominal = metaMensal * def

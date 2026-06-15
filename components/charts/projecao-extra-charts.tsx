@@ -229,8 +229,25 @@ export function RendaCarteiraChart({
                 return (
                   <div className="rounded-lg border border-white/10 bg-[#131929] px-3 py-2 text-xs shadow-lg">
                     <p className="font-semibold text-white">Idade {p.idade}</p>
-                    <p className="mt-1 text-white">Renda nominal: {formatarMoedaCompleta(p.rendaNominal)}</p>
-                    <p className="text-white/90">Renda real: {formatarMoedaCompleta(p.rendaPoderCompra)}</p>
+                    {displayMode === "nominal" ? (
+                      <>
+                        <p className="mt-1 text-white">
+                          Renda nominal: {formatarMoedaCompleta(p.rendaNominal)}
+                        </p>
+                        <p className="text-white/90">
+                          Poder de compra (hoje): {formatarMoedaCompleta(p.rendaPoderCompra)}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="mt-1 text-white">
+                          Renda real (Fisher): {formatarMoedaCompleta(p.rendaReal)}
+                        </p>
+                        <p className="text-white/90">
+                          Renda nominal (ref.): {formatarMoedaCompleta(p.rendaNominal)}
+                        </p>
+                      </>
+                    )}
                     <p className="text-white/80">Meta: {formatarMoedaCompleta(p.meta)}</p>
                     <p className="mt-1 font-medium" style={{ color: corStatus }}>
                       {status}

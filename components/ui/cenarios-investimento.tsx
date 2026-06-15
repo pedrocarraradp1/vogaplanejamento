@@ -171,11 +171,23 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
     return null
   }
 
-  const patrimonioNaIdadeApos = (projecaoLocal: ProjecaoAno[]) =>
-    projecaoLocal.find((p) => p.idade === premissas.idadeApos)?.saldoNominal ?? 0
+  const patrimonioNaIdadeApos = (projecaoLocal: ProjecaoAno[]) => {
+    const row = projecaoLocal.find((p) => p.idade === premissas.idadeApos)
+    return {
+      nominal: Number(row?.saldoNominal) || 0,
+      real: Number(row?.saldoReal) || 0,
+    }
+  }
 
-  const rendaMensalNaApos = (patrimonio: number, taxaAnualPct: number) =>
-    (Math.max(0, patrimonio) * ((Number(taxaAnualPct) || 0) / 100)) / 12
+  const inflacaoAnual = inflacaoGlobal / 100
+
+  /** Renda mensal real (Fisher) — mesmo método da simulação principal. */
+  const rendaMensalRealNaApos = (patrimonioReal: number, taxaLiquidaPct: number) => {
+    const taxaNominalAnual = Math.max(0, (Number(taxaLiquidaPct) || 0) / 100)
+    const taxaReal = (1 + taxaNominalAnual) / (1 + inflacaoAnual) - 1
+    const taxaRealMensal = Math.pow(1 + Math.max(0, taxaReal), 1 / 12) - 1
+    return Math.max(0, Math.max(0, patrimonioReal) * taxaRealMensal)
+  }
 
   const projecaoConservadora = useMemo(() => {
     return calcularProjecao(
@@ -215,7 +227,7 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
       corBg: string,
       corBorder: string,
       taxaBruta: number,
-      patrimonioApos: number,
+      patrimonio: { nominal: number; real: number },
       projecaoLocal: ProjecaoAno[],
     ) => {
       const taxaLiquida = rentabilidadeLiquidaDeBruta(taxaBruta)
@@ -229,8 +241,9 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
         corBorder,
         taxaBruta,
         taxaLiquida,
-        patrimonioApos,
-        rendaMensalApos: rendaMensalNaApos(patrimonioApos, taxaLiquida),
+        patrimonioApos: patrimonio.nominal,
+        patrimonioAposReal: patrimonio.real,
+        rendaMensalAposReal: rendaMensalRealNaApos(patrimonio.real, taxaLiquida),
         idadeIF: idadeIndependenciaNaProjecao(projecaoLocal, taxaLiquida),
       }
     }
@@ -278,6 +291,7 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
     cenarioModerado,
     cenarioAgressivo,
     aliquotaIR,
+    inflacaoGlobal,
     projecaoConservadora,
     projecaoModerada,
     projecaoAgressiva,
@@ -454,12 +468,8 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
                       ),
                     },
                     {
-                      label: "Renda Mensal na Aposentadoria",
-                      values: cenarios.map((c) =>
-                        fmtFull(
-                          displayMode === "real" ? c.rendaMensalApos / deflatorAposentadoria : c.rendaMensalApos,
-                        ),
-                      ),
+                      label: "Renda Mensal na Aposentadoria (real)",
+                      values: cenarios.map((c) => fmtFull(c.rendaMensalAposReal)),
                     },
                     { label: "Independência Financeira", values: cenarios.map((c) => (c.idadeIF ? `${c.idadeIF} anos` : "—")) },
                   ].map((row) => (
