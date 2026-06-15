@@ -16,6 +16,7 @@ interface DashboardPDFProps {
     percentualCusto: number
   }
   sucessao: { plEditavel: number; itcmd: number; honorarios: number; cartoriais: number; herdeiros: number }
+  patrimonioTotal: number
   protecao: { custoVida: number; anosCob: number; eduFilhos: number; dividasPend: number }
   capitalSeguravel: number
   projecaoDetalhada: Array<{ idade: number; saldoNominal: number; saldoReal: number; rendaMensalReal: number; isAposentado: boolean }>
@@ -37,7 +38,7 @@ const fk = (moeda: "BRL" | "USD", v: number) => {
 }
 
 export function DashboardPDF({
-  dadosPessoais, kpis, inventario, sucessao, protecao,
+  dadosPessoais, kpis, inventario, sucessao, patrimonioTotal, protecao,
   capitalSeguravel, projecaoDetalhada, projecaoCompleta, premissas, idadeAtual, aporteM,
   moeda,
 }: DashboardPDFProps) {
@@ -153,7 +154,7 @@ export function DashboardPDF({
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
           <div>
             <div style={{ fontSize: 10, fontWeight: 600, color: muted, textTransform: "uppercase" as const, marginBottom: 10 }}>Distribuição Patrimonial</div>
-            {rowItem("Patrimônio (simulação)", f(moeda, sucessao.plEditavel))}
+            {rowItem("Patrimônio Total", f(moeda, patrimonioTotal))}
             {rowItem("Meação (cônjuge)", f(moeda, inventario.meacao))}
             {rowItem("Valor da Herança", f(moeda, inventario.heranca))}
             {rowItem("Herdeiros", String(sucessao.herdeiros))}

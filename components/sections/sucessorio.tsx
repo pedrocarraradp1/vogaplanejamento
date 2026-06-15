@@ -51,7 +51,7 @@ interface SucessorioProps {
 }
 
 export function Sucessorio({ onNavigate }: SucessorioProps) {
-  const { state, setSucessao, setDadosPessoais, getPatrimonioLiquido, getIdadeAtual } = usePlano()
+  const { state, setSucessao, setDadosPessoais, getPatrimonioTotalConsolidado, getIdadeAtual } = usePlano()
   const { sucessao, dadosPessoais, ativos, passivos } = state
   const moeda = state.moeda ?? "BRL"
 
@@ -68,7 +68,8 @@ export function Sucessorio({ onNavigate }: SucessorioProps) {
     [passivos]
   )
 
-  const plInventario = sucessao.plEditavel > 0 ? sucessao.plEditavel : getPatrimonioLiquido()
+  const patrimonioTotalConsolidado = getPatrimonioTotalConsolidado()
+  const plInventario = sucessao.plEditavel > 0 ? sucessao.plEditavel : patrimonioTotalConsolidado
   const regimeInventario =
     sucessao.regimeSucessao || dadosPessoais.regime || "Comunhão Parcial de Bens"
 
@@ -340,6 +341,14 @@ export function Sucessorio({ onNavigate }: SucessorioProps) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
+          <div className="flex justify-between gap-4 text-muted-foreground">
+            <span>Patrimônio Total</span>
+            <span className="font-medium text-foreground tabular-nums">{fmt(plInventario)}</span>
+          </div>
+          <div className="flex justify-between gap-4 text-muted-foreground">
+            <span>Meação (cônjuge)</span>
+            <span className="font-medium text-foreground tabular-nums">{fmt(inventario.meacao)}</span>
+          </div>
           <div className="flex justify-between gap-4 text-muted-foreground">
             <span>Valor da herança (estimado)</span>
             <span className="font-medium text-foreground tabular-nums">{fmt(inventario.heranca)}</span>

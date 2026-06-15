@@ -1,10 +1,12 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { Info } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { usePlano } from "@/lib/plano-context"
 import { calcularProjecao, type ProjecaoAno } from "@/lib/engine"
 import {
@@ -14,7 +16,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   Legend,
 } from "recharts"
 
@@ -46,6 +48,14 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
   const cenarioConservador = premissas.rentabilidadeConservador ?? 7
   const cenarioModerado = premissas.rentabilidadeModerado ?? 10
   const cenarioAgressivo = premissas.rentabilidadeAgressivo ?? 13
+
+  const aliquotaIR = Math.max(0, Math.min(1, Number(premissas.aliquotaImpostoRendimento) || 0.15))
+  const aliquotaIRPct = Math.round(aliquotaIR * 100)
+
+  const rentabilidadeLiquidaDeBruta = (bruta: number) =>
+    Math.max(0, (Number(bruta) || 0) * (1 - aliquotaIR))
+
+  const fmtPct = (v: number) => v.toFixed(1).replace(".", ",")
 
   const [displayModeInternal, setDisplayModeInternal] = useState<DisplayMode>("nominal")
 
@@ -168,67 +178,106 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
     (Math.max(0, patrimonio) * ((Number(taxaAnualPct) || 0) / 100)) / 12
 
   const projecaoConservadora = useMemo(() => {
-    return calcularProjecao({ ...premissasCompletas, rendimento: cenarioConservador }, objetivosEngine, passivos)
-  }, [premissasCompletas, objetivosEngine, passivos, cenarioConservador])
+    return calcularProjecao(
+      { ...premissasCompletas, rendimento: rentabilidadeLiquidaDeBruta(cenarioConservador) },
+      objetivosEngine,
+      passivos,
+    )
+  }, [premissasCompletas, objetivosEngine, passivos, cenarioConservador, aliquotaIR])
 
   const projecaoModerada = useMemo(() => {
-    return calcularProjecao({ ...premissasCompletas, rendimento: cenarioModerado }, objetivosEngine, passivos)
-  }, [premissasCompletas, objetivosEngine, passivos, cenarioModerado])
+    return calcularProjecao(
+      { ...premissasCompletas, rendimento: rentabilidadeLiquidaDeBruta(cenarioModerado) },
+      objetivosEngine,
+      passivos,
+    )
+  }, [premissasCompletas, objetivosEngine, passivos, cenarioModerado, aliquotaIR])
 
   const projecaoAgressiva = useMemo(() => {
-    return calcularProjecao({ ...premissasCompletas, rendimento: cenarioAgressivo }, objetivosEngine, passivos)
-  }, [premissasCompletas, objetivosEngine, passivos, cenarioAgressivo])
+    return calcularProjecao(
+      { ...premissasCompletas, rendimento: rentabilidadeLiquidaDeBruta(cenarioAgressivo) },
+      objetivosEngine,
+      passivos,
+    )
+  }, [premissasCompletas, objetivosEngine, passivos, cenarioAgressivo, aliquotaIR])
 
   const cenarios = useMemo(() => {
     const pCon = patrimonioNaIdadeApos(projecaoConservadora)
     const pMod = patrimonioNaIdadeApos(projecaoModerada)
     const pAgr = patrimonioNaIdadeApos(projecaoAgressiva)
 
+    const build = (
+      key: "conservador" | "moderado" | "agressivo",
+      nome: string,
+      sub: string,
+      vol: string,
+      cor: string,
+      corBg: string,
+      corBorder: string,
+      taxaBruta: number,
+      patrimonioApos: number,
+      projecaoLocal: ProjecaoAno[],
+    ) => {
+      const taxaLiquida = rentabilidadeLiquidaDeBruta(taxaBruta)
+      return {
+        key,
+        nome,
+        sub,
+        vol,
+        cor,
+        corBg,
+        corBorder,
+        taxaBruta,
+        taxaLiquida,
+        patrimonioApos,
+        rendaMensalApos: rendaMensalNaApos(patrimonioApos, taxaLiquida),
+        idadeIF: idadeIndependenciaNaProjecao(projecaoLocal, taxaLiquida),
+      }
+    }
+
     return [
-      {
-        key: "conservador" as const,
-        nome: "Conservador",
-        sub: "Maior previsibilidade",
-        vol: "Baixa",
-        cor: "#22C787",
-        corBg: "bg-[rgba(34,199,135,0.06)]",
-        corBorder: "border-[#22C787]/25",
-        taxa: cenarioConservador,
-        patrimonioApos: pCon,
-        rendaMensalApos: rendaMensalNaApos(pCon, cenarioConservador),
-        idadeIF: idadeIndependenciaNaProjecao(projecaoConservadora, cenarioConservador),
-      },
-      {
-        key: "moderado" as const,
-        nome: "Moderado",
-        sub: "Equilíbrio risco/retorno",
-        vol: "Média",
-        cor: "#1E5CE6",
-        corBg: "bg-[rgba(30,92,230,0.06)]",
-        corBorder: "border-[#1E5CE6]/25",
-        taxa: cenarioModerado,
-        patrimonioApos: pMod,
-        rendaMensalApos: rendaMensalNaApos(pMod, cenarioModerado),
-        idadeIF: idadeIndependenciaNaProjecao(projecaoModerada, cenarioModerado),
-      },
-      {
-        key: "agressivo" as const,
-        nome: "Agressivo",
-        sub: "Maior retorno esperado",
-        vol: "Alta",
-        cor: "#F5A623",
-        corBg: "bg-[rgba(245,166,35,0.06)]",
-        corBorder: "border-[#F5A623]/25",
-        taxa: cenarioAgressivo,
-        patrimonioApos: pAgr,
-        rendaMensalApos: rendaMensalNaApos(pAgr, cenarioAgressivo),
-        idadeIF: idadeIndependenciaNaProjecao(projecaoAgressiva, cenarioAgressivo),
-      },
+      build(
+        "conservador",
+        "Conservador",
+        "Maior previsibilidade",
+        "Baixa",
+        "#22C787",
+        "bg-[rgba(34,199,135,0.06)]",
+        "border-[#22C787]/25",
+        cenarioConservador,
+        pCon,
+        projecaoConservadora,
+      ),
+      build(
+        "moderado",
+        "Moderado",
+        "Equilíbrio risco/retorno",
+        "Média",
+        "#1E5CE6",
+        "bg-[rgba(30,92,230,0.06)]",
+        "border-[#1E5CE6]/25",
+        cenarioModerado,
+        pMod,
+        projecaoModerada,
+      ),
+      build(
+        "agressivo",
+        "Agressivo",
+        "Maior retorno esperado",
+        "Alta",
+        "#F5A623",
+        "bg-[rgba(245,166,35,0.06)]",
+        "border-[#F5A623]/25",
+        cenarioAgressivo,
+        pAgr,
+        projecaoAgressiva,
+      ),
     ]
   }, [
     cenarioConservador,
     cenarioModerado,
     cenarioAgressivo,
+    aliquotaIR,
     projecaoConservadora,
     projecaoModerada,
     projecaoAgressiva,
@@ -326,12 +375,29 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
                 </div>
 
                 <div className="mt-4 space-y-2">
-                  <Label className="text-xs uppercase text-muted-foreground tracking-wide">Rentabilidade</Label>
+                  <div className="flex items-center gap-1.5">
+                    <Label className="text-xs uppercase text-muted-foreground tracking-wide">Rentabilidade Bruta</Label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          className="inline-flex items-center justify-center text-muted-foreground hover:text-foreground"
+                          aria-label="Informação sobre rentabilidade bruta"
+                        >
+                          <Info className="w-3.5 h-3.5" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent sideOffset={8} className="max-w-[280px]">
+                        Rentabilidade bruta anual. O IR de {aliquotaIRPct}% sobre rendimentos é descontado
+                        automaticamente no cálculo.
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
                   {editable ? (
                     <div className="relative">
                       <Input
                         type="number"
-                        value={c.taxa}
+                        value={c.taxaBruta}
                         onChange={(e) => {
                           const v = parseFloat(e.target.value) || 0
                           if (c.key === "conservador") setPremissas({ rentabilidadeConservador: v })
@@ -344,7 +410,7 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
                     </div>
                   ) : (
                     <div className="rounded-lg bg-[#131929] border border-white/10 px-3 py-2 text-sm text-foreground tabular-nums">
-                      {c.taxa}% a.a.
+                      {c.taxaBruta}% a.a.
                     </div>
                   )}
                 </div>
@@ -375,7 +441,12 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
                 </thead>
                 <tbody>
                   {[
-                    { label: "Rentabilidade", values: cenarios.map((c) => `${c.taxa}% a.a.`) },
+                    {
+                      label: "Rentabilidade",
+                      values: cenarios.map(
+                        (c) => `${c.taxaBruta}% a.a. bruto (${fmtPct(c.taxaLiquida)}% líq.)`,
+                      ),
+                    },
                     {
                       label: "Patrimônio na Aposentadoria",
                       values: cenarios.map((c) =>
@@ -429,7 +500,7 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
                     axisLine={false}
                     tickFormatter={formatarMoeda}
                   />
-                  <Tooltip
+                  <RechartsTooltip
                     contentStyle={{
                       backgroundColor: "#131929",
                       border: "1px solid rgba(255,255,255,0.1)",

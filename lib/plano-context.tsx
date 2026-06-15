@@ -14,6 +14,7 @@ import {
 } from "@/lib/engine"
 import {
   computePatrimonioTotals,
+  getPatrimonioTotalConsolidado as calcPatrimonioTotalConsolidado,
   getSaldoDevedorPassivo,
   normalizePassivo,
 } from "@/lib/patrimonio-utils"
@@ -178,6 +179,8 @@ interface PlanoContextType {
   /** Limpa meta de simulação (volta para "nova simulação") */
   clearSimulacaoMeta: () => void
   getPatrimonioLiquido: () => number
+  /** Todos os ativos − passivos (líquidos + imobilizado + participações). */
+  getPatrimonioTotalConsolidado: () => number
   getAporteMensal: () => number
   getIdadeAtual: () => number
   simulatePreview: () => void
@@ -407,6 +410,10 @@ export function PlanoProvider({
     return getAtivosLiquidos() - getTotalPassivos()
   }, [getAtivosLiquidos, getTotalPassivos])
 
+  const getPatrimonioTotalConsolidado = useCallback(() => {
+    return calcPatrimonioTotalConsolidado(state.ativos ?? [], state.passivos ?? [])
+  }, [state.ativos, state.passivos])
+
   const getAporteMensal = useCallback(() => {
     return Math.max(0, state.dadosPessoais.renda - state.dadosPessoais.despesa)
   }, [state.dadosPessoais.renda, state.dadosPessoais.despesa])
@@ -559,8 +566,9 @@ export function PlanoProvider({
     )
 
     const totalPassivosInv = state.passivos.reduce((s, p) => s + getSaldoDevedorPassivo(p), 0)
+    const patrimonioTotalConsolidado = calcPatrimonioTotalConsolidado(state.ativos, state.passivos)
     const plInventario =
-      state.sucessao.plEditavel > 0 ? state.sucessao.plEditavel : saldoInicial
+      state.sucessao.plEditavel > 0 ? state.sucessao.plEditavel : patrimonioTotalConsolidado
     const regimeInventario =
       state.sucessao.regimeSucessao ||
       state.dadosPessoais.regime ||
@@ -624,7 +632,7 @@ export function PlanoProvider({
       setDadosPessoais, setAtivos, setPassivos, setPatrimonio, setObjetivos,
       setPremissas, setSucessao, setProtecao,
       loadState, clearSimulacaoMeta,
-      getPatrimonioLiquido, getAporteMensal, getIdadeAtual,
+      getPatrimonioLiquido, getPatrimonioTotalConsolidado, getAporteMensal, getIdadeAtual,
       simulatePreview, calcular, salvarPlano,
     }}>
       {children}

@@ -34,7 +34,7 @@ const CORES_DIST_ATIVOS = [
 ]
 
 export function Dashboard({ onNavigate }: DashboardProps) {
-  const { state, getPatrimonioLiquido, getAporteMensal, getIdadeAtual } = usePlano()
+  const { state, getPatrimonioLiquido, getPatrimonioTotalConsolidado, getAporteMensal, getIdadeAtual } = usePlano()
   const { dadosPessoais, objetivos, premissas, sucessao, protecao } = state
   const moeda = state.moeda ?? "BRL"
 
@@ -42,9 +42,11 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const [exportando, setExportando] = useState(false)
 
   const saldoInicial = getPatrimonioLiquido()
+  const patrimonioTotalConsolidado = getPatrimonioTotalConsolidado()
   const aporteM      = getAporteMensal()
   const idadeAtual   = getIdadeAtual()
-  const patrimonioTotalSucessao = sucessao.plEditavel === 0 ? saldoInicial : sucessao.plEditavel
+  const patrimonioTotalSucessao =
+    sucessao.plEditavel === 0 ? patrimonioTotalConsolidado : sucessao.plEditavel
 
   const premissasCompletas = useMemo(() => ({
     ...premissas,
@@ -91,7 +93,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     [state.passivos]
   )
 
-  const plInventario = sucessao.plEditavel > 0 ? sucessao.plEditavel : saldoInicial
+  const plInventario = sucessao.plEditavel > 0 ? sucessao.plEditavel : patrimonioTotalConsolidado
   const regimeInventario =
     dadosPessoais.regime || sucessao.regimeSucessao || "Comunhão Parcial de Bens"
 
@@ -245,11 +247,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const fmtFull = (v: number) =>
     new Intl.NumberFormat(moeda === "USD" ? "en-US" : "pt-BR", { style: "currency", currency: moeda === "USD" ? "USD" : "BRL", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v)
 
-  const patrimonioTotalCentro = useMemo(() => {
-    const totalAtivos = state.ativos.reduce((s, a) => s + (a.valor || 0), 0)
-    const totalPassivos = state.passivos.reduce((s, p) => s + getSaldoDevedorPassivo(p), 0)
-    return totalAtivos - totalPassivos
-  }, [state.ativos, state.passivos])
+  const patrimonioTotalCentro = patrimonioTotalConsolidado
 
   // ── Exportar PDF ──────────────────────────────────────────────────────────
   const exportarPDF = async () => {
@@ -268,6 +266,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           kpis={kpis}
           inventario={inventario}
           sucessao={sucessao}
+          patrimonioTotal={patrimonioTotalSucessao}
           protecao={protecao}
           capitalSeguravel={protecaoResult.capitalSeguravel}
           projecaoDetalhada={projecaoDetalhada}

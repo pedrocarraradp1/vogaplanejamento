@@ -200,6 +200,13 @@ export function computePatrimonioTotals(ativos: Ativo[], passivos: Passivo[]): P
   }
 }
 
+/** Patrimônio líquido consolidado: todos os ativos − passivos (mesmo cálculo do Dashboard). */
+export function getPatrimonioTotalConsolidado(ativos: Ativo[], passivos: Passivo[]): number {
+  const totalAtivos = (ativos ?? []).reduce((s, a) => s + Math.max(0, Number(a.valor) || 0), 0)
+  const totalPassivos = (passivos ?? []).reduce((s, p) => s + getSaldoDevedorPassivo(p), 0)
+  return totalAtivos - totalPassivos
+}
+
 export function sumAtivoCategoria(ativos: Ativo[], tipo: string, categoria: string): number {
   return ativos
     .filter((a) => matchesAtivoCategoria(a, tipo, categoria))
