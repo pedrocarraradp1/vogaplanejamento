@@ -63,19 +63,47 @@ export function buildDadosFluxoGrafico(
   const metaAnual = rendaMensalMeta * 12
 
   return projecao.map((p, i) => {
-    const t = p.t
+    const t = Number(p.t) || 0
     const def = Math.pow(1 + inf, Math.max(0, t))
-    const scale = (v: number) => (displayMode === "nominal" ? v : v / def)
+    const patrimonioNominal = Number(p.saldoNominal) || 0
+    const patrimonioReal =
+      Number(p.saldoReal) > 0 ? Number(p.saldoReal) : patrimonioNominal / def
 
-    const patrimonio = Number(p.saldoNominal) || 0
-    const rendimento = Math.round(scale(patrimonio * taxaLiqAnual))
-    const aporte = i < prazoAcumulacao ? Math.round(scale(aporteMensal * 12)) : 0
+    const isAposentado = i >= prazoAcumulacao
+    const anosDesdeAposentadoria = Math.max(0, i - prazoAcumulacao)
+
+    const scaleFluxoNominal = (v: number) =>
+      displayMode === "nominal" ? v : v / def
+
+    const rendimento = Math.round(
+      Math.max(
+        0,
+        displayMode === "nominal"
+          ? patrimonioNominal * taxaLiqAnual
+          : patrimonioReal * taxaLiqAnual,
+      ),
+    )
+    const aporte = !isAposentado ? Math.round(scaleFluxoNominal(aporteMensal * 12)) : 0
     const objetivosPos = objetivosPorAno[i] ?? 0
-    const objetivos = -Math.round(scale(objetivosPos))
+    const objetivos = -Math.round(scaleFluxoNominal(objetivosPos))
     const passivosPos = passivosPorAno[i] ?? 0
-    const passivos = -Math.round(scale(passivosPos))
-    const retirada = i >= prazoAcumulacao ? -Math.round(scale(metaAnual)) : 0
-    const metaRenda = metaAnual
+    const passivos = -Math.round(scaleFluxoNominal(passivosPos))
+
+    let retiradaAno = 0
+    let metaRenda = metaAnual
+    if (isAposentado) {
+      if (displayMode === "real") {
+        // Poder de compra fixo em reais de hoje — não aplica IPCA
+        retiradaAno = metaAnual
+        metaRenda = metaAnual
+      } else {
+        // Valor nominal futuro cresce com IPCA a partir da aposentadoria
+        const fatorIpca = Math.pow(1 + inf, anosDesdeAposentadoria)
+        retiradaAno = metaAnual * fatorIpca
+        metaRenda = retiradaAno
+      }
+    }
+    const retirada = -Math.round(retiradaAno)
 
     const entradasTotal = rendimento + aporte
     const saidasTotal = Math.abs(objetivos) + Math.abs(passivos) + Math.abs(retirada)
