@@ -1318,14 +1318,18 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
       // @ts-ignore
       const jsPDF = (jspdfMod as any).jsPDF ?? (jspdfMod as any).default
 
-      const elementsToHide = document.querySelectorAll(".no-print, .pdf-hide")
-      elementsToHide.forEach((node) => {
+      const nomCliente = dadosPessoais?.nome || "Cliente"
+      const dataRef = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
+
+      const toHide = document.querySelectorAll(".no-print, .pdf-hide")
+      toHide.forEach((node) => {
         ;(node as HTMLElement).style.visibility = "hidden"
       })
+      await new Promise((r) => setTimeout(r, 200))
 
       const el = document.getElementById("balanco-patrimonial-content")
       if (!el) {
-        elementsToHide.forEach((node) => {
+        toHide.forEach((node) => {
           ;(node as HTMLElement).style.visibility = "visible"
         })
         return
@@ -1335,7 +1339,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
       await new Promise((r) => setTimeout(r, 300))
 
       const canvas = await html2canvas(el, {
-        scale: 2.5,
+        scale: 2,
         useCORS: true,
         allowTaint: true,
         backgroundColor: "#ffffff",
@@ -1348,57 +1352,89 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
         height: el.scrollHeight,
       })
 
-      elementsToHide.forEach((node) => {
+      toHide.forEach((node) => {
         ;(node as HTMLElement).style.visibility = "visible"
       })
 
-      const imgData = canvas.toDataURL("image/png", 1.0)
-      const imgW = canvas.width
-      const imgH = canvas.height
-
-      const pdfW = 210
-      const pdfH = (imgH * pdfW) / imgW
-
       const pdf = new jsPDF({
-        orientation: pdfH > pdfW ? "portrait" : "landscape",
+        orientation: "landscape",
         unit: "mm",
-        format: [pdfW, pdfH],
+        format: "a4",
       })
 
-      pdf.setFillColor(1, 33, 55)
-      pdf.rect(0, 0, pdfW, 14, "F")
-      pdf.setFillColor(75, 117, 155)
-      pdf.rect(0, 14, pdfW, 1.5, "F")
+      const pdfW = 297
+      const pdfH = 210
+      const HEADER_H = 16
+      const FOOTER_H = 9
+      const MARGIN_X = 8
+      const CONTENT_W = pdfW - MARGIN_X * 2
+      const CONTENT_H = pdfH - HEADER_H - FOOTER_H
 
-      pdf.setTextColor(255, 255, 255)
-      pdf.setFontSize(11)
-      pdf.setFont("helvetica", "bold")
-      pdf.text("BALANÇO PATRIMONIAL", 10, 7)
+      const scale = CONTENT_W / canvas.width
+      const totalHeightMM = canvas.height * scale
+      const totalPages = Math.ceil(totalHeightMM / CONTENT_H)
 
-      const nomCliente = dadosPessoais?.nome || "Cliente"
-      const dataRef = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
+      const addHeader = (pageNum: number) => {
+        pdf.setFillColor(1, 33, 55)
+        pdf.rect(0, 0, pdfW, HEADER_H, "F")
+        pdf.setFillColor(75, 117, 155)
+        pdf.rect(0, HEADER_H, pdfW, 1.5, "F")
 
-      pdf.setFontSize(7)
-      pdf.setFont("helvetica", "normal")
-      pdf.setTextColor(200, 226, 245)
-      pdf.text(`${nomCliente}  ·  ${dataRef}  ·  Confidencial`, 10, 11.5)
-      pdf.text("Voga | BTG Pactual", pdfW - 10, 11.5, { align: "right" })
+        pdf.setTextColor(255, 255, 255)
+        pdf.setFontSize(11)
+        pdf.setFont("helvetica", "bold")
+        pdf.text("BALANÇO PATRIMONIAL", MARGIN_X, 8)
 
-      const topOffset = 16
-      const contentW = pdfW - 10
-      const imgFinalW = contentW
-      const imgFinalH = (imgH * imgFinalW) / imgW
+        pdf.setFontSize(7)
+        pdf.setFont("helvetica", "normal")
+        pdf.setTextColor(200, 226, 245)
+        pdf.text(`${nomCliente}  ·  ${dataRef}  ·  Confidencial`, MARGIN_X, 13)
+        pdf.text(`Página ${pageNum} de ${totalPages}`, pdfW - MARGIN_X, 8, { align: "right" })
+        pdf.text("Voga | BTG Pactual", pdfW - MARGIN_X, 13, { align: "right" })
+      }
 
-      pdf.addImage(imgData, "PNG", 5, topOffset, imgFinalW, imgFinalH)
+      const addFooter = () => {
+        const footerY = pdfH - FOOTER_H
+        pdf.setFillColor(1, 33, 55)
+        pdf.rect(0, footerY, pdfW, FOOTER_H, "F")
+        pdf.setFontSize(6.5)
+        pdf.setTextColor(155, 196, 226)
+        pdf.text("Voga | BTG Pactual | Confidencial", MARGIN_X, footerY + 5.5)
+        pdf.text(`${nomCliente} — Balanço Patrimonial`, pdfW / 2, footerY + 5.5, { align: "center" })
+        pdf.text(dataRef, pdfW - MARGIN_X, footerY + 5.5, { align: "right" })
+      }
 
-      const footerY = topOffset + imgFinalH + 3
-      pdf.setFillColor(1, 33, 55)
-      pdf.rect(0, footerY, pdfW, 8, "F")
-      pdf.setFontSize(6.5)
-      pdf.setTextColor(155, 196, 226)
-      pdf.text("Voga | BTG Pactual | Confidencial", 10, footerY + 5)
-      pdf.text(`${nomCliente} — Balanço Patrimonial`, pdfW / 2, footerY + 5, { align: "center" })
-      pdf.text(dataRef, pdfW - 10, footerY + 5, { align: "right" })
+      for (let page = 0; page < totalPages; page++) {
+        if (page > 0) pdf.addPage()
+
+        addHeader(page + 1)
+        addFooter()
+
+        const sourceYpx = (page * CONTENT_H) / scale
+        const sliceHpx = Math.min(CONTENT_H / scale, canvas.height - sourceYpx)
+        const sliceHmm = sliceHpx * scale
+
+        const sliceCanvas = document.createElement("canvas")
+        sliceCanvas.width = canvas.width
+        sliceCanvas.height = Math.ceil(sliceHpx)
+        const ctx = sliceCanvas.getContext("2d")!
+        ctx.fillStyle = "#ffffff"
+        ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height)
+        ctx.drawImage(
+          canvas,
+          0,
+          Math.floor(sourceYpx),
+          canvas.width,
+          Math.ceil(sliceHpx),
+          0,
+          0,
+          sliceCanvas.width,
+          sliceCanvas.height
+        )
+
+        const sliceImg = sliceCanvas.toDataURL("image/png", 1.0)
+        pdf.addImage(sliceImg, "PNG", MARGIN_X, HEADER_H + 2, CONTENT_W, sliceHmm)
+      }
 
       const nomeArq = `Balanco_Patrimonial_${nomCliente.replace(/\s+/g, "_")}_${new Date().getFullYear()}.pdf`
       pdf.save(nomeArq)
