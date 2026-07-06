@@ -14,7 +14,7 @@ import { usePlano } from "@/lib/plano-context"
 import { CenariosInvestimento } from "@/components/ui/cenarios-investimento"
 import { FluxoAnualChart, RendaCarteiraChart } from "@/components/charts/projecao-extra-charts"
 import { buildDadosFluxoGrafico, buildDadosRendaGrafico } from "@/lib/projecao-graficos-dados"
-import { CHART_TOOLTIP_ITEM_STYLE, CHART_TOOLTIP_LABEL_STYLE, CHART_TOOLTIP_STYLE } from "@/lib/chart-tooltip"
+import { CHART_TOOLTIP_PROPS, donutTooltipFormatter } from "@/lib/chart-tooltip"
 import {
   calcularProjecao,
   calcularKPIs,
@@ -236,6 +236,15 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         fill: CORES_DIST_ATIVOS[i % CORES_DIST_ATIVOS.length],
       }))
   }, [state.ativos])
+
+  const totalDistribuicaoTipo = useMemo(
+    () => distribuicaoAtivos.reduce((s, d) => s + d.value, 0),
+    [distribuicaoAtivos],
+  )
+  const totalDistribuicaoDescricao = useMemo(
+    () => distribuicaoPorDescricao.reduce((s, d) => s + d.value, 0),
+    [distribuicaoPorDescricao],
+  )
 
   const projecaoDetalhada = useMemo(() =>
     projecao.filter((_, i) => i % 5 === 0)
@@ -468,10 +477,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                         ))}
                       </Pie>
                       <Tooltip
-                        contentStyle={CHART_TOOLTIP_STYLE}
-                        labelStyle={CHART_TOOLTIP_LABEL_STYLE}
-                        itemStyle={CHART_TOOLTIP_ITEM_STYLE}
-                        formatter={(v: number) => fmtFull(v)}
+                        {...CHART_TOOLTIP_PROPS}
+                        formatter={donutTooltipFormatter(fmtFull, totalDistribuicaoTipo)}
                       />
                       <Legend wrapperStyle={{ fontSize: 12, color: "#9CA3AF" }} />
                     </PieChart>
@@ -519,10 +526,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                         ))}
                       </Pie>
                       <Tooltip
-                        contentStyle={CHART_TOOLTIP_STYLE}
-                        labelStyle={CHART_TOOLTIP_LABEL_STYLE}
-                        itemStyle={CHART_TOOLTIP_ITEM_STYLE}
-                        formatter={(v: number) => fmtFull(v)}
+                        {...CHART_TOOLTIP_PROPS}
+                        formatter={donutTooltipFormatter(fmtFull, totalDistribuicaoDescricao)}
                       />
                       <Legend wrapperStyle={{ fontSize: 12, color: "#9CA3AF" }} />
                     </PieChart>
@@ -565,9 +570,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 />
                 <YAxis stroke="#4A5268" tick={{ fill: "#4A5268", fontSize: 12 }} tickLine={false} axisLine={false} tickFormatter={fmt} />
                 <Tooltip
-                  contentStyle={CHART_TOOLTIP_STYLE}
-                  labelStyle={CHART_TOOLTIP_LABEL_STYLE}
-                  itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                  {...CHART_TOOLTIP_PROPS}
                   formatter={(value: number, _name: string, props: any) => {
                     const entry = props?.payload
                     const t = Number(entry?.t) || 0

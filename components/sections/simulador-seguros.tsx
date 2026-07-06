@@ -17,7 +17,7 @@ import {
 import { ArrowLeft, ArrowRight, ShieldCheck } from "lucide-react"
 import { usePlano } from "@/lib/plano-context"
 import { computeTotaisAtivos, getSaldoDevedorPassivo, normalizeAtivoTipo } from "@/lib/patrimonio-utils"
-import { CHART_TOOLTIP_ITEM_STYLE, CHART_TOOLTIP_LABEL_STYLE, CHART_TOOLTIP_STYLE } from "@/lib/chart-tooltip"
+import { CHART_TOOLTIP_PROPS } from "@/lib/chart-tooltip"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -1035,9 +1035,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
                 width={56}
               />
               <Tooltip
-                contentStyle={CHART_TOOLTIP_STYLE}
-                labelStyle={CHART_TOOLTIP_LABEL_STYLE}
-                itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                {...CHART_TOOLTIP_PROPS}
                 formatter={(value: number | string) => [fmtMoney(Number(value), moeda), ""]}
               />
               <Legend />
@@ -1080,9 +1078,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
                 tickFormatter={(v: number) => fmtShort(v, moeda)}
               />
               <Tooltip
-                contentStyle={CHART_TOOLTIP_STYLE}
-                labelStyle={CHART_TOOLTIP_LABEL_STYLE}
-                itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                {...CHART_TOOLTIP_PROPS}
                 formatter={(value: number | string) => fmtMoney(Number(value), moeda)}
               />
               <Legend />
@@ -1114,9 +1110,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
                 tickFormatter={(v: number) => fmtShort(v, moeda)}
               />
               <Tooltip
-                contentStyle={CHART_TOOLTIP_STYLE}
-                labelStyle={CHART_TOOLTIP_LABEL_STYLE}
-                itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                {...CHART_TOOLTIP_PROPS}
                 formatter={(value: number | string, _n, p) => {
                   const row = p?.payload as { acumulado?: number } | undefined
                   const acum = row?.acumulado ?? 0

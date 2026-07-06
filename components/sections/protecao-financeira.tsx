@@ -11,7 +11,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell, Legend,
 } from "recharts"
-import { CHART_TOOLTIP_ITEM_STYLE, CHART_TOOLTIP_LABEL_STYLE, CHART_TOOLTIP_STYLE } from "@/lib/chart-tooltip"
+import { CHART_TOOLTIP_PROPS } from "@/lib/chart-tooltip"
 
 interface ProtecaoFinanceiraProps {
   onNavigate: (section: string) => void
@@ -322,10 +322,8 @@ export function ProtecaoFinanceira({ onNavigate }: ProtecaoFinanceiraProps) {
               <YAxis type="category" dataKey="name"
                 stroke="#8E96AC" fontSize={12} axisLine={false} tickLine={false} width={100} />
               <Tooltip
+                {...CHART_TOOLTIP_PROPS}
                 formatter={(value: number) => [formatCurrency(value), "Patrimônio Final"]}
-                contentStyle={CHART_TOOLTIP_STYLE}
-                labelStyle={CHART_TOOLTIP_LABEL_STYLE}
-                itemStyle={CHART_TOOLTIP_ITEM_STYLE}
               />
               <Legend wrapperStyle={{ paddingTop: "20px" }} formatter={() => "Patrimônio Final"} />
               <Bar dataKey="value" radius={[0, 4, 4, 0]} name="Patrimônio Final">

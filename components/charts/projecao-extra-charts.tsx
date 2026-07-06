@@ -2,6 +2,11 @@
 
 import { useMemo } from "react"
 import {
+  CHART_TOOLTIP_ITEM_STYLE,
+  CHART_TOOLTIP_LABEL_STYLE,
+  CHART_TOOLTIP_STYLE,
+} from "@/lib/chart-tooltip"
+import {
   ComposedChart,
   Bar,
   Line,
@@ -82,28 +87,30 @@ export function FluxoAnualChart({
                 const p = payload[0]?.payload as DadoFluxoGrafico
                 const corLiq = p.fluxoLiquido >= 0 ? "#1D9E75" : "#E24B4A"
                 return (
-                  <div className="rounded-lg border border-border bg-white px-3 py-2 text-xs shadow-lg min-w-[200px] text-[var(--text-primary)]">
-                    <p className="font-semibold text-[var(--text-primary)]">
+                  <div style={{ ...CHART_TOOLTIP_STYLE, fontSize: 12, minWidth: 200 }}>
+                    <p style={{ ...CHART_TOOLTIP_LABEL_STYLE, margin: 0 }}>
                       Ano {p.t} · Idade {p.idade}
                     </p>
-                    <p className="text-muted-foreground mt-0.5">Fase: {p.fase}</p>
-                    <p className="mt-2 text-[#378ADD]">
+                    <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, opacity: 0.85, marginTop: 2 }}>
+                      Fase: {p.fase}
+                    </p>
+                    <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, marginTop: 8, color: "#7CB9E8" }}>
                       Rendimento: {formatarMoedaCompleta(p.rendimento)}
                     </p>
-                    <p className="text-primary">Aporte: {formatarMoedaCompleta(p.aporte)}</p>
-                    <p className="text-[#BA7517]">
+                    <p style={CHART_TOOLTIP_ITEM_STYLE}>Aporte: {formatarMoedaCompleta(p.aporte)}</p>
+                    <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, color: "#F5C97A" }}>
                       Objetivos: {formatarMoedaCompleta(Math.abs(p.objetivos))}
                     </p>
-                    <p className="text-[#7C3AED]">
+                    <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, color: "#C4B5FD" }}>
                       Passivos: {formatarMoedaCompleta(Math.abs(p.passivos))}
                     </p>
-                    <p className="text-[#E24B4A]">
+                    <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, color: "#F5A5A4" }}>
                       Retirada: {formatarMoedaCompleta(Math.abs(p.retirada))}
                     </p>
-                    <p className="text-[#1D9E75]">
+                    <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, color: "#7FE0B8" }}>
                       Meta renda (ref.): {formatarMoedaCompleta(p.metaRenda)}
                     </p>
-                    <p className="mt-1 font-medium" style={{ color: corLiq }}>
+                    <p className="mt-1 font-medium" style={{ ...CHART_TOOLTIP_ITEM_STYLE, color: corLiq, marginTop: 6 }}>
                       Fluxo líquido: {formatarMoedaCompleta(p.fluxoLiquido)}
                     </p>
                   </div>
@@ -227,29 +234,31 @@ export function RendaCarteiraChart({
                 const status = p.acimaMeta ? "Acima da meta" : "Abaixo da meta"
                 const corStatus = p.acimaMeta ? "#22C787" : "#EF4444"
                 return (
-                  <div className="rounded-lg border border-border bg-white px-3 py-2 text-xs shadow-lg text-[var(--text-primary)]">
-                    <p className="font-semibold text-[var(--text-primary)]">Idade {p.idade}</p>
+                  <div style={{ ...CHART_TOOLTIP_STYLE, fontSize: 12 }}>
+                    <p style={{ ...CHART_TOOLTIP_LABEL_STYLE, margin: 0 }}>Idade {p.idade}</p>
                     {displayMode === "nominal" ? (
                       <>
-                        <p className="mt-1 text-[var(--text-primary)]">
+                        <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, marginTop: 6 }}>
                           Renda nominal: {formatarMoedaCompleta(p.rendaNominal)}
                         </p>
-                        <p className="text-[var(--text-label)]">
+                        <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, opacity: 0.85 }}>
                           Poder de compra (hoje): {formatarMoedaCompleta(p.rendaPoderCompra)}
                         </p>
                       </>
                     ) : (
                       <>
-                        <p className="mt-1 text-[var(--text-primary)]">
+                        <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, marginTop: 6 }}>
                           Renda real (Fisher): {formatarMoedaCompleta(p.rendaReal)}
                         </p>
-                        <p className="text-[var(--text-label)]">
+                        <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, opacity: 0.85 }}>
                           Renda nominal (ref.): {formatarMoedaCompleta(p.rendaNominal)}
                         </p>
                       </>
                     )}
-                    <p className="text-[var(--text-label)]">Meta: {formatarMoedaCompleta(p.meta)}</p>
-                    <p className="mt-1 font-medium" style={{ color: corStatus }}>
+                    <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, opacity: 0.85 }}>
+                      Meta: {formatarMoedaCompleta(p.meta)}
+                    </p>
+                    <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, fontWeight: 500, color: corStatus, marginTop: 6 }}>
                       {status}
                     </p>
                   </div>

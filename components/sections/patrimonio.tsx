@@ -13,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts"
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts"
 import { Pencil, Plus, Trash2 } from "lucide-react"
 import { usePlano } from "@/lib/plano-context"
 import type { Ativo } from "@/lib/plano-context"
@@ -65,6 +65,12 @@ import {
   type SecaoAtivoConfig,
   type TipoAtivoSlug,
 } from "@/lib/patrimonio-utils"
+import {
+  CHART_TOOLTIP_LABEL_STYLE,
+  CHART_TOOLTIP_ITEM_STYLE,
+  CHART_TOOLTIP_STYLE,
+  formatDonutTooltipPct,
+} from "@/lib/chart-tooltip"
 
 interface PatrimonioProps {
   onNavigate: (section: string) => void
@@ -294,42 +300,58 @@ function DonutComLegenda({
                 <Cell key={`${entry.name}-${i}`} fill={entry.fill} />
               ))}
             </Pie>
+            <Tooltip
+              content={({ active, payload }) => {
+                if (!active || !payload?.length) return null
+                const entry = payload[0]
+                const nome = String(entry.name ?? "")
+                const valor = Number(entry.value) || 0
+                const pct = formatDonutTooltipPct(valor, total)
+                return (
+                  <div style={{ ...CHART_TOOLTIP_STYLE, fontSize: 12 }}>
+                    <div style={{ ...CHART_TOOLTIP_LABEL_STYLE, marginBottom: 4 }}>{nome}</div>
+                    <div style={CHART_TOOLTIP_ITEM_STYLE}>
+                      {formatCurrency(valor)} ({pct}%)
+                    </div>
+                  </div>
+                )
+              }}
+            />
           </PieChart>
         </ResponsiveContainer>
       </div>
       <ul style={{ listStyle: "none", margin: 0, padding: 0, flex: 1, minWidth: 0 }}>
-        {data.map((item) => {
-          const pct = total > 0 ? ((item.value / total) * 100).toFixed(1) : "0.0"
+        {ativo.map((item) => {
+          const pct = formatDonutTooltipPct(item.value, total)
           return (
             <li
               key={item.name}
               style={{
                 display: "flex",
+                justifyContent: "space-between",
                 alignItems: "center",
-                gap: 8,
-                fontSize: 11,
-                color: "#52514e",
-                marginBottom: 6,
+                padding: "5px 0",
+                borderBottom: "0.5px solid rgba(0,0,0,0.06)",
               }}
             >
-              <span
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  background: item.fill,
-                  flexShrink: 0,
-                }}
-              />
-              <span style={{ flex: 1, minWidth: 0 }}>
-                {item.name}
-              </span>
-              <span style={{ color: "#9A9B9B", whiteSpace: "nowrap" }}>
-                {pct}%
-              </span>
-              <span style={{ fontWeight: 500, whiteSpace: "nowrap" }}>
-                {formatCurrency(item.value)}
-              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+                <span
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: 2,
+                    background: item.fill,
+                    flexShrink: 0,
+                  }}
+                />
+                <span style={{ fontSize: 12, color: "#1a1a1a" }}>{item.name}</span>
+              </div>
+              <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 8 }}>
+                <div style={{ fontSize: 12, fontWeight: 500, color: "#1a1a1a" }}>
+                  {formatCurrency(item.value)}
+                </div>
+                <div style={{ fontSize: 10, color: "#9A9B9B" }}>{pct}%</div>
+              </div>
             </li>
           )
         })}
@@ -947,13 +969,14 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
   const totalInvestimentos = totalInvestimentosLiq + participacoes
 
   const dataDonutGrupos = useMemo(
-    () => [
-      { name: "Imobilizado", value: imobilizado, fill: COR_GRAFICO_IMOBILIZADO },
-      { name: "Previdência", value: totalPrevidencia, fill: COR_GRAFICO_PREVIDENCIA },
-      { name: "Investimentos", value: totalInvestimentos, fill: COR_GRAFICO_INVESTIMENTOS },
-      { name: "Líquidos", value: totalLiquidosRest, fill: COR_GRAFICO_LIQUIDOS },
-    ],
-    [imobilizado, totalPrevidencia, totalInvestimentos, totalLiquidosRest],
+    () =>
+      [
+        { name: "Imobilizado", value: imobilizado, fill: "#4B759B" },
+        { name: "Previdência", value: totalPrevidencia, fill: "#5DCAA5" },
+        { name: "Ativos Líquidos", value: ativosLiquidos, fill: "#EF9F27" },
+        { name: "Participações Societárias", value: participacoes, fill: "#7F77DD" },
+      ].filter((g) => g.value > 0),
+    [imobilizado, totalPrevidencia, ativosLiquidos, participacoes],
   )
 
   const barrasGrupos = dataDonutGrupos
