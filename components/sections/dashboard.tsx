@@ -24,7 +24,7 @@ import {
   calcularPassivosPorAnoSeries,
   type ProjecaoAno,
 } from "@/lib/engine"
-import { getSaldoDevedorPassivo } from "@/lib/patrimonio-utils"
+import { getSaldoDevedorPassivo, labelTipoAtivo } from "@/lib/patrimonio-utils"
 
 interface DashboardProps {
   onNavigate: (section: string) => void
@@ -208,7 +208,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const distribuicaoAtivos = useMemo(() => {
     const acc = new Map<string, number>()
     for (const a of state.ativos) {
-      const k = a.tipo?.trim() || "Sem tipo"
+      const k = labelTipoAtivo(a.tipo, a.descricao)
       acc.set(k, (acc.get(k) ?? 0) + Math.max(0, a.valor ?? 0))
     }
     return [...acc.entries()]

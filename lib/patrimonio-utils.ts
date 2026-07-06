@@ -1,23 +1,40 @@
 import type { Ativo, Passivo, PatrimonioState } from "@/lib/plano-context"
 
-export const TIPOS_ATIVO = ["Líquido", "Imobilizado", "Participação Societária"] as const
-export type TipoAtivoLabel = (typeof TIPOS_ATIVO)[number]
+export const TIPOS_ATIVO_OPCOES = [
+  { value: "imobilizado", label: "Imobilizado" },
+  { value: "ativo_liquido", label: "Ativos Líquidos" },
+  { value: "participacao_societaria", label: "Participações Societárias" },
+  { value: "previdencia", label: "Previdência" },
+] as const
 
-export const DESCRICOES_ATIVOS_POR_TIPO: Record<TipoAtivoLabel, string[]> = {
-  "Líquido": [
-    "Ativos Nacionais",
-    "Ativos Internacionais",
-    "Previdência Privada",
-    "Outros",
-  ],
-  Imobilizado: [
+export const TIPOS_ATIVO = TIPOS_ATIVO_OPCOES.map((o) => o.value) as readonly [
+  "imobilizado",
+  "ativo_liquido",
+  "participacao_societaria",
+  "previdencia",
+]
+
+export type TipoAtivoSlug = (typeof TIPOS_ATIVO)[number]
+/** @deprecated Use TipoAtivoSlug */
+export type TipoAtivoLabel = TipoAtivoSlug
+
+export const DESCRICOES_ATIVOS_POR_TIPO: Record<TipoAtivoSlug, string[]> = {
+  ativo_liquido: ["Ativos Nacionais", "Ativos Internacionais", "Outros"],
+  imobilizado: [
     "Casa/Apto Residencial",
     "Imóvel Investimento",
     "Terreno",
     "Veículo/Carro",
     "Outros",
   ],
-  "Participação Societária": ["Empresa", "Holding", "Fundo Exclusivo", "Outros"],
+  participacao_societaria: ["Empresa", "Holding", "Fundo Exclusivo", "Outros"],
+  previdencia: ["Previdência Privada", "Outros"],
+}
+
+const LEGACY_TIPO_ATIVO: Record<string, TipoAtivoSlug> = {
+  Líquido: "ativo_liquido",
+  Imobilizado: "imobilizado",
+  "Participação Societária": "participacao_societaria",
 }
 
 /** Descrições antigas → rótulo atual (migração / agregação). */
@@ -35,17 +52,42 @@ export function normalizeAtivoDescricao(descricao: string): string {
   return LEGACY_DESCRICAO_ATIVO[d] ?? d
 }
 
-export function isTipoAtivoLabel(tipo: string): tipo is TipoAtivoLabel {
+export function isTipoAtivoSlug(tipo: string): tipo is TipoAtivoSlug {
   return (TIPOS_ATIVO as readonly string[]).includes(tipo)
 }
 
-export function resolveTipoAtivoLabel(tipo: string | undefined | null): TipoAtivoLabel {
+/** @deprecated Use isTipoAtivoSlug */
+export const isTipoAtivoLabel = isTipoAtivoSlug
+
+export function normalizeAtivoTipo(tipo: string, descricao?: string): TipoAtivoSlug {
   const t = (tipo ?? "").trim()
-  return isTipoAtivoLabel(t) ? t : "Líquido"
+  if (isTipoAtivoSlug(t)) return t
+  if (t === "Líquido" && normalizeAtivoDescricao(descricao ?? "") === "Previdência Privada") {
+    return "previdencia"
+  }
+  return LEGACY_TIPO_ATIVO[t] ?? "ativo_liquido"
+}
+
+export function resolveTipoAtivoSlug(tipo: string | undefined | null, descricao?: string): TipoAtivoSlug {
+  return normalizeAtivoTipo(tipo ?? "", descricao)
+}
+
+/** @deprecated Use resolveTipoAtivoSlug */
+export const resolveTipoAtivoLabel = resolveTipoAtivoSlug
+
+export function labelTipoAtivo(tipo: string, descricao?: string): string {
+  const slug = normalizeAtivoTipo(tipo, descricao)
+  return TIPOS_ATIVO_OPCOES.find((o) => o.value === slug)?.label ?? slug
+}
+
+export function normalizeAtivoRecord(ativo: Ativo): Ativo {
+  const tipo = normalizeAtivoTipo(ativo.tipo, ativo.descricao)
+  const descricao = resolveDescricaoAtivo(tipo, ativo.descricao)
+  return { ...ativo, tipo, descricao }
 }
 
 export function resolveDescricaoAtivo(
-  tipo: TipoAtivoLabel,
+  tipo: TipoAtivoSlug,
   descricao: string | undefined | null,
 ): string {
   const cats = DESCRICOES_ATIVOS_POR_TIPO[tipo]
@@ -84,6 +126,14 @@ export type InstituicaoFinanceira = (typeof INSTITUICOES_FINANCEIRAS)[number]
 
 export function isInstituicaoFinanceiraListada(value: string): value is InstituicaoFinanceira {
   return (INSTITUICOES_FINANCEIRAS as readonly string[]).includes(value)
+}
+
+/** Instituição financeira só se aplica a ativos líquidos do tipo Ativos Nacionais. */
+export function exibeInstituicaoAtivo(tipo: string, descricao: string): boolean {
+  return (
+    normalizeAtivoTipo(tipo, descricao) === "ativo_liquido" &&
+    normalizeAtivoDescricao(descricao) === "Ativos Nacionais"
+  )
 }
 
 /** Empresário(a) ou profissão customizada que indique empresário. */
@@ -131,7 +181,7 @@ export function tooltipReservaEmergencia(profissao: string, quantidadeFilhos: nu
       : "sem filhos"
   return [
     "Cálculo: Ativos Líquidos ÷ Despesa Mensal (aba Dados Pessoais).",
-    "Considera apenas ativos do tipo Líquido.",
+    "Considera apenas ativos do tipo Ativos Líquidos (sem previdência).",
     "",
     "Meta recomendada:",
     "• Empresário: 12 meses",
@@ -202,17 +252,26 @@ export const COR_GRAFICO_INVESTIMENTOS = "#345E7B"
 export const SECAO_LIQUIDO = {
   id: "liquidos",
   title: "Ativos Líquidos",
-  tipo: "Líquido",
-  categorias: DESCRICOES_ATIVOS_POR_TIPO["Líquido"],
+  tipo: "ativo_liquido",
+  categorias: DESCRICOES_ATIVOS_POR_TIPO.ativo_liquido,
   cor: "#4B759B",
+  totalLabel: "Total",
+} as const
+
+export const SECAO_PREVIDENCIA = {
+  id: "previdencia",
+  title: "Previdência",
+  tipo: "previdencia",
+  categorias: DESCRICOES_ATIVOS_POR_TIPO.previdencia,
+  cor: "#00954F",
   totalLabel: "Total",
 } as const
 
 export const SECAO_IMOBILIZADO = {
   id: "imobilizado",
   title: "Imobilizado",
-  tipo: "Imobilizado",
-  categorias: DESCRICOES_ATIVOS_POR_TIPO["Imobilizado"],
+  tipo: "imobilizado",
+  categorias: DESCRICOES_ATIVOS_POR_TIPO.imobilizado,
   cor: "#033252",
   totalLabel: "Total",
 } as const
@@ -220,20 +279,25 @@ export const SECAO_IMOBILIZADO = {
 export const SECAO_PARTICIPACOES = {
   id: "participacoes",
   title: "Participações Societárias",
-  tipo: "Participação Societária",
-  categorias: DESCRICOES_ATIVOS_POR_TIPO["Participação Societária"],
+  tipo: "participacao_societaria",
+  categorias: DESCRICOES_ATIVOS_POR_TIPO.participacao_societaria,
   cor: "#345E7B",
   totalLabel: "Total",
 } as const
 
-export const SECOES_ATIVOS = [SECAO_LIQUIDO, SECAO_IMOBILIZADO, SECAO_PARTICIPACOES] as const
+export const SECOES_ATIVOS = [
+  SECAO_LIQUIDO,
+  SECAO_PREVIDENCIA,
+  SECAO_IMOBILIZADO,
+  SECAO_PARTICIPACOES,
+] as const
 
 export type SecaoAtivoConfig = (typeof SECOES_ATIVOS)[number]
 
-export function matchesAtivoCategoria(ativo: Ativo, tipo: string, categoria: string): boolean {
-  if ((ativo.tipo ?? "").trim() !== tipo) return false
+export function matchesAtivoCategoria(ativo: Ativo, tipo: TipoAtivoSlug, categoria: string): boolean {
+  if (normalizeAtivoTipo(ativo.tipo, ativo.descricao) !== tipo) return false
   const desc = normalizeAtivoDescricao(ativo.descricao ?? "")
-  const cats = DESCRICOES_ATIVOS_POR_TIPO[tipo as TipoAtivoLabel] ?? []
+  const cats = DESCRICOES_ATIVOS_POR_TIPO[tipo] ?? []
   if (categoria === "Outros") {
     return desc === "Outros" || (desc !== "" && !cats.slice(0, -1).includes(desc))
   }
@@ -317,17 +381,46 @@ export function getParcelaMensalPassivo(passivo: Passivo): number {
   return 0
 }
 
-export function sumAtivoTipo(ativos: Ativo[], tipo: string): number {
+export function sumAtivoTipo(ativos: Ativo[], tipo: TipoAtivoSlug): number {
   return (ativos ?? [])
-    .filter((a) => (a.tipo ?? "").trim() === tipo)
+    .filter((a) => normalizeAtivoTipo(a.tipo, a.descricao) === tipo)
     .reduce((s, a) => s + (Number(a.valor) || 0), 0)
 }
 
-export function computePatrimonioTotals(ativos: Ativo[], passivos: Passivo[]): PatrimonioState {
+export interface TotaisAtivos {
+  totalAtivoLiquido: number
+  totalPrevidencia: number
+  totalImobilizado: number
+  totalParticipacoes: number
+  totalAtivosFinanceiros: number
+  patrimonioBruto: number
+}
+
+export function computeTotaisAtivos(ativos: Ativo[]): TotaisAtivos {
+  const totalAtivoLiquido = sumAtivoTipo(ativos, "ativo_liquido")
+  const totalPrevidencia = sumAtivoTipo(ativos, "previdencia")
+  const totalImobilizado = sumAtivoTipo(ativos, "imobilizado")
+  const totalParticipacoes = sumAtivoTipo(ativos, "participacao_societaria")
+  const totalAtivosFinanceiros = totalAtivoLiquido + totalPrevidencia
+  const patrimonioBruto =
+    totalAtivoLiquido + totalPrevidencia + totalImobilizado + totalParticipacoes
   return {
-    ativosLiquidos: sumAtivoTipo(ativos, "Líquido"),
-    imobilizado: sumAtivoTipo(ativos, "Imobilizado"),
-    participacoes: sumAtivoTipo(ativos, "Participação Societária"),
+    totalAtivoLiquido,
+    totalPrevidencia,
+    totalImobilizado,
+    totalParticipacoes,
+    totalAtivosFinanceiros,
+    patrimonioBruto,
+  }
+}
+
+export function computePatrimonioTotals(ativos: Ativo[], passivos: Passivo[]): PatrimonioState {
+  const totais = computeTotaisAtivos(ativos)
+  return {
+    ativosLiquidos: totais.totalAtivoLiquido,
+    previdencia: totais.totalPrevidencia,
+    imobilizado: totais.totalImobilizado,
+    participacoes: totais.totalParticipacoes,
     passivos: (passivos ?? []).reduce((s, p) => s + getSaldoDevedorPassivo(p), 0),
   }
 }

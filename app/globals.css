@@ -371,13 +371,16 @@
   /* Layout otimizado para exportação PDF do Balanço Patrimonial */
   #balanco-patrimonial-content.pdf-export-mode {
     position: fixed;
-    left: -9999px;
     top: 0;
-    width: 720px;
-    max-width: 720px;
+    left: 0;
+    width: 1200px;
+    max-width: 1200px;
     background: #ffffff;
-    padding: 0;
-    z-index: -1;
+    padding: 16px;
+    z-index: 100000;
+    box-sizing: border-box;
+    overflow: visible;
+    pointer-events: none;
   }
 
   #balanco-patrimonial-content.pdf-export-mode .pdf-hide {
@@ -385,23 +388,23 @@
   }
 
   #balanco-patrimonial-content.pdf-export-mode .pdf-grid-kpis {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    gap: 12px !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 10px !important;
   }
 
   #balanco-patrimonial-content.pdf-export-mode .pdf-grid-2 {
-    grid-template-columns: 1fr !important;
-    gap: 14px !important;
-  }
-
-  #balanco-patrimonial-content.pdf-export-mode .pdf-grid-indicadores {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-template-columns: 1fr 1fr !important;
     gap: 12px !important;
   }
 
+  #balanco-patrimonial-content.pdf-export-mode .pdf-grid-indicadores {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+  }
+
   #balanco-patrimonial-content.pdf-export-mode .pdf-grid-balanco {
-    grid-template-columns: 1fr !important;
-    gap: 14px !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 12px !important;
   }
 
   #balanco-patrimonial-content.pdf-export-mode .pdf-section {
@@ -415,14 +418,15 @@
   }
 
   #balanco-patrimonial-content.pdf-export-mode .donut-com-legenda {
-    flex-direction: column !important;
+    flex-direction: row !important;
     align-items: center !important;
-    gap: 12px !important;
+    gap: 16px !important;
   }
 
   #balanco-patrimonial-content.pdf-export-mode .donut-com-legenda > div:first-child {
-    width: 180px !important;
-    height: 180px !important;
+    width: 140px !important;
+    height: 140px !important;
+    flex-shrink: 0;
   }
 
   #balanco-patrimonial-content.pdf-export-mode .donut-com-legenda ul {

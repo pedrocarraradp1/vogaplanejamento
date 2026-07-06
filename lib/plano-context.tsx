@@ -14,9 +14,12 @@ import {
 } from "@/lib/engine"
 import {
   computePatrimonioTotals,
+  computeTotaisAtivos,
   getPatrimonioTotalConsolidado as calcPatrimonioTotalConsolidado,
   getSaldoDevedorPassivo,
   normalizePassivo,
+  normalizeAtivoRecord,
+  normalizeAtivoTipo,
 } from "@/lib/patrimonio-utils"
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
@@ -43,7 +46,7 @@ export interface DadosPessoais {
 
 export interface Ativo {
   id: string
-  /** Líquido | Imobilizado | Participação Societária */
+  /** imobilizado | ativo_liquido | participacao_societaria | previdencia */
   tipo: string
   descricao: string
   instituicao: string
@@ -133,6 +136,7 @@ export interface Protecao {
 
 export interface PatrimonioState {
   ativosLiquidos: number
+  previdencia: number
   imobilizado: number
   participacoes: number
   passivos: number
@@ -179,6 +183,10 @@ interface PlanoContextType {
   /** Limpa meta de simulação (volta para "nova simulação") */
   clearSimulacaoMeta: () => void
   getPatrimonioLiquido: () => number
+  /** Soma ativos líquidos + previdência (sem passivos). */
+  getAtivosFinanceiros: () => number
+  /** Apenas ativos líquidos imediatos (sem previdência). */
+  getAtivosLiquidosImediatos: () => number
   /** Todos os ativos − passivos (líquidos + imobilizado + participações). */
   getPatrimonioTotalConsolidado: () => number
   getAporteMensal: () => number
@@ -245,7 +253,7 @@ const initialState: PlanoState = {
   },
   ativos: [],
   passivos: [],
-  patrimonio: { ativosLiquidos: 0, imobilizado: 0, participacoes: 0, passivos: 0 },
+  patrimonio: { ativosLiquidos: 0, previdencia: 0, imobilizado: 0, participacoes: 0, passivos: 0 },
   objetivos: [],
   premissas: defaultPremissas,
   sucessao: {
@@ -304,6 +312,7 @@ export function PlanoProvider({
       passivos: Array.isArray(raw?.passivos) ? raw.passivos : [],
       patrimonio: {
         ativosLiquidos: 0,
+        previdencia: 0,
         imobilizado: 0,
         participacoes: 0,
         passivos: 0,
@@ -362,17 +371,19 @@ export function PlanoProvider({
       }
     })
 
+    merged.ativos = (merged.ativos ?? []).map((a: Ativo) => normalizeAtivoRecord(a))
+
     const rawPat = (raw?.patrimonio ?? {}) as Partial<PatrimonioState> & { participacoes?: number }
     const participacoesLegado = Number(rawPat.participacoes) || 0
     const temAtivosParticipacao = (merged.ativos ?? []).some(
-      (a) => (a.tipo ?? "").trim() === "Participação Societária",
+      (a) => normalizeAtivoTipo(a.tipo, a.descricao) === "participacao_societaria",
     )
     if (participacoesLegado > 0 && !temAtivosParticipacao) {
       merged.ativos = [
         ...merged.ativos,
         {
           id: `mig-part-${Date.now()}`,
-          tipo: "Participação Societária",
+          tipo: "participacao_societaria",
           descricao: "Outros",
           instituicao: "",
           valor: participacoesLegado,
@@ -395,10 +406,12 @@ export function PlanoProvider({
 
   // ── Helpers derivados ──────────────────────────────────────────────────────
 
-  const getAtivosLiquidos = useCallback(() => {
-    return (state.ativos ?? [])
-      .filter(a => (a.tipo ?? "").trim() === "Líquido")
-      .reduce((s, a) => s + (Number(a.valor) || 0), 0)
+  const getAtivosLiquidosImediatos = useCallback(() => {
+    return computeTotaisAtivos(state.ativos ?? []).totalAtivoLiquido
+  }, [state.ativos])
+
+  const getAtivosFinanceiros = useCallback(() => {
+    return computeTotaisAtivos(state.ativos ?? []).totalAtivosFinanceiros
   }, [state.ativos])
 
   const getTotalPassivos = useCallback(() => {
@@ -406,9 +419,9 @@ export function PlanoProvider({
   }, [state.passivos])
 
   const getPatrimonioLiquido = useCallback(() => {
-    // Patrimônio Líquido Financeiro = Ativos Líquidos (categoria "Líquido") − Passivos
-    return getAtivosLiquidos() - getTotalPassivos()
-  }, [getAtivosLiquidos, getTotalPassivos])
+    // Projeção / proteção: ativos líquidos + previdência − passivos
+    return getAtivosFinanceiros() - getTotalPassivos()
+  }, [getAtivosFinanceiros, getTotalPassivos])
 
   const getPatrimonioTotalConsolidado = useCallback(() => {
     return calcPatrimonioTotalConsolidado(state.ativos ?? [], state.passivos ?? [])
@@ -443,7 +456,7 @@ export function PlanoProvider({
     setState(prev => {
       const normalized = ativos.map((a) => {
         const bem = a.heranca === true || a.bemDeHeranca === true
-        return { ...a, heranca: bem, bemDeHeranca: bem }
+        return normalizeAtivoRecord({ ...a, heranca: bem, bemDeHeranca: bem })
       })
       return {
         ...prev,
@@ -515,7 +528,7 @@ export function PlanoProvider({
   // ── Cálculos ───────────────────────────────────────────────────────────────
 
   const simulatePreview = useCallback(() => {
-    const saldoInicial = getAtivosLiquidos() - getTotalPassivos()
+    const saldoInicial = getAtivosFinanceiros() - getTotalPassivos()
     const aporteM    = Math.max(0, state.dadosPessoais.renda - state.dadosPessoais.despesa)
     const idadeAtual = (() => {
       const nasc = state.dadosPessoais.nascimento
@@ -534,10 +547,10 @@ export function PlanoProvider({
       state.passivos
     )
     setState(prev => ({ ...prev, projecao }))
-  }, [state.premissas, state.objetivos, state.passivos, state.dadosPessoais, getAtivosLiquidos, getTotalPassivos])
+  }, [state.premissas, state.objetivos, state.passivos, state.dadosPessoais, getAtivosFinanceiros, getTotalPassivos])
 
   const calcular = useCallback(() => {
-    const saldoInicial = getAtivosLiquidos() - getTotalPassivos()
+    const saldoInicial = getAtivosFinanceiros() - getTotalPassivos()
     const aporteM    = Math.max(0, state.dadosPessoais.renda - state.dadosPessoais.despesa)
     const idadeAtual = (() => {
       const nasc = state.dadosPessoais.nascimento
@@ -594,7 +607,7 @@ export function PlanoProvider({
     )
 
     setState(prev => ({ ...prev, projecao, kpis, inventario, protecaoResult }))
-  }, [state, getAtivosLiquidos, getTotalPassivos])
+  }, [state, getAtivosFinanceiros, getTotalPassivos])
 
   const salvarPlano = useCallback(async (): Promise<{ error: string | null }> => {
     try {
@@ -632,7 +645,8 @@ export function PlanoProvider({
       setDadosPessoais, setAtivos, setPassivos, setPatrimonio, setObjetivos,
       setPremissas, setSucessao, setProtecao,
       loadState, clearSimulacaoMeta,
-      getPatrimonioLiquido, getPatrimonioTotalConsolidado, getAporteMensal, getIdadeAtual,
+      getPatrimonioLiquido, getAtivosFinanceiros, getAtivosLiquidosImediatos,
+      getPatrimonioTotalConsolidado, getAporteMensal, getIdadeAtual,
       simulatePreview, calcular, salvarPlano,
     }}>
       {children}

@@ -34,7 +34,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
   const moeda = state.moeda ?? "BRL"
 
   // ── Derivados automáticos ────────────────────────────────────────────────
-  // Saldo inicial usado na simulação: Ativos Líquidos (categoria "Líquido") − Passivos
+  // Saldo inicial: ativos líquidos + previdência − passivos
   const saldoInicialCalculado = useMemo(() => getPatrimonioLiquido(), [getPatrimonioLiquido])
 
   const idadeAtualCalculada = useMemo(() => {
@@ -286,7 +286,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
               <Label className="field-label">Saldo Inicial Líquido (R$)</Label>
               <Input value={formatCurrency(saldoInicialCalculado)} readOnly
                 className="form-card text-foreground cursor-not-allowed opacity-70" />
-              <p className="text-xs text-muted-foreground">Calculado automaticamente: Ativos Líquidos − Passivos</p>
+              <p className="text-xs text-muted-foreground">Calculado automaticamente: Ativos Líquidos + Previdência − Passivos</p>
             </div>
             <div className="space-y-2">
               <Label className="field-label">Rendimento Anual Bruto (%)</Label>

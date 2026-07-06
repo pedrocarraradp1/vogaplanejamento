@@ -16,7 +16,7 @@ import {
 } from "recharts"
 import { ArrowLeft, ArrowRight, ShieldCheck } from "lucide-react"
 import { usePlano } from "@/lib/plano-context"
-import { getSaldoDevedorPassivo } from "@/lib/patrimonio-utils"
+import { computeTotaisAtivos, getSaldoDevedorPassivo, normalizeAtivoTipo } from "@/lib/patrimonio-utils"
 import { CHART_TOOLTIP_ITEM_STYLE, CHART_TOOLTIP_LABEL_STYLE, CHART_TOOLTIP_STYLE } from "@/lib/chart-tooltip"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -195,9 +195,12 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
   const [localUf, setLocalUf] = useState<string>(() => resolveUfSelect(dadosPessoais.uf))
 
   const ativosLiquidosGlobal = useMemo(() => {
-    const rows = (ativos ?? []).filter((a) => (a.tipo ?? "").trim() === "Líquido")
-    const sum = rows.reduce((s, a) => s + (Number(a.valor) || 0), 0)
-    return { sum, temLinha: rows.length > 0 }
+    const { totalAtivosFinanceiros } = computeTotaisAtivos(ativos ?? [])
+    const rows = (ativos ?? []).filter((a) => {
+      const t = normalizeAtivoTipo(a.tipo, a.descricao)
+      return t === "ativo_liquido" || t === "previdencia"
+    })
+    return { sum: totalAtivosFinanceiros, temLinha: rows.length > 0 }
   }, [ativos])
 
   const passivosGlobal = useMemo(() => {

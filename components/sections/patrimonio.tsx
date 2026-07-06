@@ -21,19 +21,21 @@ import {
   DESCRICOES_ATIVOS_POR_TIPO,
   SECOES_ATIVOS,
   SECAO_LIQUIDO,
-  TIPOS_ATIVO,
-  isTipoAtivoLabel,
+  TIPOS_ATIVO_OPCOES,
+  isTipoAtivoSlug,
   DEFAULT_CATEGORIA_PASSIVO,
   normalizeAtivoDescricao,
   normalizePassivo,
+  normalizeAtivoTipo,
   resolveDescricaoAtivo,
   resolvePassivoCategoria,
-  resolveTipoAtivoLabel,
+  resolveTipoAtivoSlug,
   getSaldoDevedorPassivo,
   getParcelaMensalPassivo,
   sumAtivoCategoria,
   INSTITUICOES_FINANCEIRAS,
   isInstituicaoFinanceiraListada,
+  exibeInstituicaoAtivo,
   metaReservaEmergenciaMeses,
   descricaoMetaReservaEmergencia,
   nivelReservaEmergencia,
@@ -52,7 +54,7 @@ import {
   COR_GRAFICO_PREVIDENCIA,
   COR_GRAFICO_INVESTIMENTOS,
   type SecaoAtivoConfig,
-  type TipoAtivoLabel,
+  type TipoAtivoSlug,
 } from "@/lib/patrimonio-utils"
 
 interface PatrimonioProps {
@@ -72,7 +74,7 @@ type LinhaAtivo = {
 type BemDeHerancaSelect = "sim" | "nao"
 
 type AddAtivoForm = {
-  tipo: TipoAtivoLabel
+  tipo: TipoAtivoSlug
   descricao: string
   valor: number
   instituicao: string
@@ -91,8 +93,8 @@ type AddPassivoForm = {
 }
 
 const EMPTY_ATIVO_FORM = (): AddAtivoForm => ({
-  tipo: "Líquido",
-  descricao: DESCRICOES_ATIVOS_POR_TIPO["Líquido"][0],
+  tipo: "ativo_liquido",
+  descricao: DESCRICOES_ATIVOS_POR_TIPO.ativo_liquido[0],
   valor: 0,
   instituicao: "",
   bemDeHeranca: "nao",
@@ -110,7 +112,7 @@ const EMPTY_PASSIVO_FORM = (): AddPassivoForm => ({
 })
 
 type AddModalState =
-  | { kind: "ativo"; tipoInicial?: TipoAtivoLabel }
+  | { kind: "ativo"; tipoInicial?: TipoAtivoSlug }
   | { kind: "passivo" }
   | null
 
@@ -539,6 +541,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
   const [addModal, setAddModal] = useState<AddModalState>(null)
   const [addAtivoForm, setAddAtivoForm] = useState<AddAtivoForm>(() => EMPTY_ATIVO_FORM())
   const [addPassivoForm, setAddPassivoForm] = useState<AddPassivoForm>(() => EMPTY_PASSIVO_FORM())
+  const [exportandoPdf, setExportandoPdf] = useState(false)
 
   const formatCurrency = useCallback(
     (value: number) =>
@@ -565,7 +568,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
           id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           tipo: form.tipo,
           descricao: form.descricao.trim(),
-          instituicao: form.instituicao.trim(),
+          instituicao: exibeInstituicaoAtivo(form.tipo, form.descricao) ? form.instituicao.trim() : "",
           valor: form.valor,
           heranca: bem,
           bemDeHeranca: bem,
@@ -625,7 +628,11 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
     const map = new Map<string, LinhaAtivo[]>()
     for (const secao of SECOES_ATIVOS) {
       const linhas = ativos
-        .filter((a) => (a.tipo ?? "").trim() === secao.tipo && (Number(a.valor) || 0) > 0)
+        .filter(
+          (a) =>
+            normalizeAtivoTipo(a.tipo, a.descricao) === secao.tipo &&
+            (Number(a.valor) || 0) > 0,
+        )
         .map((a) => {
           const desc = normalizeAtivoDescricao(a.descricao)
           const inst = (a.instituicao ?? "").trim()
@@ -644,25 +651,22 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
   }, [ativos])
 
   const ativosLiquidos = patrimonio.ativosLiquidos
+  const totalPrevidencia = patrimonio.previdencia
   const imobilizado = patrimonio.imobilizado
   const participacoes = patrimonio.participacoes
   const totalPassivos = patrimonio.passivos
 
-  const patrimonioTotal = ativosLiquidos + imobilizado + participacoes
+  const patrimonioTotal = ativosLiquidos + totalPrevidencia + imobilizado + participacoes
   const patrimonioLiquidoResumo = patrimonioTotal - totalPassivos
   const idadeAtual = getIdadeAtual()
 
-  const totalPrevidencia = useMemo(
-    () => sumAtivoCategoria(ativos, "Líquido", "Previdência Privada"),
-    [ativos],
-  )
   const totalInvestimentosLiq = useMemo(
     () =>
-      sumAtivoCategoria(ativos, "Líquido", "Ativos Nacionais") +
-      sumAtivoCategoria(ativos, "Líquido", "Ativos Internacionais"),
+      sumAtivoCategoria(ativos, "ativo_liquido", "Ativos Nacionais") +
+      sumAtivoCategoria(ativos, "ativo_liquido", "Ativos Internacionais"),
     [ativos],
   )
-  const totalLiquidosRest = Math.max(0, ativosLiquidos - totalPrevidencia - totalInvestimentosLiq)
+  const totalLiquidosRest = Math.max(0, ativosLiquidos - totalInvestimentosLiq)
   const totalInvestimentos = totalInvestimentosLiq + participacoes
 
   const dataDonutGrupos = useMemo(
@@ -677,7 +681,11 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
 
   const dataDonutLiquidos = useMemo(() => {
     return ativos
-      .filter((a) => (a.tipo ?? "").trim() === "Líquido" && (Number(a.valor) || 0) > 0)
+      .filter(
+        (a) =>
+          normalizeAtivoTipo(a.tipo, a.descricao) === "ativo_liquido" &&
+          (Number(a.valor) || 0) > 0,
+      )
       .map((a, i) => {
         const desc = normalizeAtivoDescricao(a.descricao) || "Outros"
         const inst = (a.instituicao ?? "").trim()
@@ -762,10 +770,12 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
         valor: Number(a.valor) || 0,
       }
     }
-    const filtro = (tipo: string, cats?: string[]) =>
+    const filtro = (tipo: TipoAtivoSlug, cats?: string[]) =>
       ativos
         .filter((a) => {
-          if ((a.tipo ?? "").trim() !== tipo || (Number(a.valor) || 0) <= 0) return false
+          if (normalizeAtivoTipo(a.tipo, a.descricao) !== tipo || (Number(a.valor) || 0) <= 0) {
+            return false
+          }
           if (!cats) return true
           const desc = normalizeAtivoDescricao(a.descricao)
           return cats.includes(desc)
@@ -777,35 +787,35 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
       {
         titulo: "Líquidos",
         cor: COR_GRAFICO_LIQUIDOS,
-        itens: filtro("Líquido", ["Outros"]),
-        subtotal: filtro("Líquido", ["Outros"]).reduce((s, i) => s + i.valor, 0),
+        itens: filtro("ativo_liquido", ["Outros"]),
+        subtotal: filtro("ativo_liquido", ["Outros"]).reduce((s, i) => s + i.valor, 0),
       },
       {
         titulo: "Investimentos",
         cor: COR_GRAFICO_INVESTIMENTOS,
         itens: [
-          ...filtro("Líquido", ["Ativos Nacionais", "Ativos Internacionais"]),
-          ...filtro("Participação Societária"),
+          ...filtro("ativo_liquido", ["Ativos Nacionais", "Ativos Internacionais"]),
+          ...filtro("participacao_societaria"),
         ],
         subtotal: totalInvestimentos,
       },
       {
         titulo: "Previdência",
         cor: COR_GRAFICO_PREVIDENCIA,
-        itens: filtro("Líquido", ["Previdência Privada"]),
+        itens: filtro("previdencia"),
         subtotal: totalPrevidencia,
       },
       {
         titulo: "Imobilizado",
         cor: COR_GRAFICO_IMOBILIZADO,
-        itens: filtro("Imobilizado"),
+        itens: filtro("imobilizado"),
         subtotal: imobilizado,
       },
     ]
   }, [ativos, totalInvestimentos, totalPrevidencia, imobilizado])
 
   const openAddAtivo = (secao: SecaoAtivoConfig) => {
-    const tipo = isTipoAtivoLabel(secao.tipo) ? secao.tipo : "Líquido"
+    const tipo = isTipoAtivoSlug(secao.tipo) ? secao.tipo : "ativo_liquido"
     setAddAtivoForm({
       tipo,
       descricao: DESCRICOES_ATIVOS_POR_TIPO[tipo][0],
@@ -822,12 +832,21 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
   }
 
   const exportarPDF = async () => {
-    const nomCliente = dadosPessoais?.nome || "Cliente"
-    const dataRef = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
-    await exportBalancoPatrimonialPdf("balanco-patrimonial-content", {
-      clientName: nomCliente,
-      referenceDate: dataRef,
-    })
+    if (exportandoPdf) return
+    setExportandoPdf(true)
+    try {
+      const nomCliente = dadosPessoais?.nome || "Cliente"
+      const dataRef = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
+      await exportBalancoPatrimonialPdf("balanco-patrimonial-content", {
+        clientName: nomCliente,
+        referenceDate: dataRef,
+      })
+    } catch (err) {
+      console.error("Erro ao exportar PDF:", err)
+      window.alert("Não foi possível gerar o PDF. Tente novamente.")
+    } finally {
+      setExportandoPdf(false)
+    }
   }
 
   const abrirModalAtivo = () => openAddAtivo(SECAO_LIQUIDO)
@@ -837,22 +856,26 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
 
   const totalSecao = (secao: SecaoAtivoConfig) => {
     if (secao.id === "liquidos") return ativosLiquidos
+    if (secao.id === "previdencia") return totalPrevidencia
     if (secao.id === "imobilizado") return imobilizado
     return participacoes
   }
 
   const totalCorSecao = (secao: SecaoAtivoConfig) => secao.cor
 
-  const onAtivoTipoChange = (tipo: TipoAtivoLabel) => {
+  const onAtivoTipoChange = (tipo: TipoAtivoSlug) => {
+    const descricao = DESCRICOES_ATIVOS_POR_TIPO[tipo][0]
     setAddAtivoForm((prev) => ({
       ...prev,
       tipo,
-      descricao: DESCRICOES_ATIVOS_POR_TIPO[tipo][0],
+      descricao,
+      instituicao: exibeInstituicaoAtivo(tipo, descricao) ? prev.instituicao : "",
     }))
   }
 
-  const ativoTipoSelect = resolveTipoAtivoLabel(addAtivoForm.tipo)
+  const ativoTipoSelect = resolveTipoAtivoSlug(addAtivoForm.tipo, addAtivoForm.descricao)
   const ativoDescricaoSelect = resolveDescricaoAtivo(ativoTipoSelect, addAtivoForm.descricao)
+  const mostrarInstituicaoAtivo = exibeInstituicaoAtivo(ativoTipoSelect, ativoDescricaoSelect)
   const passivoCategoriaSelect = addPassivoForm.categoria || DEFAULT_CATEGORIA_PASSIVO
 
   const saveAddModal = () => {
@@ -940,6 +963,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
             type="button"
             className="no-print"
             onClick={exportarPDF}
+            disabled={exportandoPdf}
             style={{
               background: "#012137",
               border: "none",
@@ -947,7 +971,8 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
               padding: "6px 13px",
               fontSize: 12,
               color: "white",
-              cursor: "pointer",
+              cursor: exportandoPdf ? "wait" : "pointer",
+              opacity: exportandoPdf ? 0.7 : 1,
               display: "flex",
               alignItems: "center",
               gap: 6,
@@ -958,7 +983,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
               <path d="M4 5h5M4 7h5M4 9h3" stroke="white" strokeWidth="1.2" strokeLinecap="round" />
               <path d="M9 11l1.5 1.5L12 11" stroke="#EF9F27" strokeWidth="1.2" strokeLinecap="round" />
             </svg>
-            Exportar PDF
+            {exportandoPdf ? "Gerando PDF…" : "Exportar PDF"}
           </button>
         </div>
       </div>
@@ -1525,15 +1550,15 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                 </label>
                 <Select
                   value={ativoTipoSelect}
-                  onValueChange={(v) => onAtivoTipoChange(v as TipoAtivoLabel)}
+                  onValueChange={(v) => onAtivoTipoChange(v as TipoAtivoSlug)}
                 >
                   <SelectTrigger className="form-card text-foreground">
                     <SelectValue placeholder="Selecione o tipo" />
                   </SelectTrigger>
                   <SelectContent className="form-card">
-                    {TIPOS_ATIVO.map((t) => (
-                      <SelectItem key={t} value={t}>
-                        {t}
+                    {TIPOS_ATIVO_OPCOES.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>
+                        {t.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1546,7 +1571,11 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                 <Select
                   value={ativoDescricaoSelect}
                   onValueChange={(descricao) =>
-                    setAddAtivoForm((prev) => ({ ...prev, descricao }))
+                    setAddAtivoForm((prev) => ({
+                      ...prev,
+                      descricao,
+                      instituicao: exibeInstituicaoAtivo(prev.tipo, descricao) ? prev.instituicao : "",
+                    }))
                   }
                 >
                   <SelectTrigger className="form-card text-foreground">
@@ -1574,11 +1603,13 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                   className="form-card text-foreground tabular-nums"
                 />
               </div>
-              <InstituicaoFinanceiraField
-                label="Instituição"
-                value={addAtivoForm.instituicao}
-                onChange={(instituicao) => setAddAtivoForm({ ...addAtivoForm, instituicao })}
-              />
+              {mostrarInstituicaoAtivo ? (
+                <InstituicaoFinanceiraField
+                  label="Instituição"
+                  value={addAtivoForm.instituicao}
+                  onChange={(instituicao) => setAddAtivoForm({ ...addAtivoForm, instituicao })}
+                />
+              ) : null}
               <div className="space-y-2">
                 <label className="field-label">
                   Bem de Herança
@@ -1714,12 +1745,6 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                   />
                 </div>
               </div>
-              <InstituicaoFinanceiraField
-                value={addPassivoForm.instituicao}
-                onChange={(instituicao) =>
-                  setAddPassivoForm((prev) => ({ ...prev, instituicao }))
-                }
-              />
               <div className="space-y-2">
                 <label className="field-label">
                   Bem vinculado
