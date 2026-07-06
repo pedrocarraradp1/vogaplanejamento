@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts"
-import { Pencil, Plus } from "lucide-react"
+import { Pencil, Plus, Trash2 } from "lucide-react"
 import { usePlano } from "@/lib/plano-context"
 import { exportBalancoPatrimonialPdf } from "@/lib/balanco-pdf-export"
 import {
@@ -113,7 +113,7 @@ const EMPTY_PASSIVO_FORM = (): AddPassivoForm => ({
 
 type AddModalState =
   | { kind: "ativo"; tipoInicial?: TipoAtivoSlug }
-  | { kind: "passivo" }
+  | { kind: "passivo"; editId?: string }
   | null
 
 type SemaphoreLevel = "green" | "yellow" | "red"
@@ -418,6 +418,7 @@ function AtivoListaBarRow({
   formatCurrency,
   valueColor = "#1A1A1A",
   onValueCommit,
+  onRemove,
 }: {
   label: string
   sublabel?: string
@@ -427,6 +428,7 @@ function AtivoListaBarRow({
   formatCurrency: (value: number) => string
   valueColor?: string
   onValueCommit: (valor: number) => void
+  onRemove: () => void
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState("")
@@ -456,24 +458,52 @@ function AtivoListaBarRow({
             </span>
           ) : null}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-          <button
-            type="button"
-            className="pdf-hide"
-            onClick={startEdit}
-            aria-label="Editar valor"
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              color: "#9A9B9B",
-              padding: 4,
-              display: "flex",
-              alignItems: "center",
-            }}
-          >
-            <Pencil size={14} />
-          </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <button
+              type="button"
+              className="pdf-hide"
+              onClick={startEdit}
+              aria-label="Editar valor"
+              title="Editar"
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                color: "#9A9B9B",
+                padding: 4,
+                display: "flex",
+                alignItems: "center",
+              }}
+            >
+              <Pencil size={14} />
+            </button>
+            <button
+              type="button"
+              className="pdf-hide"
+              onClick={onRemove}
+              aria-label="Remover ativo"
+              title="Remover ativo"
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                color: "#C0392B",
+                padding: 4,
+                display: "flex",
+                alignItems: "center",
+                opacity: 0.7,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.opacity = "1"
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.opacity = "0.7"
+              }}
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
           {editing ? (
             <Input
               autoFocus
@@ -534,6 +564,60 @@ function AtivoListaBarRow({
   )
 }
 
+function PassivoRowActions({
+  onEdit,
+  onRemove,
+}: {
+  onEdit: () => void
+  onRemove: () => void
+}) {
+  return (
+    <div className="pdf-hide" style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+      <button
+        type="button"
+        onClick={onEdit}
+        aria-label="Editar passivo"
+        title="Editar"
+        style={{
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          color: "#9A9B9B",
+          padding: 4,
+          display: "flex",
+          alignItems: "center",
+        }}
+      >
+        <Pencil size={14} />
+      </button>
+      <button
+        type="button"
+        onClick={onRemove}
+        aria-label="Remover passivo"
+        title="Remover passivo"
+        style={{
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          color: "#C0392B",
+          padding: 4,
+          display: "flex",
+          alignItems: "center",
+          opacity: 0.7,
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.opacity = "1"
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.opacity = "0.7"
+        }}
+      >
+        <Trash2 size={14} />
+      </button>
+    </div>
+  )
+}
+
 export function Patrimonio({ onNavigate }: PatrimonioProps) {
   const { state, setAtivos, setPassivos, getIdadeAtual } = usePlano()
   const { ativos, passivos, patrimonio, moeda, dadosPessoais } = state
@@ -589,6 +673,14 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
     [ativos, setAtivos],
   )
 
+  const removerAtivo = useCallback(
+    (id: string) => {
+      if (!window.confirm("Remover este ativo?")) return
+      setAtivos(ativos.filter((a) => a.id !== id))
+    },
+    [ativos, setAtivos],
+  )
+
   const appendPassivo = useCallback(
     (form: AddPassivoForm) => {
       const novo = normalizePassivo({
@@ -623,6 +715,28 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
     },
     [passivos, setPassivos],
   )
+
+  const removerPassivo = useCallback(
+    (id: string) => {
+      if (!window.confirm("Remover este passivo?")) return
+      setPassivos(passivos.filter((p) => p.id !== id))
+    },
+    [passivos, setPassivos],
+  )
+
+  const abrirModalEditarPassivo = useCallback((passivo: (typeof passivos)[number]) => {
+    setAddPassivoForm({
+      categoria: resolvePassivoCategoria(passivo),
+      descricao: passivo.descricao?.trim() || resolvePassivoCategoria(passivo),
+      saldoDevedor: getSaldoDevedorPassivo(passivo),
+      parcelaMensal: getParcelaMensalPassivo(passivo),
+      taxaJurosMensal: Number(passivo.taxaJurosMensal) || 0,
+      prazoRestanteMeses: Number(passivo.prazoRestanteMeses) || 0,
+      instituicao: passivo.instituicao ?? "",
+      bemVinculado: passivo.bemVinculado ?? "",
+    })
+    setAddModal({ kind: "passivo", editId: passivo.id })
+  }, [])
 
   const linhasPorSecao = useMemo(() => {
     const map = new Map<string, LinhaAtivo[]>()
@@ -891,7 +1005,27 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
     } else {
       if (!passivoCategoriaSelect || !addPassivoForm.descricao.trim()) return
       if (addPassivoForm.saldoDevedor <= 0) return
-      appendPassivo({ ...addPassivoForm, categoria: passivoCategoriaSelect })
+      if (addModal.editId) {
+        setPassivos(
+          passivos.map((p) =>
+            p.id === addModal.editId
+              ? normalizePassivo({
+                  ...p,
+                  categoria: passivoCategoriaSelect,
+                  descricao: addPassivoForm.descricao.trim() || passivoCategoriaSelect,
+                  saldoDevedor: addPassivoForm.saldoDevedor,
+                  parcelaMensal: addPassivoForm.parcelaMensal,
+                  taxaJurosMensal: addPassivoForm.taxaJurosMensal,
+                  prazoRestanteMeses: addPassivoForm.prazoRestanteMeses,
+                  instituicao: addPassivoForm.instituicao,
+                  bemVinculado: addPassivoForm.bemVinculado,
+                })
+              : p,
+          ),
+        )
+      } else {
+        appendPassivo({ ...addPassivoForm, categoria: passivoCategoriaSelect })
+      }
       setAddPassivoForm(EMPTY_PASSIVO_FORM())
     }
     setAddModal(null)
@@ -1151,15 +1285,21 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                       <p style={{ fontSize: 10, color: "#9A9B9B", margin: "2px 0 0" }}>{subtitulo}</p>
                     ) : null}
                   </div>
-                  <div style={{ textAlign: "right", flexShrink: 0 }}>
-                    <p style={{ fontSize: 12, fontWeight: 500, color: "#C0392B", margin: 0 }}>
-                      {formatCurrency(saldo)}
-                    </p>
-                    {parcela > 0 ? (
-                      <p style={{ fontSize: 10, color: "#9A9B9B", margin: "2px 0 0" }}>
-                        {formatCurrency(parcela)}/mês
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 8, flexShrink: 0 }}>
+                    <div style={{ textAlign: "right" }}>
+                      <p style={{ fontSize: 12, fontWeight: 500, color: "#C0392B", margin: 0 }}>
+                        {formatCurrency(saldo)}
                       </p>
-                    ) : null}
+                      {parcela > 0 ? (
+                        <p style={{ fontSize: 10, color: "#9A9B9B", margin: "2px 0 0" }}>
+                          {formatCurrency(parcela)}/mês
+                        </p>
+                      ) : null}
+                    </div>
+                    <PassivoRowActions
+                      onEdit={() => abrirModalEditarPassivo(passivo)}
+                      onRemove={() => removerPassivo(passivo.id)}
+                    />
                   </div>
                 </li>
               ))}
@@ -1390,9 +1530,15 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                         </p>
                       ) : null}
                     </div>
-                    <span style={{ fontSize: 12, fontWeight: 500, color: "#C0392B", flexShrink: 0 }}>
-                      {formatCurrency(saldo)}
-                    </span>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 8, flexShrink: 0 }}>
+                      <span style={{ fontSize: 12, fontWeight: 500, color: "#C0392B" }}>
+                        {formatCurrency(saldo)}
+                      </span>
+                      <PassivoRowActions
+                        onEdit={() => abrirModalEditarPassivo(passivo)}
+                        onRemove={() => removerPassivo(passivo.id)}
+                      />
+                    </div>
                   </div>
                 ))
               )}
@@ -1516,6 +1662,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                         formatCurrency={formatCurrency}
                         valueColor="#1A1A1A"
                         onValueCommit={(v) => updateAtivoValor(linha.id, v)}
+                        onRemove={() => removerAtivo(linha.id)}
                       />
                     </div>
                   ))}
@@ -1534,7 +1681,11 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
         >
           <DialogHeader>
             <DialogTitle className="text-foreground">
-              {addModal?.kind === "passivo" ? "Adicionar dívida" : "Adicionar Ativo"}
+              {addModal?.kind === "passivo"
+                ? addModal.editId
+                  ? "Editar dívida"
+                  : "Adicionar dívida"
+                : "Adicionar Ativo"}
             </DialogTitle>
             <DialogDescription className="text-muted-foreground">
               {addModal?.kind === "passivo"
