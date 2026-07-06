@@ -15,6 +15,7 @@ import { CenariosInvestimento } from "@/components/ui/cenarios-investimento"
 import { FluxoAnualChart, RendaCarteiraChart } from "@/components/charts/projecao-extra-charts"
 import { buildDadosFluxoGrafico, buildDadosRendaGrafico } from "@/lib/projecao-graficos-dados"
 import { CHART_TOOLTIP_PROPS, donutTooltipFormatter } from "@/lib/chart-tooltip"
+import { usePieVogaProps } from "@/components/charts/use-pie-voga"
 import {
   calcularProjecao,
   calcularKPIs,
@@ -24,15 +25,11 @@ import {
   calcularPassivosPorAnoSeries,
   type ProjecaoAno,
 } from "@/lib/engine"
-import { getSaldoDevedorPassivo, labelTipoAtivo } from "@/lib/patrimonio-utils"
+import { getSaldoDevedorPassivo, labelTipoAtivo, CORES_GRUPOS_ATIVO, VOGA_CHART_COLORS, normalizeAtivoTipo } from "@/lib/patrimonio-utils"
 
 interface DashboardProps {
   onNavigate: (section: string) => void
 }
-
-const CORES_DIST_ATIVOS = [
-  "var(--accent)", "#22C787", "#F5A623", "#8B5CF6", "#EC4899", "#06B6D4",
-]
 
 export function Dashboard({ onNavigate }: DashboardProps) {
   const { state, getPatrimonioLiquido, getPatrimonioTotalConsolidado, getAporteMensal, getIdadeAtual } = usePlano()
@@ -41,6 +38,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
   const [viewMode, setViewMode] = useState<"nominal" | "real">("nominal")
   const [exportando, setExportando] = useState(false)
+  const pieVogaTipo = usePieVogaProps()
+  const pieVogaDescricao = usePieVogaProps()
 
   const saldoInicial = getPatrimonioLiquido()
   const patrimonioTotalConsolidado = getPatrimonioTotalConsolidado()
@@ -206,19 +205,20 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   }, [projecao, viewMode, premissas.inflacao])
 
   const distribuicaoAtivos = useMemo(() => {
-    const acc = new Map<string, number>()
+    const acc = new Map<string, { value: number; fill: string }>()
     for (const a of state.ativos) {
       const k = labelTipoAtivo(a.tipo, a.descricao)
-      acc.set(k, (acc.get(k) ?? 0) + Math.max(0, a.valor ?? 0))
+      const slug = normalizeAtivoTipo(a.tipo, a.descricao)
+      const fill = CORES_GRUPOS_ATIVO[slug] ?? VOGA_CHART_COLORS[0]
+      const v = Math.max(0, a.valor ?? 0)
+      if (v <= 0) continue
+      const cur = acc.get(k)
+      if (cur) cur.value += v
+      else acc.set(k, { value: v, fill })
     }
     return [...acc.entries()]
-      .filter(([, v]) => v > 0)
-      .sort((a, b) => b[1] - a[1])
-      .map(([name, value], i) => ({
-        name,
-        value,
-        fill: CORES_DIST_ATIVOS[i % CORES_DIST_ATIVOS.length],
-      }))
+      .sort((a, b) => b[1].value - a[1].value)
+      .map(([name, { value, fill }]) => ({ name, value, fill }))
   }, [state.ativos])
 
   const distribuicaoPorDescricao = useMemo(() => {
@@ -233,7 +233,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       .map(([name, value], i) => ({
         name,
         value,
-        fill: CORES_DIST_ATIVOS[i % CORES_DIST_ATIVOS.length],
+        fill: VOGA_CHART_COLORS[i % VOGA_CHART_COLORS.length],
       }))
   }, [state.ativos])
 
@@ -434,6 +434,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                         outerRadius={112}
                         paddingAngle={2}
                         labelLine
+                        {...pieVogaTipo}
                         label={(props: {
                           name?: string
                           percent?: number
@@ -500,6 +501,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                         outerRadius={112}
                         paddingAngle={2}
                         labelLine
+                        {...pieVogaDescricao}
                         label={(props: {
                           name?: string
                           percent?: number

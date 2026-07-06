@@ -55,16 +55,16 @@ export const LOCALIZACAO_ATIVO = [
 export type LocalizacaoAtivo = (typeof LOCALIZACAO_ATIVO)[number]["value"]
 
 export const CORES_SUBCATEGORIA: Record<string, string> = {
-  pre_fixado: "#4B759B",
-  pos_fixado: "#5DCAA5",
-  inflacao: "#7F77DD",
-  acoes: "#EF9F27",
-  fundos_imobiliarios: "#E67E22",
+  pre_fixado: "#012137",
+  pos_fixado: "#4B759B",
+  inflacao: "#1A9E6B",
+  acoes: "#C8A44A",
+  fundos_imobiliarios: "#7B4F9E",
   alternativos: "#C0392B",
-  cambial: "#1ABC9C",
-  multimercado: "#8E44AD",
-  exterior: "#2980B9",
-  criptoativos: "#F39C12",
+  cambial: "#2E9BB5",
+  multimercado: "#E07B2A",
+  exterior: "#2C6E49",
+  criptoativos: "#8B5E3C",
 }
 
 export function labelSubcategoriaLiquido(value: string): string {
@@ -287,28 +287,42 @@ export const TOOLTIP_CUSTO_JUROS_PROJETADO =
 export const TOOLTIP_INDICE_ALAVANCAGEM =
   "Cálculo: (Total de Passivos ÷ Ativos Totais) × 100.\n\nEsperado: quanto menor o percentual, menor a dependência de endividamento no patrimônio."
 
-/** Paleta de gráficos — tokens Voga (azuis, verde, cinza). */
-export const CORES_GRAFICO_VOGA = [
+/** Paleta Voga com diferenciação visual — azul dominante + complementares. */
+export const VOGA_CHART_COLORS = [
+  "#012137",
   "#4B759B",
-  "#033252",
-  "#345E7B",
-  "#6B8FB0",
-  "#00954F",
-  "#9A9B9B",
-  "#C8E2F5",
+  "#1A9E6B",
+  "#C8A44A",
+  "#7B4F9E",
+  "#C0392B",
+  "#2E9BB5",
+  "#E07B2A",
+  "#5B8FA8",
+  "#2C6E49",
 ] as const
 
-export const COR_GRAFICO_LIQUIDOS = "#4B759B"
-export const COR_GRAFICO_IMOBILIZADO = "#033252"
-export const COR_GRAFICO_PREVIDENCIA = "#00954F"
-export const COR_GRAFICO_INVESTIMENTOS = "#345E7B"
+/** Cores fixas por grupo de ativo — consistentes em toda a plataforma. */
+export const CORES_GRUPOS_ATIVO: Record<string, string> = {
+  imobilizado: "#012137",
+  previdencia: "#4B759B",
+  ativo_liquido: "#1A9E6B",
+  participacao_societaria: "#C8A44A",
+}
+
+/** @deprecated Use VOGA_CHART_COLORS */
+export const CORES_GRAFICO_VOGA = VOGA_CHART_COLORS
+
+export const COR_GRAFICO_LIQUIDOS = CORES_GRUPOS_ATIVO.ativo_liquido
+export const COR_GRAFICO_IMOBILIZADO = CORES_GRUPOS_ATIVO.imobilizado
+export const COR_GRAFICO_PREVIDENCIA = CORES_GRUPOS_ATIVO.previdencia
+export const COR_GRAFICO_INVESTIMENTOS = CORES_GRUPOS_ATIVO.participacao_societaria
 
 export const SECAO_LIQUIDO = {
   id: "liquidos",
   title: "Ativos Líquidos",
   tipo: "ativo_liquido",
   categorias: DESCRICOES_ATIVOS_POR_TIPO.ativo_liquido,
-  cor: "#4B759B",
+  cor: CORES_GRUPOS_ATIVO.ativo_liquido,
   totalLabel: "Total",
 } as const
 
@@ -317,7 +331,7 @@ export const SECAO_PREVIDENCIA = {
   title: "Previdência",
   tipo: "previdencia",
   categorias: DESCRICOES_ATIVOS_POR_TIPO.previdencia,
-  cor: "#00954F",
+  cor: CORES_GRUPOS_ATIVO.previdencia,
   totalLabel: "Total",
 } as const
 
@@ -326,7 +340,7 @@ export const SECAO_IMOBILIZADO = {
   title: "Imobilizado",
   tipo: "imobilizado",
   categorias: DESCRICOES_ATIVOS_POR_TIPO.imobilizado,
-  cor: "#033252",
+  cor: CORES_GRUPOS_ATIVO.imobilizado,
   totalLabel: "Total",
 } as const
 
@@ -335,7 +349,7 @@ export const SECAO_PARTICIPACOES = {
   title: "Participações Societárias",
   tipo: "participacao_societaria",
   categorias: DESCRICOES_ATIVOS_POR_TIPO.participacao_societaria,
-  cor: "#345E7B",
+  cor: CORES_GRUPOS_ATIVO.participacao_societaria,
   totalLabel: "Total",
 } as const
 

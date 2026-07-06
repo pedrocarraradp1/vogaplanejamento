@@ -49,7 +49,7 @@ import {
   TOOLTIP_TAXA_POUPANCA,
   TOOLTIP_CUSTO_JUROS_PROJETADO,
   TOOLTIP_INDICE_ALAVANCAGEM,
-  CORES_GRAFICO_VOGA,
+  CORES_GRUPOS_ATIVO,
   COR_GRAFICO_LIQUIDOS,
   COR_GRAFICO_IMOBILIZADO,
   COR_GRAFICO_PREVIDENCIA,
@@ -70,6 +70,7 @@ import {
   CHART_TOOLTIP_STYLE,
   formatDonutTooltipPct,
 } from "@/lib/chart-tooltip"
+import { usePieVogaProps } from "@/components/charts/use-pie-voga"
 
 interface PatrimonioProps {
   onNavigate: (section: string) => void
@@ -268,6 +269,7 @@ function DonutComLegenda({
   formatCurrency: (v: number) => string
   footer?: ReactNode
 }) {
+  const pieVoga = usePieVogaProps()
   const ativo = data.filter((d) => d.value > 0)
   const total = ativo.reduce((s, d) => s + d.value, 0)
 
@@ -293,7 +295,7 @@ function DonutComLegenda({
               innerRadius={48}
               outerRadius={72}
               paddingAngle={2}
-              stroke="transparent"
+              {...pieVoga}
             >
               {ativo.map((entry, i) => (
                 <Cell key={`${entry.name}-${i}`} fill={entry.fill} />
@@ -423,7 +425,7 @@ function AtivosLiquidosComposicao({
     if (semSub.length > 0) {
       const valor = semSub.reduce((s, a) => s + (Number(a.valor) || 0), 0)
       if (valor > 0) {
-        slices.push({ name: "Sem subcategoria", value: valor, fill: "#9A9B9B" })
+        slices.push({ name: "Sem subcategoria", value: valor, fill: "#5B8FA8" })
       }
     }
     return slices.sort((a, b) => b.value - a.value)
@@ -1151,10 +1153,14 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
   const dataDonutGrupos = useMemo(
     () =>
       [
-        { name: "Imobilizado", value: imobilizado, fill: "#4B759B" },
-        { name: "Previdência", value: totalPrevidencia, fill: "#5DCAA5" },
-        { name: "Ativos Líquidos", value: ativosLiquidos, fill: "#EF9F27" },
-        { name: "Participações Societárias", value: participacoes, fill: "#7F77DD" },
+        { name: "Imobilizado", value: imobilizado, fill: CORES_GRUPOS_ATIVO.imobilizado },
+        { name: "Previdência", value: totalPrevidencia, fill: CORES_GRUPOS_ATIVO.previdencia },
+        { name: "Ativos Líquidos", value: ativosLiquidos, fill: CORES_GRUPOS_ATIVO.ativo_liquido },
+        {
+          name: "Participações Societárias",
+          value: participacoes,
+          fill: CORES_GRUPOS_ATIVO.participacao_societaria,
+        },
       ].filter((g) => g.value > 0),
     [imobilizado, totalPrevidencia, ativosLiquidos, participacoes],
   )
