@@ -17,7 +17,6 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts"
 import { Pencil, Plus, Trash2 } from "lucide-react"
 import { usePlano } from "@/lib/plano-context"
 import type { Ativo } from "@/lib/plano-context"
-import { downloadBalancoPDF } from "@/components/pdf/BalancoPDF"
 import {
   CATEGORIAS_PASSIVO,
   DESCRICOES_ATIVOS_POR_TIPO,
@@ -436,7 +435,7 @@ function AtivosLiquidosComposicao({
 
   return (
     <>
-      <div className="pdf-hide" style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+      <div className="pdf-hide no-print" style={{ display: "flex", gap: 8, marginBottom: 12 }}>
         <select
           value={filtroLocalizacao}
           onChange={(e) => setFiltroLocalizacao(e.target.value as FiltroLocalizacaoLiquido)}
@@ -815,7 +814,7 @@ function AtivoListaBarRow({
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
             <button
               type="button"
-              className="pdf-hide"
+              className="no-print pdf-hide"
               onClick={startEdit}
               aria-label="Editar valor"
               title="Editar"
@@ -833,7 +832,7 @@ function AtivoListaBarRow({
             </button>
             <button
               type="button"
-              className="pdf-hide"
+              className="no-print pdf-hide"
               onClick={onRemove}
               aria-label="Remover ativo"
               title="Remover ativo"
@@ -925,7 +924,7 @@ function PassivoRowActions({
   onRemove: () => void
 }) {
   return (
-    <div className="pdf-hide" style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+    <div className="no-print pdf-hide" style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
       <button
         type="button"
         onClick={onEdit}
@@ -1311,23 +1310,98 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
     if (exportandoPdf) return
     setExportandoPdf(true)
     try {
-      await downloadBalancoPDF({
-        dadosPessoais,
-        ativos,
-        passivos,
-        moeda,
-        indicadores: {
-          totalAtivos: patrimonioTotal,
-          totalPassivos,
-          pl: patrimonioLiquidoResumo,
-          reservaMeses: reservaEmergenciaMeses,
-          metaReservaMeses: metaReservaEmergencia,
-          comprometimento: comprometimentoRendaPct,
-          liquidez: indiceLiquidez,
-          alavancagem: indiceAlavancagem,
-          totalAtivoLiquido: ativosLiquidos,
-        },
+      const [{ default: html2canvas }, jspdfMod] = await Promise.all([
+        import("html2canvas"),
+        // @ts-ignore
+        import("jspdf/dist/jspdf.es.min.js"),
+      ])
+      // @ts-ignore
+      const jsPDF = (jspdfMod as any).jsPDF ?? (jspdfMod as any).default
+
+      const elementsToHide = document.querySelectorAll(".no-print, .pdf-hide")
+      elementsToHide.forEach((node) => {
+        ;(node as HTMLElement).style.visibility = "hidden"
       })
+
+      const el = document.getElementById("balanco-patrimonial-content")
+      if (!el) {
+        elementsToHide.forEach((node) => {
+          ;(node as HTMLElement).style.visibility = "visible"
+        })
+        return
+      }
+
+      window.scrollTo(0, 0)
+      await new Promise((r) => setTimeout(r, 300))
+
+      const canvas = await html2canvas(el, {
+        scale: 2.5,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: "#ffffff",
+        logging: false,
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: el.scrollWidth,
+        windowHeight: el.scrollHeight,
+        width: el.scrollWidth,
+        height: el.scrollHeight,
+      })
+
+      elementsToHide.forEach((node) => {
+        ;(node as HTMLElement).style.visibility = "visible"
+      })
+
+      const imgData = canvas.toDataURL("image/png", 1.0)
+      const imgW = canvas.width
+      const imgH = canvas.height
+
+      const pdfW = 210
+      const pdfH = (imgH * pdfW) / imgW
+
+      const pdf = new jsPDF({
+        orientation: pdfH > pdfW ? "portrait" : "landscape",
+        unit: "mm",
+        format: [pdfW, pdfH],
+      })
+
+      pdf.setFillColor(1, 33, 55)
+      pdf.rect(0, 0, pdfW, 14, "F")
+      pdf.setFillColor(75, 117, 155)
+      pdf.rect(0, 14, pdfW, 1.5, "F")
+
+      pdf.setTextColor(255, 255, 255)
+      pdf.setFontSize(11)
+      pdf.setFont("helvetica", "bold")
+      pdf.text("BALANÇO PATRIMONIAL", 10, 7)
+
+      const nomCliente = dadosPessoais?.nome || "Cliente"
+      const dataRef = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
+
+      pdf.setFontSize(7)
+      pdf.setFont("helvetica", "normal")
+      pdf.setTextColor(200, 226, 245)
+      pdf.text(`${nomCliente}  ·  ${dataRef}  ·  Confidencial`, 10, 11.5)
+      pdf.text("Voga | BTG Pactual", pdfW - 10, 11.5, { align: "right" })
+
+      const topOffset = 16
+      const contentW = pdfW - 10
+      const imgFinalW = contentW
+      const imgFinalH = (imgH * imgFinalW) / imgW
+
+      pdf.addImage(imgData, "PNG", 5, topOffset, imgFinalW, imgFinalH)
+
+      const footerY = topOffset + imgFinalH + 3
+      pdf.setFillColor(1, 33, 55)
+      pdf.rect(0, footerY, pdfW, 8, "F")
+      pdf.setFontSize(6.5)
+      pdf.setTextColor(155, 196, 226)
+      pdf.text("Voga | BTG Pactual | Confidencial", 10, footerY + 5)
+      pdf.text(`${nomCliente} — Balanço Patrimonial`, pdfW / 2, footerY + 5, { align: "center" })
+      pdf.text(dataRef, pdfW - 10, footerY + 5, { align: "right" })
+
+      const nomeArq = `Balanco_Patrimonial_${nomCliente.replace(/\s+/g, "_")}_${new Date().getFullYear()}.pdf`
+      pdf.save(nomeArq)
     } catch (err) {
       console.error("Erro ao exportar PDF:", err)
       window.alert("Não foi possível gerar o PDF. Tente novamente.")
@@ -1415,7 +1489,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
   }
 
   return (
-    <div id="balanco-patrimonial-content">
+    <div id="balanco-patrimonial-content" style={{ background: "#ffffff" }}>
       {/* 1. Cabeçalho (somente tela) */}
       <div className="pdf-hide">
       <p style={{ fontSize: 11, color: "var(--accent)", marginBottom: 8 }}>Cadastro</p>
