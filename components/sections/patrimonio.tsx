@@ -744,16 +744,14 @@ function BalancoAtivoAccordion({
                       </div>
                     ) : null}
                   </div>
-                  <div
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 500,
-                      color: "#1a1a1a",
-                      textAlign: "right",
-                      flexShrink: 0,
-                    }}
-                  >
-                    {formatCurrency(Number(ativo.valor) || 0)}
+                  <div style={{ textAlign: "right", flexShrink: 0 }}>
+                    <div style={{ fontSize: 11, fontWeight: 500, color: "#1a1a1a" }}>
+                      {formatCurrency(Number(ativo.valor) || 0)}
+                    </div>
+                    <div style={{ fontSize: 10, color: "#9A9B9B" }}>
+                      {pct(Number(ativo.valor) || 0)}% dos{" "}
+                      {variant === "liquido" ? "líquidos" : "participações"}
+                    </div>
                   </div>
                 </div>
               )
@@ -1001,11 +999,14 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
   const appendAtivo = useCallback(
     (form: AddAtivoForm) => {
       const isLiquido = form.tipo === "ativo_liquido"
+      const isImobilizado = form.tipo === "imobilizado"
       if (form.valor <= 0) return
       if (!isLiquido && !form.descricao.trim()) return
       const bem = form.bemDeHeranca === "sim"
       const instituicao =
         isLiquido || exibeInstituicaoAtivo(form.tipo, form.descricao) ? form.instituicao.trim() : ""
+      const observacao =
+        (isLiquido || isImobilizado) && form.observacao.trim() ? form.observacao.trim() : undefined
       setAtivos(
         ativos.concat({
           id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -1016,7 +1017,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
           instituicao,
           subcategoria: isLiquido ? form.subcategoria : undefined,
           localizacao: isLiquido ? form.localizacao : undefined,
-          observacao: isLiquido && form.observacao.trim() ? form.observacao.trim() : undefined,
+          observacao,
           valor: form.valor,
           heranca: bem,
           bemDeHeranca: bem,
@@ -1225,14 +1226,16 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
     const mapItem = (a: (typeof ativos)[number]) => {
       const desc = normalizeAtivoDescricao(a.descricao)
       const inst = (a.instituicao ?? "").trim()
-      const tooltip = [inst, a.heranca || a.bemDeHeranca ? "Bem de herança" : null]
-        .filter(Boolean)
-        .join(" · ")
+      const obs = (a.observacao ?? "").trim()
+      const tipo = normalizeAtivoTipo(a.tipo, a.descricao)
+      const herancaNote = a.heranca || a.bemDeHeranca ? "Bem de herança" : null
+      const infoTooltip =
+        tipo === "imobilizado" ? obs : [inst, herancaNote].filter(Boolean).join(" · ")
       return {
         id: a.id,
         nome: desc || "Sem descrição",
         subtitulo: inst || undefined,
-        tooltip,
+        infoTooltip,
         valor: Number(a.valor) || 0,
       }
     }
@@ -1345,13 +1348,15 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
       instituicao: tipo === "ativo_liquido" || exibeInstituicaoAtivo(tipo, descricao) ? prev.instituicao : "",
       subcategoria: tipo === "ativo_liquido" ? SUBCATEGORIAS_LIQUIDO[0].value : prev.subcategoria,
       localizacao: tipo === "ativo_liquido" ? "nacional" : prev.localizacao,
-      observacao: tipo === "ativo_liquido" ? prev.observacao : "",
+      observacao:
+        tipo === "ativo_liquido" || tipo === "imobilizado" ? prev.observacao : "",
     }))
   }
 
   const ativoTipoSelect = resolveTipoAtivoSlug(addAtivoForm.tipo, addAtivoForm.descricao)
   const ativoDescricaoSelect = resolveDescricaoAtivo(ativoTipoSelect, addAtivoForm.descricao)
   const isFormAtivoLiquido = ativoTipoSelect === "ativo_liquido"
+  const isFormImobilizado = ativoTipoSelect === "imobilizado"
   const mostrarInstituicaoAtivo =
     !isFormAtivoLiquido && exibeInstituicaoAtivo(ativoTipoSelect, ativoDescricaoSelect)
   const passivoCategoriaSelect = addPassivoForm.categoria || DEFAULT_CATEGORIA_PASSIVO
@@ -1836,7 +1841,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                         <div style={{ minWidth: 0, flex: 1 }}>
                           <div style={{ display: "flex", alignItems: "center" }}>
                             <span style={{ fontSize: 12, color: "#1A1A1A" }}>{item.nome}</span>
-                            <InfoTooltip text={item.tooltip} />
+                            <InfoTooltip text={item.infoTooltip} />
                           </div>
                           {item.subtitulo ? (
                             <p style={{ fontSize: 10, color: "#9A9B9B", margin: "2px 0 0" }}>
@@ -2252,6 +2257,20 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                   Se &quot;Sim&quot;, o valor entra na base de cálculo do ITCMD na aba Sucessório.
                 </p>
               </div>
+              {isFormImobilizado ? (
+                <div className="space-y-2">
+                  <label className="field-label">Observação (opcional)</label>
+                  <Textarea
+                    value={addAtivoForm.observacao}
+                    onChange={(e) =>
+                      setAddAtivoForm({ ...addAtivoForm, observacao: e.target.value })
+                    }
+                    placeholder="Ex: Apartamento 120m² — Rua das Flores 123, São Paulo. Matrícula 45.678."
+                    className="form-card text-foreground min-h-[72px] resize-y"
+                    rows={3}
+                  />
+                </div>
+              ) : null}
             </div>
           ) : addModal?.kind === "passivo" ? (
             <div className="space-y-4 py-4">
