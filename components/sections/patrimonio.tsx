@@ -578,8 +578,124 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
     setAddModal({ kind: "passivo" })
   }
 
-  const exportarPDF = () => {
-    if (typeof window !== "undefined") window.print()
+  const exportarPDF = async () => {
+    const [{ default: html2canvas }, jspdfMod] = await Promise.all([
+      import("html2canvas"),
+      // @ts-expect-error — bundle ESM do jsPDF para evitar import node no SSR
+      import("jspdf/dist/jspdf.es.min.js"),
+    ])
+    const jsPDF = (jspdfMod as { jsPDF?: typeof import("jspdf").jsPDF; default?: typeof import("jspdf").jsPDF }).jsPDF
+      ?? (jspdfMod as { default: typeof import("jspdf").jsPDF }).default
+
+    const el = document.getElementById("balanco-patrimonial-content")
+    if (!el) return
+
+    const botoes = el.querySelectorAll(".no-print")
+    botoes.forEach((b) => {
+      ;(b as HTMLElement).style.visibility = "hidden"
+    })
+
+    const canvas = await html2canvas(el, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: "#ffffff",
+      logging: false,
+    })
+
+    botoes.forEach((b) => {
+      ;(b as HTMLElement).style.visibility = "visible"
+    })
+
+    const imgData = canvas.toDataURL("image/png")
+    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" })
+
+    const pageW = pdf.internal.pageSize.getWidth()
+    const pageH = pdf.internal.pageSize.getHeight()
+    const margin = 12
+    const contentW = pageW - margin * 2
+    const imgH = (canvas.height * contentW) / canvas.width
+
+    pdf.setFillColor(1, 33, 55)
+    pdf.rect(0, 0, pageW, 52, "F")
+
+    pdf.setFillColor(75, 117, 155)
+    pdf.rect(0, 52, pageW, 1.5, "F")
+
+    pdf.setTextColor(255, 255, 255)
+    pdf.setFontSize(20)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("BALANÇO PATRIMONIAL", margin, 22)
+
+    pdf.setFontSize(10)
+    pdf.setFont("helvetica", "normal")
+    pdf.setTextColor(200, 226, 245)
+    pdf.text("Demonstrativo completo de ativos e passivos", margin, 30)
+
+    const nomCliente = dadosPessoais?.nome || "Cliente"
+    const dataRef = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
+    pdf.setFontSize(9)
+    pdf.setTextColor(160, 190, 220)
+    pdf.text(`Cliente: ${nomCliente}`, margin, 40)
+    pdf.text(`Data de referência: ${dataRef}`, margin, 46)
+    pdf.text("Classificação: Confidencial", pageW - margin - 40, 46)
+
+    pdf.setFontSize(8)
+    pdf.setTextColor(100, 130, 160)
+    pdf.text("Voga | BTG Pactual | Planejamento Financeiro Pessoal", margin, 52 - 3)
+
+    let yPos = 58
+    const pageContentH = pageH - yPos - 12
+
+    if (imgH <= pageContentH) {
+      pdf.addImage(imgData, "PNG", margin, yPos, contentW, imgH)
+    } else {
+      let remainingH = imgH
+      let sourceY = 0
+      let firstPage = true
+
+      while (remainingH > 0) {
+        const sliceH = firstPage ? pageContentH : pageH - 20
+        const actualSlice = Math.min(sliceH, remainingH)
+        const canvasSliceH = (actualSlice * canvas.width) / contentW
+
+        const sliceCanvas = document.createElement("canvas")
+        sliceCanvas.width = canvas.width
+        sliceCanvas.height = canvasSliceH
+        const ctx = sliceCanvas.getContext("2d")!
+        ctx.drawImage(canvas, 0, sourceY, canvas.width, canvasSliceH, 0, 0, canvas.width, canvasSliceH)
+
+        const sliceImg = sliceCanvas.toDataURL("image/png")
+        const startY = firstPage ? yPos : 12
+        pdf.addImage(sliceImg, "PNG", margin, startY, contentW, actualSlice)
+
+        pdf.setFillColor(1, 33, 55)
+        pdf.rect(0, pageH - 8, pageW, 8, "F")
+        pdf.setFontSize(7)
+        pdf.setTextColor(160, 190, 220)
+        pdf.text("Voga | BTG Pactual | Confidencial", margin, pageH - 3)
+        pdf.text(`${nomCliente} — Balanço Patrimonial`, pageW / 2, pageH - 3, { align: "center" })
+        pdf.text(dataRef, pageW - margin, pageH - 3, { align: "right" })
+
+        sourceY += canvasSliceH
+        remainingH -= actualSlice
+
+        if (remainingH > 0) {
+          pdf.addPage()
+          firstPage = false
+        }
+      }
+    }
+
+    pdf.setFillColor(1, 33, 55)
+    pdf.rect(0, pageH - 8, pageW, 8, "F")
+    pdf.setFontSize(7)
+    pdf.setTextColor(160, 190, 220)
+    pdf.text("Voga | BTG Pactual | Confidencial", margin, pageH - 3)
+    pdf.text(`${nomCliente} — Balanço Patrimonial`, pageW / 2, pageH - 3, { align: "center" })
+    pdf.text(dataRef, pageW - margin, pageH - 3, { align: "right" })
+
+    const nomeArq = `Balanco_Patrimonial_${nomCliente.replace(/\s+/g, "_")}_${new Date().getFullYear()}.pdf`
+    pdf.save(nomeArq)
   }
 
   const abrirModalAtivo = () => openAddAtivo(SECAO_LIQUIDO)
@@ -619,7 +735,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
   }
 
   return (
-    <div>
+    <div id="balanco-patrimonial-content">
       {/* 1. Cabeçalho */}
       <p style={{ fontSize: 11, color: "var(--accent)", marginBottom: 8 }}>Cadastro</p>
       <div
@@ -643,6 +759,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <button
             type="button"
+            className="no-print"
             onClick={abrirModalPassivo}
             style={{
               background: "none",
@@ -661,6 +778,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
           </button>
           <button
             type="button"
+            className="no-print"
             onClick={abrirModalAtivo}
             style={{
               background: "var(--accent)",
@@ -679,6 +797,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
           </button>
           <button
             type="button"
+            className="no-print"
             onClick={exportarPDF}
             style={{
               background: "#012137",
@@ -865,6 +984,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
           )}
           <button
             type="button"
+            className="no-print"
             onClick={abrirModalPassivo}
             style={{
               marginTop: 12,
@@ -1392,6 +1512,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
 
       {/* 8. Navegação */}
       <div
+        className="no-print"
         style={{
           display: "flex",
           justifyContent: "flex-end",
