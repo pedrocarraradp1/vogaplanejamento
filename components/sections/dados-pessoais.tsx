@@ -55,6 +55,13 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
     return parseFloat(numbers) / 100 || 0
   }
 
+  const cardStyle = {
+    background: "var(--surface)",
+    borderRadius: 8,
+    padding: "20px 24px",
+    marginBottom: 16,
+  } as const
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -73,8 +80,8 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
         <span className="field-label">
           Identificação
         </span>
-        <div className="form-card">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div style={cardStyle}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Nome Completo */}
             <div className="space-y-2">
               <Label 
@@ -333,13 +340,13 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
           <span className="field-label">
             Filhos
           </span>
-          <div className="form-card p-6 space-y-6">
+          <div style={cardStyle} className="space-y-6">
             {(dadosPessoais.filhos ?? []).map((filho, idx) => (
               <div key={idx} className="space-y-4">
                 <p className="field-label">
                   Filho {idx + 1}
                 </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label
                       htmlFor={`filho-nome-${idx}`}
@@ -390,8 +397,8 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
         <span className="field-label">
           Fluxo de Caixa Mensal
         </span>
-        <div className="form-card p-6 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div style={cardStyle}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Renda Mensal */}
             <div className="space-y-2">
               <Label 
@@ -409,7 +416,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
                   value={formatCurrency(dadosPessoais.renda)}
                   onChange={(e) => setDadosPessoais({ renda: parseCurrency(e.target.value) })}
                   placeholder="0,00"
-                  className="h-11 pl-10 form-card text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
+                  className="form-input pl-10 placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30 tabular-nums"
                 />
               </div>
             </div>
@@ -431,14 +438,13 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
                   value={formatCurrency(dadosPessoais.despesa)}
                   onChange={(e) => setDadosPessoais({ despesa: parseCurrency(e.target.value) })}
                   placeholder="0,00"
-                  className="h-11 pl-10 form-card text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
+                  className="form-input pl-10 placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30 tabular-nums"
                 />
               </div>
             </div>
           </div>
 
-          {/* Barra de Capacidade de Poupança */}
-          <div className="savings-badge w-full">
+          <div className="savings-badge w-full" style={{ marginTop: 12 }}>
             <p className="text-white text-sm font-medium">
               Capacidade de poupança mensal:{" "}
               <span className="font-semibold">
