@@ -17,7 +17,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts"
 import { Pencil, Plus, Trash2 } from "lucide-react"
 import { usePlano } from "@/lib/plano-context"
 import type { Ativo } from "@/lib/plano-context"
-import { exportBalancoPatrimonialPdf } from "@/lib/balanco-pdf-export"
+import { downloadBalancoPDF } from "@/components/pdf/BalancoPDF"
 import {
   CATEGORIAS_PASSIVO,
   DESCRICOES_ATIVOS_POR_TIPO,
@@ -1311,11 +1311,22 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
     if (exportandoPdf) return
     setExportandoPdf(true)
     try {
-      const nomCliente = dadosPessoais?.nome || "Cliente"
-      const dataRef = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
-      await exportBalancoPatrimonialPdf("balanco-patrimonial-content", {
-        clientName: nomCliente,
-        referenceDate: dataRef,
+      await downloadBalancoPDF({
+        dadosPessoais,
+        ativos,
+        passivos,
+        moeda,
+        indicadores: {
+          totalAtivos: patrimonioTotal,
+          totalPassivos,
+          pl: patrimonioLiquidoResumo,
+          reservaMeses: reservaEmergenciaMeses,
+          metaReservaMeses: metaReservaEmergencia,
+          comprometimento: comprometimentoRendaPct,
+          liquidez: indiceLiquidez,
+          alavancagem: indiceAlavancagem,
+          totalAtivoLiquido: ativosLiquidos,
+        },
       })
     } catch (err) {
       console.error("Erro ao exportar PDF:", err)
