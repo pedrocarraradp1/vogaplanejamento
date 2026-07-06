@@ -49,8 +49,11 @@ export interface Ativo {
   /** imobilizado | ativo_liquido | participacao_societaria | previdencia */
   tipo: string
   descricao: string
-  instituicao: string
+  instituicao?: string
   valor: number
+  subcategoria?: string
+  localizacao?: string
+  observacao?: string
   /**
    * Bem de herança — quando true, o valor entra na base de cálculo do ITCMD (aba Sucessório).
    * Persistido como `heranca` no estado; `bemDeHeranca` é alias de leitura/escrita na UI.

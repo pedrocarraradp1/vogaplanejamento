@@ -31,6 +31,54 @@ export const DESCRICOES_ATIVOS_POR_TIPO: Record<TipoAtivoSlug, string[]> = {
   previdencia: ["Previdência Privada", "Outros"],
 }
 
+export const SUBCATEGORIAS_LIQUIDO = [
+  { value: "pre_fixado", label: "Pré-fixado" },
+  { value: "pos_fixado", label: "Pós-fixado (CDI / Selic)" },
+  { value: "inflacao", label: "Inflação (IPCA+ / IGPM+)" },
+  { value: "acoes", label: "Ações" },
+  { value: "fundos_imobiliarios", label: "Fundos Imobiliários (FII)" },
+  { value: "alternativos", label: "Alternativos (Hedge / Private)" },
+  { value: "cambial", label: "Cambial / Dólar" },
+  { value: "multimercado", label: "Multimercado" },
+  { value: "exterior", label: "Fundo de Exterior / ETF" },
+  { value: "criptoativos", label: "Criptoativos" },
+] as const
+
+export type SubcategoriaLiquido = (typeof SUBCATEGORIAS_LIQUIDO)[number]["value"]
+
+export const LOCALIZACAO_ATIVO = [
+  { value: "nacional", label: "Nacional" },
+  { value: "internacional", label: "Internacional" },
+  { value: "outros", label: "Outros" },
+] as const
+
+export type LocalizacaoAtivo = (typeof LOCALIZACAO_ATIVO)[number]["value"]
+
+export const CORES_SUBCATEGORIA: Record<string, string> = {
+  pre_fixado: "#4B759B",
+  pos_fixado: "#5DCAA5",
+  inflacao: "#7F77DD",
+  acoes: "#EF9F27",
+  fundos_imobiliarios: "#E67E22",
+  alternativos: "#C0392B",
+  cambial: "#1ABC9C",
+  multimercado: "#8E44AD",
+  exterior: "#2980B9",
+  criptoativos: "#F39C12",
+}
+
+export function labelSubcategoriaLiquido(value: string): string {
+  return SUBCATEGORIAS_LIQUIDO.find((s) => s.value === value)?.label ?? value
+}
+
+export function labelLocalizacaoAtivo(value: string): string {
+  return LOCALIZACAO_ATIVO.find((l) => l.value === value)?.label ?? value
+}
+
+export function isAtivoLiquidoTipo(tipo: string, descricao?: string): boolean {
+  return normalizeAtivoTipo(tipo, descricao) === "ativo_liquido"
+}
+
 const LEGACY_TIPO_ATIVO: Record<string, TipoAtivoSlug> = {
   Líquido: "ativo_liquido",
   Imobilizado: "imobilizado",
@@ -82,8 +130,17 @@ export function labelTipoAtivo(tipo: string, descricao?: string): string {
 
 export function normalizeAtivoRecord(ativo: Ativo): Ativo {
   const tipo = normalizeAtivoTipo(ativo.tipo, ativo.descricao)
-  const descricao = resolveDescricaoAtivo(tipo, ativo.descricao)
-  return { ...ativo, tipo, descricao }
+  const subcategoria = (ativo.subcategoria ?? "").trim() || undefined
+  const localizacao = (ativo.localizacao ?? "").trim() || undefined
+  const observacao = (ativo.observacao ?? "").trim() || undefined
+  const instituicao = (ativo.instituicao ?? "").trim()
+  let descricao = (ativo.descricao ?? "").trim()
+  if (tipo === "ativo_liquido" && subcategoria) {
+    descricao = labelSubcategoriaLiquido(subcategoria)
+  } else {
+    descricao = resolveDescricaoAtivo(tipo, descricao)
+  }
+  return { ...ativo, tipo, descricao, subcategoria, localizacao, observacao, instituicao }
 }
 
 export function resolveDescricaoAtivo(
@@ -128,12 +185,9 @@ export function isInstituicaoFinanceiraListada(value: string): value is Institui
   return (INSTITUICOES_FINANCEIRAS as readonly string[]).includes(value)
 }
 
-/** Instituição financeira só se aplica a ativos líquidos do tipo Ativos Nacionais. */
-export function exibeInstituicaoAtivo(tipo: string, descricao: string): boolean {
-  return (
-    normalizeAtivoTipo(tipo, descricao) === "ativo_liquido" &&
-    normalizeAtivoDescricao(descricao) === "Ativos Nacionais"
-  )
+/** Instituição no modal de ativos líquidos. */
+export function exibeInstituicaoAtivo(tipo: string, descricao?: string): boolean {
+  return isAtivoLiquidoTipo(tipo, descricao)
 }
 
 /** Empresário(a) ou profissão customizada que indique empresário. */

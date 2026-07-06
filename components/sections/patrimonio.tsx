@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo, type ReactNode } from "react"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
@@ -15,6 +16,7 @@ import {
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts"
 import { Pencil, Plus, Trash2 } from "lucide-react"
 import { usePlano } from "@/lib/plano-context"
+import type { Ativo } from "@/lib/plano-context"
 import { exportBalancoPatrimonialPdf } from "@/lib/balanco-pdf-export"
 import {
   CATEGORIAS_PASSIVO,
@@ -53,6 +55,13 @@ import {
   COR_GRAFICO_IMOBILIZADO,
   COR_GRAFICO_PREVIDENCIA,
   COR_GRAFICO_INVESTIMENTOS,
+  SUBCATEGORIAS_LIQUIDO,
+  LOCALIZACAO_ATIVO,
+  CORES_SUBCATEGORIA,
+  labelSubcategoriaLiquido,
+  labelLocalizacaoAtivo,
+  type LocalizacaoAtivo,
+  type SubcategoriaLiquido,
   type SecaoAtivoConfig,
   type TipoAtivoSlug,
 } from "@/lib/patrimonio-utils"
@@ -78,8 +87,13 @@ type AddAtivoForm = {
   descricao: string
   valor: number
   instituicao: string
+  subcategoria: SubcategoriaLiquido
+  localizacao: LocalizacaoAtivo
+  observacao: string
   bemDeHeranca: BemDeHerancaSelect
 }
+
+type FiltroLocalizacaoLiquido = "todos" | LocalizacaoAtivo
 
 type AddPassivoForm = {
   categoria: string
@@ -97,6 +111,9 @@ const EMPTY_ATIVO_FORM = (): AddAtivoForm => ({
   descricao: DESCRICOES_ATIVOS_POR_TIPO.ativo_liquido[0],
   valor: 0,
   instituicao: "",
+  subcategoria: SUBCATEGORIAS_LIQUIDO[0].value,
+  localizacao: "nacional",
+  observacao: "",
   bemDeHeranca: "nao",
 })
 
@@ -319,6 +336,131 @@ function DonutComLegenda({
       </ul>
       {footer}
     </div>
+  )
+}
+
+function AtivosLiquidosComposicao({
+  ativos,
+  totalAtivoLiquido,
+  formatCurrency,
+}: {
+  ativos: Ativo[]
+  totalAtivoLiquido: number
+  formatCurrency: (v: number) => string
+}) {
+  const [filtroLocalizacao, setFiltroLocalizacao] = useState<FiltroLocalizacaoLiquido>("todos")
+  const [filtroInstituicao, setFiltroInstituicao] = useState<string>("todas")
+
+  const ativosLiquidos = useMemo(
+    () =>
+      ativos.filter(
+        (a) =>
+          normalizeAtivoTipo(a.tipo, a.descricao) === "ativo_liquido" &&
+          (Number(a.valor) || 0) > 0,
+      ),
+    [ativos],
+  )
+
+  const instituicoesUnicas = useMemo(() => {
+    const set = new Set<string>()
+    for (const a of ativosLiquidos) {
+      const inst = (a.instituicao ?? "").trim()
+      if (inst) set.add(inst)
+    }
+    return ["todas", ...Array.from(set).sort()]
+  }, [ativosLiquidos])
+
+  const ativosFiltrados = useMemo(() => {
+    return ativosLiquidos.filter((a) => {
+      const passaLoc =
+        filtroLocalizacao === "todos" || (a.localizacao ?? "") === filtroLocalizacao
+      const passaInst =
+        filtroInstituicao === "todas" || (a.instituicao ?? "").trim() === filtroInstituicao
+      return passaLoc && passaInst
+    })
+  }, [ativosLiquidos, filtroLocalizacao, filtroInstituicao])
+
+  const totalFiltrado = useMemo(
+    () => ativosFiltrados.reduce((s, a) => s + (Number(a.valor) || 0), 0),
+    [ativosFiltrados],
+  )
+
+  const dataDonut = useMemo(() => {
+    const slices: DonutSlice[] = []
+    for (const sub of SUBCATEGORIAS_LIQUIDO) {
+      const valor = ativosFiltrados
+        .filter((a) => (a.subcategoria ?? "") === sub.value)
+        .reduce((s, a) => s + (Number(a.valor) || 0), 0)
+      if (valor <= 0) continue
+      slices.push({
+        name: sub.label,
+        value: valor,
+        fill: CORES_SUBCATEGORIA[sub.value] ?? "#9A9B9B",
+      })
+    }
+    const semSub = ativosFiltrados.filter((a) => !(a.subcategoria ?? "").trim())
+    if (semSub.length > 0) {
+      const valor = semSub.reduce((s, a) => s + (Number(a.valor) || 0), 0)
+      if (valor > 0) {
+        slices.push({ name: "Sem subcategoria", value: valor, fill: "#9A9B9B" })
+      }
+    }
+    return slices.sort((a, b) => b.value - a.value)
+  }, [ativosFiltrados])
+
+  const pctDoTotal =
+    totalAtivoLiquido > 0 ? ((totalFiltrado / totalAtivoLiquido) * 100).toFixed(1) : "0.0"
+
+  return (
+    <>
+      <div className="pdf-hide" style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+        <select
+          value={filtroLocalizacao}
+          onChange={(e) => setFiltroLocalizacao(e.target.value as FiltroLocalizacaoLiquido)}
+          style={{
+            flex: 1,
+            height: 30,
+            background: "var(--input-bg)",
+            border: "none",
+            borderRadius: 4,
+            padding: "0 8px",
+            fontSize: 12,
+            color: "#1a1a1a",
+          }}
+        >
+          <option value="todos">Nacional + Internacional</option>
+          {LOCALIZACAO_ATIVO.map((loc) => (
+            <option key={loc.value} value={loc.value}>
+              {loc.label}
+            </option>
+          ))}
+        </select>
+        <select
+          value={filtroInstituicao}
+          onChange={(e) => setFiltroInstituicao(e.target.value)}
+          style={{
+            flex: 1,
+            height: 30,
+            background: "var(--input-bg)",
+            border: "none",
+            borderRadius: 4,
+            padding: "0 8px",
+            fontSize: 12,
+            color: "#1a1a1a",
+          }}
+        >
+          {instituicoesUnicas.map((inst) => (
+            <option key={inst} value={inst}>
+              {inst === "todas" ? "Todas as instituições" : inst}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div style={{ fontSize: 11, color: "#9A9B9B", marginBottom: 8 }}>
+        {ativosFiltrados.length} ativos · {formatCurrency(totalFiltrado)} · {pctDoTotal}% do total
+      </div>
+      <DonutComLegenda data={dataDonut} formatCurrency={formatCurrency} />
+    </>
   )
 }
 
@@ -645,14 +787,23 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
 
   const appendAtivo = useCallback(
     (form: AddAtivoForm) => {
-      if (form.valor <= 0 || !form.descricao.trim()) return
+      const isLiquido = form.tipo === "ativo_liquido"
+      if (form.valor <= 0) return
+      if (!isLiquido && !form.descricao.trim()) return
       const bem = form.bemDeHeranca === "sim"
+      const instituicao =
+        isLiquido || exibeInstituicaoAtivo(form.tipo, form.descricao) ? form.instituicao.trim() : ""
       setAtivos(
         ativos.concat({
           id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           tipo: form.tipo,
-          descricao: form.descricao.trim(),
-          instituicao: exibeInstituicaoAtivo(form.tipo, form.descricao) ? form.instituicao.trim() : "",
+          descricao: isLiquido
+            ? labelSubcategoriaLiquido(form.subcategoria)
+            : form.descricao.trim(),
+          instituicao,
+          subcategoria: isLiquido ? form.subcategoria : undefined,
+          localizacao: isLiquido ? form.localizacao : undefined,
+          observacao: isLiquido && form.observacao.trim() ? form.observacao.trim() : undefined,
           valor: form.valor,
           heranca: bem,
           bemDeHeranca: bem,
@@ -750,10 +901,22 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
         .map((a) => {
           const desc = normalizeAtivoDescricao(a.descricao)
           const inst = (a.instituicao ?? "").trim()
+          const isLiquido = normalizeAtivoTipo(a.tipo, a.descricao) === "ativo_liquido"
+          const label =
+            isLiquido && (a.subcategoria ?? "").trim()
+              ? labelSubcategoriaLiquido(a.subcategoria!)
+              : desc || "Sem descrição"
+          const sublabelParts = [
+            isLiquido && (a.localizacao ?? "").trim()
+              ? labelLocalizacaoAtivo(a.localizacao!)
+              : null,
+            inst || null,
+            isLiquido && (a.observacao ?? "").trim() ? a.observacao!.trim() : null,
+          ].filter(Boolean)
           return {
             id: a.id,
-            label: desc || "Sem descrição",
-            sublabel: inst || undefined,
+            label,
+            sublabel: sublabelParts.length > 0 ? sublabelParts.join(" · ") : undefined,
             valor: Number(a.valor) || 0,
             bemDeHeranca: a.heranca === true || a.bemDeHeranca === true,
           }
@@ -792,26 +955,6 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
     ],
     [imobilizado, totalPrevidencia, totalInvestimentos, totalLiquidosRest],
   )
-
-  const dataDonutLiquidos = useMemo(() => {
-    return ativos
-      .filter(
-        (a) =>
-          normalizeAtivoTipo(a.tipo, a.descricao) === "ativo_liquido" &&
-          (Number(a.valor) || 0) > 0,
-      )
-      .map((a, i) => {
-        const desc = normalizeAtivoDescricao(a.descricao) || "Outros"
-        const inst = (a.instituicao ?? "").trim()
-        const name = inst ? `${desc} · ${inst}` : desc
-        return {
-          name,
-          value: Number(a.valor) || 0,
-          fill: CORES_GRAFICO_VOGA[i % CORES_GRAFICO_VOGA.length],
-        }
-      })
-      .sort((a, b) => b.value - a.value)
-  }, [ativos])
 
   const barrasGrupos = dataDonutGrupos
 
@@ -931,11 +1074,9 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
   const openAddAtivo = (secao: SecaoAtivoConfig) => {
     const tipo = isTipoAtivoSlug(secao.tipo) ? secao.tipo : "ativo_liquido"
     setAddAtivoForm({
+      ...EMPTY_ATIVO_FORM(),
       tipo,
       descricao: DESCRICOES_ATIVOS_POR_TIPO[tipo][0],
-      valor: 0,
-      instituicao: "",
-      bemDeHeranca: "nao",
     })
     setAddModal({ kind: "ativo", tipoInicial: tipo })
   }
@@ -983,23 +1124,31 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
       ...prev,
       tipo,
       descricao,
-      instituicao: exibeInstituicaoAtivo(tipo, descricao) ? prev.instituicao : "",
+      instituicao: tipo === "ativo_liquido" || exibeInstituicaoAtivo(tipo, descricao) ? prev.instituicao : "",
+      subcategoria: tipo === "ativo_liquido" ? SUBCATEGORIAS_LIQUIDO[0].value : prev.subcategoria,
+      localizacao: tipo === "ativo_liquido" ? "nacional" : prev.localizacao,
+      observacao: tipo === "ativo_liquido" ? prev.observacao : "",
     }))
   }
 
   const ativoTipoSelect = resolveTipoAtivoSlug(addAtivoForm.tipo, addAtivoForm.descricao)
   const ativoDescricaoSelect = resolveDescricaoAtivo(ativoTipoSelect, addAtivoForm.descricao)
-  const mostrarInstituicaoAtivo = exibeInstituicaoAtivo(ativoTipoSelect, ativoDescricaoSelect)
+  const isFormAtivoLiquido = ativoTipoSelect === "ativo_liquido"
+  const mostrarInstituicaoAtivo =
+    !isFormAtivoLiquido && exibeInstituicaoAtivo(ativoTipoSelect, ativoDescricaoSelect)
   const passivoCategoriaSelect = addPassivoForm.categoria || DEFAULT_CATEGORIA_PASSIVO
 
   const saveAddModal = () => {
     if (!addModal) return
     if (addModal.kind === "ativo") {
-      if (!ativoDescricaoSelect || addAtivoForm.valor <= 0) return
+      if (addAtivoForm.valor <= 0) return
+      if (!isFormAtivoLiquido && !ativoDescricaoSelect) return
       appendAtivo({
         ...addAtivoForm,
         tipo: ativoTipoSelect,
-        descricao: ativoDescricaoSelect,
+        descricao: isFormAtivoLiquido
+          ? labelSubcategoriaLiquido(addAtivoForm.subcategoria)
+          : ativoDescricaoSelect,
       })
       setAddAtivoForm(EMPTY_ATIVO_FORM())
     } else {
@@ -1186,7 +1335,11 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
           <p style={{ fontSize: 13, color: "#1A1A1A", marginBottom: 12, fontWeight: 500 }}>
             Composição dos ativos líquidos
           </p>
-          <DonutComLegenda data={dataDonutLiquidos} formatCurrency={formatCurrency} />
+          <AtivosLiquidosComposicao
+            ativos={ativos}
+            totalAtivoLiquido={ativosLiquidos}
+            formatCurrency={formatCurrency}
+          />
           <p style={{ fontSize: 11, color: "#9A9B9B", marginTop: 12 }}>
             <LabelComTooltip label="Reserva de emergência" tooltip={tooltipReserva} />
             {": "}
@@ -1696,9 +1849,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
           {addModal?.kind === "ativo" ? (
             <div className="space-y-4 py-2">
               <div className="space-y-2">
-                <label className="field-label">
-                  Tipo
-                </label>
+                <label className="field-label">Tipo</label>
                 <Select
                   value={ativoTipoSelect}
                   onValueChange={(v) => onAtivoTipoChange(v as TipoAtivoSlug)}
@@ -1715,56 +1866,140 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                   </SelectContent>
                 </Select>
               </div>
+              {isFormAtivoLiquido ? (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <label className="field-label">Subcategoria</label>
+                      <Select
+                        value={addAtivoForm.subcategoria}
+                        onValueChange={(subcategoria) =>
+                          setAddAtivoForm((prev) => ({
+                            ...prev,
+                            subcategoria: subcategoria as SubcategoriaLiquido,
+                          }))
+                        }
+                      >
+                        <SelectTrigger className="form-card text-foreground">
+                          <SelectValue placeholder="Selecione" />
+                        </SelectTrigger>
+                        <SelectContent className="form-card">
+                          {SUBCATEGORIAS_LIQUIDO.map((s) => (
+                            <SelectItem key={s.value} value={s.value}>
+                              {s.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="field-label">Localização</label>
+                      <Select
+                        value={addAtivoForm.localizacao}
+                        onValueChange={(localizacao) =>
+                          setAddAtivoForm((prev) => ({
+                            ...prev,
+                            localizacao: localizacao as LocalizacaoAtivo,
+                          }))
+                        }
+                      >
+                        <SelectTrigger className="form-card text-foreground">
+                          <SelectValue placeholder="Selecione" />
+                        </SelectTrigger>
+                        <SelectContent className="form-card">
+                          {LOCALIZACAO_ATIVO.map((loc) => (
+                            <SelectItem key={loc.value} value={loc.value}>
+                              {loc.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="field-label">Instituição</label>
+                      <Input
+                        value={addAtivoForm.instituicao}
+                        onChange={(e) =>
+                          setAddAtivoForm({ ...addAtivoForm, instituicao: e.target.value })
+                        }
+                        placeholder="Ex.: XP, BTG, Itaú..."
+                        className="form-card text-foreground"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="field-label">Valor (R$)</label>
+                      <Input
+                        value={addAtivoForm.valor ? formatCurrency(addAtivoForm.valor) : ""}
+                        onChange={(e) =>
+                          setAddAtivoForm({ ...addAtivoForm, valor: parseCurrency(e.target.value) })
+                        }
+                        placeholder="0"
+                        className="form-card text-foreground tabular-nums"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="field-label">Descrição / observação</label>
+                    <Textarea
+                      value={addAtivoForm.observacao}
+                      onChange={(e) =>
+                        setAddAtivoForm({ ...addAtivoForm, observacao: e.target.value })
+                      }
+                      placeholder="Detalhes opcionais sobre o ativo"
+                      className="form-card text-foreground min-h-[72px]"
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <label className="field-label">Descrição</label>
+                    <Select
+                      value={ativoDescricaoSelect}
+                      onValueChange={(descricao) =>
+                        setAddAtivoForm((prev) => ({
+                          ...prev,
+                          descricao,
+                          instituicao: exibeInstituicaoAtivo(prev.tipo, descricao)
+                            ? prev.instituicao
+                            : "",
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="form-card text-foreground">
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                      <SelectContent className="form-card">
+                        {DESCRICOES_ATIVOS_POR_TIPO[ativoTipoSelect].map((d) => (
+                          <SelectItem key={d} value={d}>
+                            {d}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="field-label">Valor (R$)</label>
+                    <Input
+                      value={addAtivoForm.valor ? formatCurrency(addAtivoForm.valor) : ""}
+                      onChange={(e) =>
+                        setAddAtivoForm({ ...addAtivoForm, valor: parseCurrency(e.target.value) })
+                      }
+                      placeholder="0"
+                      className="form-card text-foreground tabular-nums"
+                    />
+                  </div>
+                  {mostrarInstituicaoAtivo ? (
+                    <InstituicaoFinanceiraField
+                      label="Instituição"
+                      value={addAtivoForm.instituicao}
+                      onChange={(instituicao) => setAddAtivoForm({ ...addAtivoForm, instituicao })}
+                    />
+                  ) : null}
+                </>
+              )}
               <div className="space-y-2">
-                <label className="field-label">
-                  Descrição
-                </label>
-                <Select
-                  value={ativoDescricaoSelect}
-                  onValueChange={(descricao) =>
-                    setAddAtivoForm((prev) => ({
-                      ...prev,
-                      descricao,
-                      instituicao: exibeInstituicaoAtivo(prev.tipo, descricao) ? prev.instituicao : "",
-                    }))
-                  }
-                >
-                  <SelectTrigger className="form-card text-foreground">
-                    <SelectValue placeholder="Selecione" />
-                  </SelectTrigger>
-                  <SelectContent className="form-card">
-                    {DESCRICOES_ATIVOS_POR_TIPO[ativoTipoSelect].map((d) => (
-                      <SelectItem key={d} value={d}>
-                        {d}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <label className="field-label">
-                  Valor (R$)
-                </label>
-                <Input
-                  value={addAtivoForm.valor ? formatCurrency(addAtivoForm.valor) : ""}
-                  onChange={(e) =>
-                    setAddAtivoForm({ ...addAtivoForm, valor: parseCurrency(e.target.value) })
-                  }
-                  placeholder="0"
-                  className="form-card text-foreground tabular-nums"
-                />
-              </div>
-              {mostrarInstituicaoAtivo ? (
-                <InstituicaoFinanceiraField
-                  label="Instituição"
-                  value={addAtivoForm.instituicao}
-                  onChange={(instituicao) => setAddAtivoForm({ ...addAtivoForm, instituicao })}
-                />
-              ) : null}
-              <div className="space-y-2">
-                <label className="field-label">
-                  Bem de Herança
-                </label>
+                <label className="field-label">Bem de Herança</label>
                 <Select
                   value={addAtivoForm.bemDeHeranca}
                   onValueChange={(v) =>
@@ -1919,7 +2154,8 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
               onClick={saveAddModal}
               disabled={
                 addModal?.kind === "ativo"
-                  ? addAtivoForm.valor <= 0 || !addAtivoForm.descricao
+                  ? addAtivoForm.valor <= 0 ||
+                    (!isFormAtivoLiquido && !addAtivoForm.descricao)
                   : addModal?.kind === "passivo"
                     ? !passivoCategoriaSelect ||
                       !addPassivoForm.descricao.trim() ||
