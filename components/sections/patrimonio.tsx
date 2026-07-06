@@ -34,7 +34,6 @@ import {
   resolveTipoAtivoSlug,
   getSaldoDevedorPassivo,
   getParcelaMensalPassivo,
-  sumAtivoCategoria,
   INSTITUICOES_FINANCEIRAS,
   isInstituicaoFinanceiraListada,
   exibeInstituicaoAtivo,
@@ -573,6 +572,196 @@ function nivelPoupanca(pct: number): SemaphoreLevel {
   return "red"
 }
 
+function agruparAtivosPorInstituicao(ativosLista: Ativo[]): Record<string, Ativo[]> {
+  return ativosLista.reduce(
+    (acc, ativo) => {
+      const inst = (ativo.instituicao ?? "").trim() || "Sem instituição"
+      if (!acc[inst]) acc[inst] = []
+      acc[inst].push(ativo)
+      return acc
+    },
+    {} as Record<string, Ativo[]>,
+  )
+}
+
+function BalancoAtivoAccordion({
+  ativosLista,
+  totalSecao,
+  variant,
+  formatCurrency,
+}: {
+  ativosLista: Ativo[]
+  totalSecao: number
+  variant: "liquido" | "participacao"
+  formatCurrency: (v: number) => string
+}) {
+  const [expandidas, setExpandidas] = useState<Set<string>>(new Set())
+
+  const porInstituicao = useMemo(() => agruparAtivosPorInstituicao(ativosLista), [ativosLista])
+
+  const instituicoesOrdenadas = useMemo(
+    () =>
+      Object.keys(porInstituicao).sort((a, b) => {
+        const totalA = porInstituicao[a].reduce((s, at) => s + (Number(at.valor) || 0), 0)
+        const totalB = porInstituicao[b].reduce((s, at) => s + (Number(at.valor) || 0), 0)
+        return totalB - totalA
+      }),
+    [porInstituicao],
+  )
+
+  const toggleInstituicao = (inst: string) => {
+    setExpandidas((prev) => {
+      const next = new Set(prev)
+      if (next.has(inst)) next.delete(inst)
+      else next.add(inst)
+      return next
+    })
+  }
+
+  const totalInst = (inst: string) =>
+    porInstituicao[inst].reduce((s, a) => s + (Number(a.valor) || 0), 0)
+
+  const pct = (valor: number) =>
+    totalSecao > 0 ? ((valor / totalSecao) * 100).toFixed(1) : "0.0"
+
+  const labelAtivo = (ativo: Ativo) => {
+    if (variant === "liquido") {
+      const sub = (ativo.subcategoria ?? "").trim()
+      if (sub) return labelSubcategoriaLiquido(sub)
+      return normalizeAtivoDescricao(ativo.descricao) || "Sem descrição"
+    }
+    return normalizeAtivoDescricao(ativo.descricao) || "Sem descrição"
+  }
+
+  const labelLocalizacao = (loc: string) => {
+    if (loc === "nacional") return "Nacional"
+    if (loc === "internacional") return "Internacional"
+    return "Outros"
+  }
+
+  return (
+    <>
+      {instituicoesOrdenadas.map((inst) => (
+        <div key={inst}>
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => toggleInstituicao(inst)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault()
+                toggleInstituicao(inst)
+              }
+            }}
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              padding: "7px 14px 7px 22px",
+              borderBottom: "0.5px solid #F0F2F5",
+              cursor: "pointer",
+              background: expandidas.has(inst) ? "#F0F5FA" : "white",
+              transition: "background .12s",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+              <span
+                style={{
+                  fontSize: 10,
+                  color: "#9A9B9B",
+                  transform: expandidas.has(inst) ? "rotate(90deg)" : "rotate(0deg)",
+                  transition: "transform .15s",
+                  display: "inline-block",
+                  flexShrink: 0,
+                }}
+              >
+                ›
+              </span>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 12, color: "#1a1a1a", fontWeight: 500 }}>{inst}</div>
+                <div style={{ fontSize: 10, color: "#9A9B9B" }}>
+                  {porInstituicao[inst].length}{" "}
+                  {porInstituicao[inst].length === 1 ? "ativo" : "ativos"}
+                </div>
+              </div>
+            </div>
+            <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 500, color: "#1a1a1a" }}>
+                {formatCurrency(totalInst(inst))}
+              </div>
+              <div style={{ fontSize: 10, color: "#9A9B9B" }}>
+                {pct(totalInst(inst))}% dos {variant === "liquido" ? "líquidos" : "participações"}
+              </div>
+            </div>
+          </div>
+
+          {expandidas.has(inst) &&
+            porInstituicao[inst].map((ativo) => {
+              const loc = (ativo.localizacao ?? "").trim()
+              const obs = (ativo.observacao ?? "").trim()
+              return (
+                <div
+                  key={ativo.id}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "6px 14px 6px 42px",
+                    borderBottom: "0.5px solid #F0F2F5",
+                    background: "#FAFBFC",
+                    gap: 8,
+                  }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 11, color: "#1a1a1a" }}>{labelAtivo(ativo)}</div>
+                    {(variant === "liquido" && (loc || obs)) || (variant === "participacao" && obs) ? (
+                      <div
+                        style={{
+                          fontSize: 10,
+                          color: "#9A9B9B",
+                          display: "flex",
+                          gap: 8,
+                          flexWrap: "wrap",
+                          marginTop: 2,
+                        }}
+                      >
+                        {variant === "liquido" && loc ? (
+                          <span
+                            style={{
+                              background: loc === "nacional" ? "#E6F0F8" : "#E8F5EE",
+                              color: loc === "nacional" ? "#4B759B" : "#00954F",
+                              padding: "1px 6px",
+                              borderRadius: 10,
+                              fontSize: 9,
+                            }}
+                          >
+                            {labelLocalizacao(loc)}
+                          </span>
+                        ) : null}
+                        {obs ? <span>{obs}</span> : null}
+                      </div>
+                    ) : null}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 500,
+                      color: "#1a1a1a",
+                      textAlign: "right",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {formatCurrency(Number(ativo.valor) || 0)}
+                  </div>
+                </div>
+              )
+            })}
+        </div>
+      ))}
+    </>
+  )
+}
+
 function AtivoListaBarRow({
   label,
   sublabel,
@@ -959,15 +1148,6 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
   const patrimonioLiquidoResumo = patrimonioTotal - totalPassivos
   const idadeAtual = getIdadeAtual()
 
-  const totalInvestimentosLiq = useMemo(
-    () =>
-      sumAtivoCategoria(ativos, "ativo_liquido", "Ativos Nacionais") +
-      sumAtivoCategoria(ativos, "ativo_liquido", "Ativos Internacionais"),
-    [ativos],
-  )
-  const totalLiquidosRest = Math.max(0, ativosLiquidos - totalInvestimentosLiq)
-  const totalInvestimentos = totalInvestimentosLiq + participacoes
-
   const dataDonutGrupos = useMemo(
     () =>
       [
@@ -1050,49 +1230,58 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
         valor: Number(a.valor) || 0,
       }
     }
-    const filtro = (tipo: TipoAtivoSlug, cats?: string[]) =>
+    const filtroSimples = (tipo: TipoAtivoSlug) =>
       ativos
-        .filter((a) => {
-          if (normalizeAtivoTipo(a.tipo, a.descricao) !== tipo || (Number(a.valor) || 0) <= 0) {
-            return false
-          }
-          if (!cats) return true
-          const desc = normalizeAtivoDescricao(a.descricao)
-          return cats.includes(desc)
-        })
+        .filter(
+          (a) =>
+            normalizeAtivoTipo(a.tipo, a.descricao) === tipo && (Number(a.valor) || 0) > 0,
+        )
         .map(mapItem)
         .sort((a, b) => b.valor - a.valor)
 
+    const ativosLiquidosLista = ativos.filter(
+      (a) =>
+        normalizeAtivoTipo(a.tipo, a.descricao) === "ativo_liquido" && (Number(a.valor) || 0) > 0,
+    )
+    const participacoesLista = ativos.filter(
+      (a) =>
+        normalizeAtivoTipo(a.tipo, a.descricao) === "participacao_societaria" &&
+        (Number(a.valor) || 0) > 0,
+    )
+
     return [
       {
-        titulo: "Líquidos",
+        tipo: "accordion" as const,
+        titulo: "Ativos Líquidos",
         cor: COR_GRAFICO_LIQUIDOS,
-        itens: filtro("ativo_liquido", ["Outros"]),
-        subtotal: filtro("ativo_liquido", ["Outros"]).reduce((s, i) => s + i.valor, 0),
+        subtotal: ativosLiquidos,
+        ativos: ativosLiquidosLista,
+        accordionVariant: "liquido" as const,
       },
       {
-        titulo: "Investimentos",
+        tipo: "accordion" as const,
+        titulo: "Participações Societárias",
         cor: COR_GRAFICO_INVESTIMENTOS,
-        itens: [
-          ...filtro("ativo_liquido", ["Ativos Nacionais", "Ativos Internacionais"]),
-          ...filtro("participacao_societaria"),
-        ],
-        subtotal: totalInvestimentos,
+        subtotal: participacoes,
+        ativos: participacoesLista,
+        accordionVariant: "participacao" as const,
       },
       {
+        tipo: "simple" as const,
         titulo: "Previdência",
         cor: COR_GRAFICO_PREVIDENCIA,
-        itens: filtro("previdencia"),
+        itens: filtroSimples("previdencia"),
         subtotal: totalPrevidencia,
       },
       {
+        tipo: "simple" as const,
         titulo: "Imobilizado",
         cor: COR_GRAFICO_IMOBILIZADO,
-        itens: filtro("imobilizado"),
+        itens: filtroSimples("imobilizado"),
         subtotal: imobilizado,
       },
     ]
-  }, [ativos, totalInvestimentos, totalPrevidencia, imobilizado])
+  }, [ativos, ativosLiquidos, participacoes, totalPrevidencia, imobilizado])
 
   const openAddAtivo = (secao: SecaoAtivoConfig) => {
     const tipo = isTipoAtivoSlug(secao.tipo) ? secao.tipo : "ativo_liquido"
@@ -1608,7 +1797,20 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                     <span>{grupo.titulo}</span>
                     <span>{formatCurrency(grupo.subtotal)}</span>
                   </div>
-                  {grupo.itens.length === 0 ? (
+                  {grupo.tipo === "accordion" ? (
+                    grupo.ativos.length === 0 ? (
+                      <p style={{ fontSize: 11, color: "#9A9B9B", padding: "8px 12px", margin: 0 }}>
+                        Nenhum item
+                      </p>
+                    ) : (
+                      <BalancoAtivoAccordion
+                        ativosLista={grupo.ativos}
+                        totalSecao={grupo.subtotal}
+                        variant={grupo.accordionVariant}
+                        formatCurrency={formatCurrency}
+                      />
+                    )
+                  ) : grupo.itens.length === 0 ? (
                     <p style={{ fontSize: 11, color: "#9A9B9B", padding: "8px 12px", margin: 0 }}>
                       Nenhum item
                     </p>
