@@ -67,6 +67,25 @@ export type CategoriaPassivo = (typeof CATEGORIAS_PASSIVO)[number]
 
 export const DEFAULT_CATEGORIA_PASSIVO = CATEGORIAS_PASSIVO[0]
 
+export const INSTITUICOES_FINANCEIRAS = [
+  "XP",
+  "BTG",
+  "Itaú",
+  "BB",
+  "Genial",
+  "Santander",
+  "BRB",
+  "Bradesco",
+  "Nubank",
+  "Outros",
+] as const
+
+export type InstituicaoFinanceira = (typeof INSTITUICOES_FINANCEIRAS)[number]
+
+export function isInstituicaoFinanceiraListada(value: string): value is InstituicaoFinanceira {
+  return (INSTITUICOES_FINANCEIRAS as readonly string[]).includes(value)
+}
+
 export const SECAO_LIQUIDO = {
   id: "liquidos",
   title: "Ativos Líquidos",

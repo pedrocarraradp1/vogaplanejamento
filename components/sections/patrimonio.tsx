@@ -13,11 +13,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts"
-import { ArrowLeft, ArrowRight } from "lucide-react"
+import { Pencil, Plus } from "lucide-react"
 import { usePlano } from "@/lib/plano-context"
 import {
   CATEGORIAS_PASSIVO,
   DESCRICOES_ATIVOS_POR_TIPO,
+  SECOES_ATIVOS,
   SECAO_LIQUIDO,
   TIPOS_ATIVO,
   isTipoAtivoLabel,
@@ -30,6 +31,8 @@ import {
   getSaldoDevedorPassivo,
   getParcelaMensalPassivo,
   sumAtivoCategoria,
+  INSTITUICOES_FINANCEIRAS,
+  isInstituicaoFinanceiraListada,
   type SecaoAtivoConfig,
   type TipoAtivoLabel,
 } from "@/lib/patrimonio-utils"
@@ -39,6 +42,14 @@ interface PatrimonioProps {
 }
 
 type DonutSlice = { name: string; value: number; fill: string }
+
+type LinhaAtivo = {
+  id: string
+  label: string
+  sublabel?: string
+  valor: number
+  bemDeHeranca: boolean
+}
 
 type BemDeHerancaSelect = "sim" | "nao"
 
@@ -91,6 +102,53 @@ const SEMAPHORE_BORDER: Record<SemaphoreLevel, string> = {
   green: "#00954F",
   yellow: "#EF9F27",
   red: "#C0392B",
+}
+
+function InstituicaoFinanceiraField({
+  value,
+  onChange,
+  label = "Instituição",
+}: {
+  value: string
+  onChange: (value: string) => void
+  label?: string
+}) {
+  const trimmed = value.trim()
+  const isListada = isInstituicaoFinanceiraListada(trimmed)
+  const selectValue = isListada ? trimmed : trimmed ? "Outros" : ""
+  const outroValor = isListada ? "" : trimmed
+
+  return (
+    <div className="space-y-2">
+      <label className="field-label">{label}</label>
+      <Select
+        value={selectValue || undefined}
+        onValueChange={(v) => {
+          if (v === "Outros") onChange("")
+          else onChange(v)
+        }}
+      >
+        <SelectTrigger className="form-input text-foreground">
+          <SelectValue placeholder="Selecione" />
+        </SelectTrigger>
+        <SelectContent className="form-card">
+          {INSTITUICOES_FINANCEIRAS.map((inst) => (
+            <SelectItem key={inst} value={inst}>
+              {inst}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {selectValue === "Outros" && (
+        <Input
+          value={outroValor}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Informe a instituição"
+          className="form-input text-foreground"
+        />
+      )}
+    </div>
+  )
 }
 
 function InfoTooltip({ text }: { text: string }) {
@@ -319,6 +377,130 @@ function nivelPoupanca(pct: number): SemaphoreLevel {
   return "red"
 }
 
+function AtivoListaBarRow({
+  label,
+  sublabel,
+  valor,
+  totalSecao,
+  barColor,
+  formatCurrency,
+  valueColor = "#1A1A1A",
+  onValueCommit,
+}: {
+  label: string
+  sublabel?: string
+  valor: number
+  totalSecao: number
+  barColor: string
+  formatCurrency: (value: number) => string
+  valueColor?: string
+  onValueCommit: (valor: number) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState("")
+
+  const pct = totalSecao > 0 ? Math.min(100, Math.round((valor / totalSecao) * 100)) : 0
+  const barWidth = totalSecao > 0 ? (valor / totalSecao) * 100 : 0
+
+  const startEdit = () => {
+    setDraft(valor > 0 ? formatCurrency(valor) : "")
+    setEditing(true)
+  }
+
+  const commit = (raw: string) => {
+    const cleaned = raw.replace(/[^\d]/g, "")
+    onValueCommit(parseInt(cleaned, 10) || 0)
+    setEditing(false)
+  }
+
+  return (
+    <div style={{ padding: "12px 0", borderBottom: "1px solid var(--border)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ fontSize: 13, color: "#1A1A1A", display: "block" }}>{label}</span>
+          {sublabel ? (
+            <span style={{ fontSize: 11, color: "#9A9B9B", display: "block", marginTop: 2 }}>
+              {sublabel}
+            </span>
+          ) : null}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+          <button
+            type="button"
+            onClick={startEdit}
+            aria-label="Editar valor"
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: "#9A9B9B",
+              padding: 4,
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
+            <Pencil size={14} />
+          </button>
+          {editing ? (
+            <Input
+              autoFocus
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={() => commit(draft)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commit(draft)
+                if (e.key === "Escape") setEditing(false)
+              }}
+              className="form-input text-right tabular-nums"
+              style={{ width: 120, height: 32 }}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={startEdit}
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                fontSize: 13,
+                fontWeight: 600,
+                color: valueColor,
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {formatCurrency(valor)}
+            </button>
+          )}
+        </div>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div
+          style={{
+            flex: 1,
+            height: 6,
+            borderRadius: 3,
+            background: "#D9D9D9",
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              height: "100%",
+              width: `${barWidth}%`,
+              background: barColor,
+              borderRadius: 3,
+              transition: "width 0.3s ease",
+            }}
+          />
+        </div>
+        <span style={{ fontSize: 11, color: "#9A9B9B", width: 32, textAlign: "right", flexShrink: 0 }}>
+          {pct}%
+        </span>
+      </div>
+    </div>
+  )
+}
+
 export function Patrimonio({ onNavigate }: PatrimonioProps) {
   const { state, setAtivos, setPassivos, getIdadeAtual } = usePlano()
   const { ativos, passivos, patrimonio, moeda, dadosPessoais } = state
@@ -407,6 +589,28 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
     },
     [passivos, setPassivos],
   )
+
+  const linhasPorSecao = useMemo(() => {
+    const map = new Map<string, LinhaAtivo[]>()
+    for (const secao of SECOES_ATIVOS) {
+      const linhas = ativos
+        .filter((a) => (a.tipo ?? "").trim() === secao.tipo && (Number(a.valor) || 0) > 0)
+        .map((a) => {
+          const desc = normalizeAtivoDescricao(a.descricao)
+          const inst = (a.instituicao ?? "").trim()
+          return {
+            id: a.id,
+            label: desc || "Sem descrição",
+            sublabel: inst || undefined,
+            valor: Number(a.valor) || 0,
+            bemDeHeranca: a.heranca === true || a.bemDeHeranca === true,
+          }
+        })
+        .sort((a, b) => b.valor - a.valor)
+      map.set(secao.id, linhas)
+    }
+    return map
+  }, [ativos])
 
   const ativosLiquidos = patrimonio.ativosLiquidos
   const imobilizado = patrimonio.imobilizado
@@ -702,6 +906,18 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
   const abrirModalPassivo = openAddPassivo
   const voltarSecao = () => onNavigate("dados-pessoais")
   const proximaSecao = () => onNavigate("objetivos")
+
+  const totalSecao = (secao: SecaoAtivoConfig) => {
+    if (secao.id === "liquidos") return ativosLiquidos
+    if (secao.id === "imobilizado") return imobilizado
+    return participacoes
+  }
+
+  const totalCorSecao = (secao: SecaoAtivoConfig) => {
+    if (secao.id === "liquidos") return "var(--accent)"
+    if (secao.id === "imobilizado") return "#00954F"
+    return "#7C3AED"
+  }
 
   const onAtivoTipoChange = (tipo: TipoAtivoLabel) => {
     setAddAtivoForm((prev) => ({
@@ -1240,6 +1456,91 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
         </div>
       </div>
 
+      {/* 7. Lista de ativos por seção */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 16 }}>
+        {SECOES_ATIVOS.map((secao) => {
+          const linhas = linhasPorSecao.get(secao.id) ?? []
+          const total = totalSecao(secao)
+          const totalCor = totalCorSecao(secao)
+
+          return (
+            <div
+              key={secao.id}
+              style={{
+                background: "var(--surface)",
+                borderRadius: 8,
+                padding: "20px 24px",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: 12,
+                  marginBottom: linhas.length > 0 ? 4 : 0,
+                  paddingBottom: 12,
+                  borderBottom: "1px solid var(--border)",
+                }}
+              >
+                <h3 style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", margin: 0 }}>
+                  {secao.title}
+                </h3>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    className="btn-add-dashed no-print"
+                    onClick={() => openAddAtivo(secao)}
+                  >
+                    <Plus size={14} />
+                    Adicionar
+                  </button>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: totalCor, fontVariantNumeric: "tabular-nums" }}>
+                    {secao.totalLabel} {formatCurrency(total)}
+                  </span>
+                </div>
+              </div>
+
+              {linhas.length === 0 ? (
+                <p
+                  style={{
+                    fontSize: 13,
+                    color: "#9A9B9B",
+                    textAlign: "center",
+                    padding: "28px 0",
+                    margin: 0,
+                  }}
+                >
+                  Nenhum ativo cadastrado
+                </p>
+              ) : (
+                <div>
+                  {linhas.map((linha) => (
+                    <div key={linha.id}>
+                      <AtivoListaBarRow
+                        label={linha.label}
+                        sublabel={
+                          [linha.sublabel, linha.bemDeHeranca ? "Bem de herança" : null]
+                            .filter(Boolean)
+                            .join(" · ") || undefined
+                        }
+                        valor={linha.valor}
+                        totalSecao={total}
+                        barColor={secao.cor}
+                        formatCurrency={formatCurrency}
+                        valueColor="#1A1A1A"
+                        onValueCommit={(v) => updateAtivoValor(linha.id, v)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
       <Dialog open={addModal != null} onOpenChange={(open) => !open && setAddModal(null)}>
         <DialogContent
           className={`form-card rounded-2xl max-h-[90vh] overflow-y-auto ${
@@ -1313,17 +1614,11 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                   className="form-card text-foreground tabular-nums"
                 />
               </div>
-              <div className="space-y-2">
-                <label className="field-label">
-                  Instituição / Localização
-                </label>
-                <Input
-                  value={addAtivoForm.instituicao}
-                  onChange={(e) => setAddAtivoForm({ ...addAtivoForm, instituicao: e.target.value })}
-                  placeholder="Ex: BTG Pactual, Brasília-DF..."
-                  className="form-card text-foreground"
-                />
-              </div>
+              <InstituicaoFinanceiraField
+                label="Instituição"
+                value={addAtivoForm.instituicao}
+                onChange={(instituicao) => setAddAtivoForm({ ...addAtivoForm, instituicao })}
+              />
               <div className="space-y-2">
                 <label className="field-label">
                   Bem de Herança
@@ -1459,19 +1754,12 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                   />
                 </div>
               </div>
-              <div className="space-y-2">
-                <label className="field-label">
-                  Instituição
-                </label>
-                <Input
-                  value={addPassivoForm.instituicao}
-                  onChange={(e) =>
-                    setAddPassivoForm((prev) => ({ ...prev, instituicao: e.target.value }))
-                  }
-                  placeholder="Ex: Caixa Econômica, Itaú"
-                  className="form-card text-foreground"
-                />
-              </div>
+              <InstituicaoFinanceiraField
+                value={addPassivoForm.instituicao}
+                onChange={(instituicao) =>
+                  setAddPassivoForm((prev) => ({ ...prev, instituicao }))
+                }
+              />
               <div className="space-y-2">
                 <label className="field-label">
                   Bem vinculado
