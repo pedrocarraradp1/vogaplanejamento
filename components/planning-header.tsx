@@ -12,13 +12,14 @@ function ToggleMoeda() {
   const moeda = state.moeda ?? "BRL"
 
   return (
-    <div className="toggle-pill">
+    <div className="flex items-center gap-1">
       {(["BRL", "USD"] as const).map((m) => (
         <button
           key={m}
           type="button"
           onClick={() => setMoeda(m)}
-          className={`toggle-pill-item ${moeda === m ? "toggle-pill-item-active" : ""}`}
+          className="btn-header-outline"
+          style={moeda === m ? { background: "rgba(255,255,255,0.1)" } : undefined}
         >
           {m === "BRL" ? "R$" : "US$"}
         </button>
@@ -41,28 +42,29 @@ export function PlanningHeader({
   showSalvar = true,
 }: PlanningHeaderProps) {
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-navy border-b border-border">
-      <div className="h-full flex items-center justify-between gap-4 px-6">
-        <Link href="/clientes" className="shrink-0">
-          <Image
-            src="/logo-voga.png"
-            alt="Voga"
-            width={120}
-            height={40}
-            className="h-8 w-auto brightness-0 invert"
-            priority
-          />
-        </Link>
+    <header
+      className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between bg-navy px-8"
+      style={{ height: "var(--header-height)" }}
+    >
+      <Link href="/clientes" className="shrink-0">
+        <Image
+          src="/logo-voga.png"
+          alt="Voga"
+          width={120}
+          height={32}
+          className="h-8 w-auto brightness-0 invert"
+          priority
+        />
+      </Link>
 
-        <div className="flex items-center gap-3 shrink-0">
-          <Link href={voltarHref} className="btn-ghost-nav">
-            <ArrowLeft className="w-4 h-4" />
-            Voltar
-          </Link>
-          {breadcrumb}
-          {showMoedaToggle && <ToggleMoeda />}
-          {showSalvar && <SalvarSimulacaoModal />}
-        </div>
+      <div className="flex items-center gap-3 shrink-0">
+        <Link href={voltarHref} className="btn-header-outline">
+          <ArrowLeft className="w-3.5 h-3.5" />
+          Voltar
+        </Link>
+        {breadcrumb}
+        {showMoedaToggle && <ToggleMoeda />}
+        {showSalvar && <SalvarSimulacaoModal />}
       </div>
     </header>
   )
@@ -75,7 +77,7 @@ export function PlanningBreadcrumb() {
   return (
     <Link
       href={`/clientes/${simulacaoMeta.clienteId}`}
-      className="hidden sm:inline-flex text-xs font-medium text-white/70 hover:text-white px-3 py-2 rounded-md border border-white/20"
+      className="hidden sm:inline-flex btn-header-outline text-[12px]"
     >
       ← {nome} · {simulacaoMeta.nomeCenario}
     </Link>

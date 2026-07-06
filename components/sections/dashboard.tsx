@@ -30,7 +30,7 @@ interface DashboardProps {
 }
 
 const CORES_DIST_ATIVOS = [
-  "#1E5CE6", "#22C787", "#F5A623", "#8B5CF6", "#EC4899", "#06B6D4",
+  "var(--accent)", "#22C787", "#F5A623", "#8B5CF6", "#EC4899", "#06B6D4",
 ]
 
 export function Dashboard({ onNavigate }: DashboardProps) {
@@ -296,7 +296,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
       const canvas = await html2canvas(div.firstElementChild as HTMLElement || div, {
         scale: 2,
-        backgroundColor: "#080C18",
+        backgroundColor: "var(--navy)",
         logging: false,
         useCORS: true,
       })
@@ -366,7 +366,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       {/* Header */}
       <div className="space-y-1">
         <p className="text-sm text-muted-foreground">Diagnóstico Financeiro</p>
-        <h1 className="text-2xl font-semibold text-foreground">
+        <h1 className="page-title text-[24px] text-foreground">
           Diagnóstico <span className="text-primary">{dadosPessoais.nome || "do Cliente"}</span>
         </h1>
         <p className="text-sm text-muted-foreground">
@@ -383,7 +383,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               <CardContent className="p-5">
                 <div className="flex items-start justify-between">
                   <div className="space-y-2">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{kpi.label}</p>
+                    <p className="field-label">{kpi.label}</p>
                     <p className={`text-2xl font-bold ${s.valor}`}>{kpi.valor}</p>
                     <p className="text-sm text-muted-foreground">{kpi.subtexto}</p>
                   </div>
@@ -398,7 +398,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       </div>
 
       {/* Distribuição de Ativos */}
-      <Card className="bg-secondary border-border">
+      <Card className="form-card">
         <CardHeader>
           <CardTitle className="text-foreground text-lg font-medium">Distribuição de Ativos</CardTitle>
         </CardHeader>
@@ -410,7 +410,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           ) : (
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-3">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Por Tipo</p>
+                <p className="field-label">Por Tipo</p>
                 <div className="h-[280px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -467,7 +467,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                         ))}
                       </Pie>
                       <Tooltip
-                        contentStyle={{ backgroundColor: "#131929", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px" }}
+                        contentStyle={{ backgroundColor: "var(--bg-page)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px" }}
                         labelStyle={{ color: "#ffffff", fontWeight: 600 }}
                         itemStyle={{ color: "#ffffff" }}
                         formatter={(v: number) => fmtFull(v)}
@@ -479,7 +479,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               </div>
 
               <div className="space-y-3">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Por Ativo</p>
+                <p className="field-label">Por Ativo</p>
                 <div className="h-[280px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -518,7 +518,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                         ))}
                       </Pie>
                       <Tooltip
-                        contentStyle={{ backgroundColor: "#131929", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px" }}
+                        contentStyle={{ backgroundColor: "var(--bg-page)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px" }}
                         labelStyle={{ color: "#ffffff", fontWeight: 600 }}
                         itemStyle={{ color: "#ffffff" }}
                         formatter={(v: number) => fmtFull(v)}
@@ -534,7 +534,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       </Card>
 
       {/* Evolução Patrimonial */}
-      <Card className="bg-secondary border-border">
+      <Card className="form-card">
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-foreground text-lg font-medium">Evolução Patrimonial</CardTitle>
           <div className="inline-flex rounded-lg bg-card p-1">
@@ -564,7 +564,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 />
                 <YAxis stroke="#4A5268" tick={{ fill: "#4A5268", fontSize: 12 }} tickLine={false} axisLine={false} tickFormatter={fmt} />
                 <Tooltip
-                  contentStyle={{ backgroundColor: "#131929", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px" }}
+                  contentStyle={{ backgroundColor: "var(--bg-page)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px" }}
                   labelStyle={{ color: "#ffffff", fontWeight: 600 }}
                   itemStyle={{ color: "#ffffff" }}
                   formatter={(value: number, _name: string, props: any) => {
@@ -643,7 +643,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       <CenariosInvestimento editable={false} />
 
       {/* Planejamento Sucessório */}
-      <Card className="bg-secondary border-border">
+      <Card className="form-card">
         <CardHeader>
           <CardTitle className="text-foreground text-lg font-medium">Planejamento Sucessório</CardTitle>
         </CardHeader>
@@ -651,7 +651,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Seção 1 — Distribuição Patrimonial */}
             <div className="space-y-4 rounded-xl border border-border bg-secondary p-5">
-              <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Distribuição Patrimonial</h4>
+              <h4 className="field-label">Distribuição Patrimonial</h4>
               <div className="space-y-0">
                 <div className="flex justify-between gap-4 py-2.5 border-b border-border">
                   <span className="text-sm text-muted-foreground">Patrimônio Total</span>
@@ -685,7 +685,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
             {/* Seção 2 — Custos do Inventário */}
             <div className="space-y-4 rounded-xl border border-border bg-secondary p-5">
-              <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Custos do Inventário</h4>
+              <h4 className="field-label">Custos do Inventário</h4>
               <div className="space-y-0">
                 <div className="flex justify-between gap-4 py-2.5 border-b border-border">
                   <span className="text-sm text-muted-foreground">ITCMD ({sucessao.itcmd}%)</span>
@@ -728,7 +728,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       </Card>
 
       {/* Projeção Detalhada */}
-      <Card className="bg-secondary border-border">
+      <Card className="form-card">
         <CardHeader>
           <CardTitle className="text-foreground text-lg font-medium">Projeção Detalhada</CardTitle>
         </CardHeader>
@@ -738,7 +738,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               <thead>
                 <tr className="border-b border-border">
                   {["Idade","Patrimônio Nominal","Patrimônio Real","Renda Mensal Real","Fase"].map(h => (
-                    <th key={h} className={`py-3 px-4 text-xs font-medium text-muted-foreground uppercase tracking-wide ${h === "Idade" ? "text-left" : h === "Fase" ? "text-center" : "text-right"}`}>{h}</th>
+                    <th key={h} className={`py-3 px-4 field-label ${h === "Idade" ? "text-left" : h === "Fase" ? "text-center" : "text-right"}`}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -763,7 +763,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       </Card>
 
       {/* Footer */}
-      <div className="flex items-center justify-between pt-4">
+      <div className="nav-footer">
         <Button variant="ghost" onClick={() => onNavigate("sucessorio")} className="text-muted-foreground hover:text-foreground">
           <ArrowLeft className="w-4 h-4 mr-2" />Editar
         </Button>

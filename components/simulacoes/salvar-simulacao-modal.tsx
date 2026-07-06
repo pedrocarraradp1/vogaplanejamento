@@ -172,7 +172,7 @@ export function SalvarSimulacaoModal() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="bg-primary hover:bg-primary/90 text-primary-foreground h-9">
+        <Button className="btn-header-primary h-auto">
           {isUpdate ? "Atualizar Cenário" : "Salvar Cenário"}
         </Button>
       </DialogTrigger>

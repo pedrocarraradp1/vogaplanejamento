@@ -266,7 +266,7 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
         "Moderado",
         "Equilíbrio risco/retorno",
         "Média",
-        "#1E5CE6",
+        "var(--accent)",
         "bg-[rgba(30,92,230,0.06)]",
         "border-primary/25",
         cenarioModerado,
@@ -354,7 +354,7 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
   )
 
   return (
-    <Card className="bg-card border-border">
+    <Card className="form-card">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-base font-medium text-foreground">Cenários Alternativos de Investimento</CardTitle>
         <div className="flex items-center gap-3">
@@ -390,7 +390,7 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
 
                 <div className="mt-4 space-y-2">
                   <div className="flex items-center gap-1.5">
-                    <Label className="text-xs uppercase text-muted-foreground tracking-wide">Rentabilidade Bruta</Label>
+                    <Label className="field-label">Rentabilidade Bruta</Label>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <button
@@ -418,12 +418,12 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
                           if (c.key === "moderado") setPremissas({ rentabilidadeModerado: v })
                           if (c.key === "agressivo") setPremissas({ rentabilidadeAgressivo: v })
                         }}
-                        className="bg-card border-border text-foreground focus:border-primary pr-16"
+                        className="form-card text-foreground focus:border-primary pr-16"
                       />
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">% a.a.</span>
                     </div>
                   ) : (
-                    <div className="rounded-lg bg-card border border-border px-3 py-2 text-sm text-foreground tabular-nums">
+                    <div className="form-card px-3 py-2 text-sm text-foreground tabular-nums">
                       {c.taxaBruta}% a.a.
                     </div>
                   )}
@@ -440,13 +440,13 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="py-3 px-4 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    <th className="py-3 px-4 text-left field-label">
                       Métrica
                     </th>
                     {cenarios.map((c) => (
                       <th
                         key={c.key}
-                        className="py-3 px-4 text-right text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                        className="py-3 px-4 text-right field-label"
                       >
                         {c.nome}
                       </th>
@@ -512,7 +512,7 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
                   />
                   <RechartsTooltip
                     contentStyle={{
-                      backgroundColor: "#131929",
+                      backgroundColor: "var(--bg-page)",
                       border: "1px solid rgba(255,255,255,0.1)",
                       borderRadius: "8px",
                       color: "#fff",
@@ -532,7 +532,7 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
                     }}
                   />
                   <Line type="monotone" dataKey="conservador" name="conservador" stroke="#22C787" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="moderado" name="moderado" stroke="#1E5CE6" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="moderado" name="moderado" stroke="var(--accent)" strokeWidth={2} dot={false} />
                   <Line type="monotone" dataKey="agressivo" name="agressivo" stroke="#F5A623" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>

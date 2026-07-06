@@ -54,10 +54,15 @@ export function ContentArea({ activeSection, onNavigate }: ContentAreaProps) {
   }
 
   return (
-    <main className="ml-64 mt-16 min-h-[calc(100vh-4rem)] bg-background">
-      <div className="px-10 py-8 max-w-[1200px]">
-        {renderSection()}
-      </div>
+    <main
+      className="flex-1 bg-background min-h-[calc(100vh-var(--header-height))]"
+      style={{
+        marginLeft: "var(--sidebar-width)",
+        marginTop: "var(--header-height)",
+        padding: "40px 48px",
+      }}
+    >
+      {renderSection()}
     </main>
   )
 }

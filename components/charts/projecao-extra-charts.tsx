@@ -19,7 +19,7 @@ import type { DadoFluxoGrafico, DadoRendaGrafico } from "@/lib/projecao-graficos
 
 const CORES_FLUXO = {
   rendimento: "#378ADD",
-  aporte: "#1E5CE6",
+  aporte: "var(--accent)",
   objetivos: "#BA7517",
   passivos: "#7C3AED",
   retirada: "#E24B4A",
@@ -263,7 +263,7 @@ export function RendaCarteiraChart({
                   type="monotone"
                   dataKey="rendaNominal"
                   name="Renda nominal"
-                  stroke="#1E5CE6"
+                  stroke="var(--accent)"
                   strokeWidth={2}
                   dot={false}
                   isAnimationActive={false}
@@ -284,7 +284,7 @@ export function RendaCarteiraChart({
                 type="monotone"
                 dataKey="rendaReal"
                 name="Renda real (Fisher)"
-                stroke="#1E5CE6"
+                stroke="var(--accent)"
                 strokeWidth={2}
                 dot={false}
                 isAnimationActive={false}

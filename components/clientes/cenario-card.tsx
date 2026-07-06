@@ -5,7 +5,6 @@ import { ArrowRight, Copy, Trash2 } from "lucide-react"
 
 type CenarioCardProps = {
   nomeCenario: string
-  /** Texto da linha cinza (ex.: data de criação). */
   sublinha: string
   patrimonioProjetadoLabel: string
   abrirHref: string
@@ -13,7 +12,6 @@ type CenarioCardProps = {
   onExcluir: (e: MouseEvent) => void
 }
 
-/** Mesmo layout visual dos cards da lista em /clientes; ações à direita. */
 export function CenarioCard({
   nomeCenario,
   sublinha,
@@ -23,14 +21,14 @@ export function CenarioCard({
   onExcluir,
 }: CenarioCardProps) {
   return (
-    <div className="bg-card border border-border rounded-xl p-5 transition-colors hover:border-primary/60">
+    <div className="kpi-card transition-colors hover:border-[var(--accent)]/40">
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1 min-w-0 flex-1">
-          <p className="text-sm font-semibold text-foreground">{nomeCenario}</p>
+          <p className="text-sm font-medium text-foreground">{nomeCenario}</p>
           <p className="text-xs text-muted-foreground">{sublinha}</p>
           <p className="text-xs text-muted-foreground mt-2">
-            <span className="text-foreground/80">Patrimônio projetado:</span>{" "}
-            <span className="text-primary font-medium">{patrimonioProjetadoLabel}</span>
+            Patrimônio projetado:{" "}
+            <span className="text-[var(--accent)] font-medium">{patrimonioProjetadoLabel}</span>
           </p>
         </div>
         <div className="flex items-center gap-1 shrink-0">
@@ -39,7 +37,7 @@ export function CenarioCard({
             variant="outline"
             size="icon"
             onClick={onDuplicar}
-            className="h-9 w-9 border-border bg-transparent text-muted-foreground hover:text-foreground hover:bg-white/5"
+            className="h-9 w-9 border-border bg-transparent text-muted-foreground hover:text-foreground"
             title="Duplicar"
           >
             <Copy className="w-4 h-4" />

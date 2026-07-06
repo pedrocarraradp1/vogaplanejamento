@@ -28,7 +28,7 @@ export function EmBreve({
     <div className="space-y-8">
       <div className="space-y-2">
         <p className="text-sm text-muted-foreground">{grupo}</p>
-        <h1 className="text-3xl font-semibold text-foreground">
+        <h1 className="page-title text-foreground">
           {prefixo ? (
             <>
               {prefixo}{" "}
@@ -41,7 +41,7 @@ export function EmBreve({
         <p className="text-sm text-muted-foreground">{descricao}</p>
       </div>
 
-      <div className="rounded-xl bg-card border border-border p-12 flex flex-col items-center justify-center text-center gap-4">
+      <div className="form-card p-12 flex flex-col items-center justify-center text-center gap-4">
         <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
           <Construction className="w-7 h-7 text-primary" />
         </div>
@@ -52,12 +52,12 @@ export function EmBreve({
       </div>
 
       {(prevSection || nextSection) && (
-        <div className="flex items-center gap-3 pt-4">
+        <div className="nav-footer">
           {prevSection && (
             <Button
-              variant="outline"
+              variant="ghost"
+              className="btn-back"
               onClick={() => onNavigate(prevSection)}
-              className="border-border text-muted-foreground hover:text-foreground"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Voltar
@@ -66,7 +66,7 @@ export function EmBreve({
           {nextSection && (
             <Button
               onClick={() => onNavigate(nextSection)}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground"
+              className="btn-next"
             >
               Próximo
               <ArrowRight className="w-4 h-4 ml-2" />

@@ -70,7 +70,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
 
       {/* Card 1 - Identificação */}
       <div className="space-y-4">
-        <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+        <span className="field-label">
           Identificação
         </span>
         <div className="form-card">
@@ -79,7 +79,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
             <div className="space-y-2">
               <Label 
                 htmlFor="nome" 
-                className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground"
+                className="field-label"
               >
                 Nome Completo
               </Label>
@@ -88,7 +88,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
                 value={dadosPessoais.nome}
                 onChange={(e) => setDadosPessoais({ nome: e.target.value })}
                 placeholder="Nome do cliente"
-                className="form-input h-11 placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
+                className="form-input placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
               />
             </div>
 
@@ -96,7 +96,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
             <div className="space-y-2">
               <Label
                 htmlFor="cpf"
-                className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground"
+                className="field-label"
               >
                 CPF
               </Label>
@@ -116,7 +116,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
                   setDadosPessoais({ cpf: digits })
                 }}
                 placeholder="000.000.000-00"
-                className="form-input h-11 placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30 tabular-nums"
+                className="form-input placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30 tabular-nums"
               />
             </div>
 
@@ -130,7 +130,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
             >
               <Label 
                 htmlFor="conjuge" 
-                className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground"
+                className="field-label"
               >
                 Nome do Cônjuge
               </Label>
@@ -139,7 +139,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
                 value={dadosPessoais.conjuge}
                 onChange={(e) => setDadosPessoais({ conjuge: e.target.value })}
                 placeholder="Nome do cônjuge"
-                className="form-input h-11 placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
+                className="form-input placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
               />
             </div>
 
@@ -147,7 +147,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
             <div className="space-y-2">
               <Label 
                 htmlFor="profissao" 
-                className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground"
+                className="field-label"
               >
                 Profissão
               </Label>
@@ -169,10 +169,10 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
                         setDadosPessoais({ profissao: value })
                       }}
                     >
-                      <SelectTrigger className="form-input h-11 focus:border-primary focus:ring-1 focus:ring-primary/30">
+                      <SelectTrigger className="form-input focus:border-primary focus:ring-1 focus:ring-primary/30">
                         <SelectValue placeholder="Selecione" />
                       </SelectTrigger>
-                      <SelectContent className="bg-card border-border">
+                      <SelectContent className="form-card">
                         {PROFISSOES_PRINCIPAIS.map((p) => (
                           <SelectItem key={p} value={p}>
                             {p}
@@ -188,7 +188,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
                         value={otherValue}
                         onChange={(e) => setDadosPessoais({ profissao: e.target.value })}
                         placeholder="Digite sua profissão"
-                        className="form-input h-11 placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
+                        className="form-input placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
                       />
                     )}
                   </div>
@@ -200,7 +200,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
             <div className="space-y-2">
               <Label 
                 htmlFor="dataNascimento" 
-                className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground"
+                className="field-label"
               >
                 Data de Nascimento
               </Label>
@@ -209,7 +209,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
                 type="date"
                 value={dadosPessoais.nascimento}
                 onChange={(e) => setDadosPessoais({ nascimento: e.target.value })}
-                className="form-input h-11 focus:border-primary focus:ring-1 focus:ring-primary/30"
+                className="form-input focus:border-primary focus:ring-1 focus:ring-primary/30"
               />
             </div>
 
@@ -217,7 +217,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
             <div className="space-y-2">
               <Label 
                 htmlFor="estadoCivil" 
-                className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground"
+                className="field-label"
               >
                 Estado Civil
               </Label>
@@ -230,10 +230,10 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
                   }
                 }}
               >
-                <SelectTrigger className="form-input h-11 focus:border-primary focus:ring-1 focus:ring-primary/30">
+                <SelectTrigger className="form-input focus:border-primary focus:ring-1 focus:ring-primary/30">
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
-                <SelectContent className="bg-card border-border">
+                <SelectContent className="form-card">
                   <SelectItem value="casado">Casado(a)</SelectItem>
                   <SelectItem value="solteiro">Solteiro(a)</SelectItem>
                   <SelectItem value="divorciado">Divorciado(a)</SelectItem>
@@ -246,7 +246,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
             <div className="space-y-2">
               <Label 
                 htmlFor="regimeBens" 
-                className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground"
+                className="field-label"
               >
                 Regime de Bens
               </Label>
@@ -254,10 +254,10 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
                 value={dadosPessoais.regime || "Comunhão Parcial de Bens"}
                 onValueChange={(value) => setDadosPessoais({ regime: value })}
               >
-                <SelectTrigger className="form-input h-11 focus:border-primary focus:ring-1 focus:ring-primary/30">
+                <SelectTrigger className="form-input focus:border-primary focus:ring-1 focus:ring-primary/30">
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
-                <SelectContent className="bg-card border-border">
+                <SelectContent className="form-card">
                   <SelectItem value="Comunhão Parcial de Bens">Comunhão Parcial de Bens</SelectItem>
                   <SelectItem value="Comunhão Universal de Bens">Comunhão Universal de Bens</SelectItem>
                   <SelectItem value="Separação Total de Bens">Separação Total de Bens</SelectItem>
@@ -270,7 +270,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
             <div className="space-y-2">
               <Label
                 htmlFor="sexo"
-                className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground"
+                className="field-label"
               >
                 Sexo
               </Label>
@@ -284,11 +284,11 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
               >
                 <SelectTrigger
                   id="sexo"
-                  className="form-input h-11 focus:border-primary focus:ring-1 focus:ring-primary/30"
+                  className="form-input focus:border-primary focus:ring-1 focus:ring-primary/30"
                 >
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
-                <SelectContent className="bg-card border-border">
+                <SelectContent className="form-card">
                   <SelectItem value="M">Masculino</SelectItem>
                   <SelectItem value="F">Feminino</SelectItem>
                 </SelectContent>
@@ -299,7 +299,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
             <div className="space-y-2">
               <Label 
                 htmlFor="filhos" 
-                className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground"
+                className="field-label"
               >
                 Número de Filhos
               </Label>
@@ -320,7 +320,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
                   setDadosPessoais({ filhos: cur.slice(0, nextCount) })
                 }}
                 placeholder="0"
-                className="form-input h-11 placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
+                className="form-input placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
               />
             </div>
           </div>
@@ -330,20 +330,20 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
       {/* Filhos — detalhes (dinâmico) */}
       {(dadosPessoais.filhos?.length ?? 0) > 0 && (
         <div className="space-y-4">
-          <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+          <span className="field-label">
             Filhos
           </span>
-          <div className="rounded-xl bg-card border border-border p-6 space-y-6">
+          <div className="form-card p-6 space-y-6">
             {(dadosPessoais.filhos ?? []).map((filho, idx) => (
               <div key={idx} className="space-y-4">
-                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                <p className="field-label">
                   Filho {idx + 1}
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label
                       htmlFor={`filho-nome-${idx}`}
-                      className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground"
+                      className="field-label"
                     >
                       Nome Completo
                     </Label>
@@ -356,13 +356,13 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
                         setDadosPessoais({ filhos: cur })
                       }}
                       placeholder="Nome do filho"
-                      className="form-input h-11 placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
+                      className="form-input placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
                     />
                   </div>
                   <div className="space-y-2">
                     <Label
                       htmlFor={`filho-nasc-${idx}`}
-                      className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground"
+                      className="field-label"
                     >
                       Data de Nascimento
                     </Label>
@@ -375,7 +375,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
                         cur[idx] = { ...(cur[idx] ?? { nome: "", dataNascimento: "" }), dataNascimento: e.target.value }
                         setDadosPessoais({ filhos: cur })
                       }}
-                      className="form-input h-11 focus:border-primary focus:ring-1 focus:ring-primary/30"
+                      className="form-input focus:border-primary focus:ring-1 focus:ring-primary/30"
                     />
                   </div>
                 </div>
@@ -387,16 +387,16 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
 
       {/* Card 2 - Fluxo de Caixa Mensal */}
       <div className="space-y-4">
-        <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+        <span className="field-label">
           Fluxo de Caixa Mensal
         </span>
-        <div className="rounded-xl bg-card border border-border p-6 space-y-6">
+        <div className="form-card p-6 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Renda Mensal */}
             <div className="space-y-2">
               <Label 
                 htmlFor="rendaMensal" 
-                className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground"
+                className="field-label"
               >
                 Renda Mensal (R$)
               </Label>
@@ -409,7 +409,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
                   value={formatCurrency(dadosPessoais.renda)}
                   onChange={(e) => setDadosPessoais({ renda: parseCurrency(e.target.value) })}
                   placeholder="0,00"
-                  className="h-11 pl-10 bg-card border-border text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
+                  className="h-11 pl-10 form-card text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
                 />
               </div>
             </div>
@@ -418,7 +418,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
             <div className="space-y-2">
               <Label 
                 htmlFor="despesaMensal" 
-                className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground"
+                className="field-label"
               >
                 Despesa Mensal (R$)
               </Label>
@@ -431,21 +431,21 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
                   value={formatCurrency(dadosPessoais.despesa)}
                   onChange={(e) => setDadosPessoais({ despesa: parseCurrency(e.target.value) })}
                   placeholder="0,00"
-                  className="h-11 pl-10 bg-card border-border text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
+                  className="h-11 pl-10 form-card text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
                 />
               </div>
             </div>
           </div>
 
           {/* Barra de Capacidade de Poupança */}
-          <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-4 py-3">
-            <p className="text-emerald-400 text-sm font-medium">
+          <div className="savings-badge w-full">
+            <p className="text-white text-sm font-medium">
               Capacidade de poupança mensal:{" "}
               <span className="font-semibold">
                 {moeda === "USD" ? "US$" : "R$"}{" "}
                 {capacidadePoupanca.valor.toLocaleString(moeda === "USD" ? "en-US" : "pt-BR", { minimumFractionDigits: 2 })}
               </span>{" "}
-              <span className="text-emerald-400/80">
+              <span className="text-white/80">
                 ({capacidadePoupanca.percentual.toFixed(0)}% da renda)
               </span>
             </p>
@@ -454,7 +454,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
       </div>
 
       {/* Rodapé */}
-      <div className="flex justify-end pt-4">
+      <div className="nav-footer">
         <Button onClick={() => onNavigate("patrimonio")} className="btn-next">
           Próximo
           <ArrowRight className="h-4 w-4" />

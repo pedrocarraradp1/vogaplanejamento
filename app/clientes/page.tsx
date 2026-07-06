@@ -3,8 +3,6 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Search, Plus, ArrowRight, Users, FileText, TrendingUp } from "lucide-react"
 import { ClientesHeader } from "@/components/clientes/clientes-header"
 import { KpiStatCard } from "@/components/clientes/kpi-stat-card"
@@ -47,7 +45,6 @@ export default function ClientesPage() {
         if (sErr) throw new Error(sErr.message)
 
         const rows = ((sRows as SimulacaoRow[]) ?? []).map((r) => ({ ...r }))
-        // Cenários antigos podem ter cliente_id nulo; vincula ao cadastro existente pelo nome (Dados Pessoais).
         for (const r of rows) {
           if (r.cliente_id) continue
           const nomePlano = String(r?.dados?.dadosPessoais?.nome ?? "").trim()
@@ -139,8 +136,8 @@ export default function ClientesPage() {
 
     return (
       <div className="min-h-screen bg-background">
-        <ClientesHeader voltarHref="/dashboard" novoCenarioHref="/dashboard" />
-        <div className="mx-auto max-w-[1200px] px-10 py-10 space-y-4">
+        <ClientesHeader novoCenarioHref="/dashboard" />
+        <div style={{ padding: "40px 48px" }}>
           <div className="form-card">
             <p className="text-sm font-semibold text-destructive">Não foi possível carregar as simulações</p>
             <p className="text-sm text-muted-foreground mt-2">
@@ -156,16 +153,14 @@ export default function ClientesPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <ClientesHeader voltarHref="/dashboard" novoCenarioHref="/dashboard" />
+      <ClientesHeader novoCenarioHref="/dashboard" />
 
-      <div className="mx-auto max-w-[1200px] px-10 py-8 space-y-6">
-        <div className="space-y-1">
-          <h1 className="page-title">
-            Planejamento <span className="text-primary">Financeiro Pessoal</span>
-          </h1>
-        </div>
+      <div style={{ padding: "40px 48px" }} className="space-y-6">
+        <h1 className="clientes-title">
+          <span className="text-[var(--text-primary)]">Planejamento</span>
+          <span className="text-[var(--accent)]"> Financeiro Pessoal</span>
+        </h1>
 
-        {/* KPIs */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <KpiStatCard label="Total de Clientes" value={kpis.totalClientes} icon={Users} />
           <KpiStatCard label="Total de Simulações" value={kpis.totalSimulacoes} icon={FileText} />
@@ -177,35 +172,24 @@ export default function ClientesPage() {
           />
         </div>
 
-        {/* Busca */}
         <div className="relative w-full max-w-md">
-          <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
-          <Input
+          <Search className="w-4 h-4 text-[var(--text-label)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Buscar cliente por nome..."
-            className="form-input pl-10"
+            className="clientes-search"
           />
         </div>
 
-        {/* Lista */}
         {clientesFiltrados.length === 0 ? (
-          <div className="form-card p-10 text-center">
-            <div className="mx-auto w-12 h-12 rounded-full bg-secondary border border-border flex items-center justify-center">
-              <FileText className="w-5 h-5 text-muted-foreground" />
-            </div>
-            <p className="text-sm font-semibold text-foreground mt-4">Nenhuma simulação salva ainda</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Crie uma nova simulação para começar a registrar clientes e planejamento.
-            </p>
-            <div className="mt-6 flex justify-center">
-              <Link href="/dashboard">
-                <Button className="rounded-md bg-primary hover:bg-primary/90 text-primary-foreground">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Novo Cenário
-                </Button>
-              </Link>
-            </div>
+          <div className="clientes-empty gap-4 p-8">
+            <p className="text-sm text-[var(--text-label)]">Nenhuma simulação salva ainda</p>
+            <Link href="/dashboard" className="btn-header-primary">
+              <Plus className="w-4 h-4" />
+              Novo Cenário
+            </Link>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -214,26 +198,17 @@ export default function ClientesPage() {
               const href = c.clienteId ? `/clientes/${c.clienteId}` : (c.simulacaoId ? `/simulacao/${c.simulacaoId}` : "/dashboard")
               return (
                 <Link key={c.key} href={href} className="group">
-                  <div className="form-card p-5 transition-colors group-hover:border-primary/40">
+                  <div className="kpi-card transition-colors group-hover:border-[var(--accent)]/40">
                     <div className="flex items-start justify-between gap-4">
                       <div className="space-y-1">
-                        <p className="text-sm font-semibold text-foreground">{c.nome}</p>
+                        <p className="text-sm font-medium text-foreground">{c.nome}</p>
                         <p className="text-xs text-muted-foreground">{c.profissao}</p>
                         <p className="text-xs text-muted-foreground mt-2">
-                          <span className="text-foreground/80">{c.totalCenarios}</span>{" "}
-                          {c.totalCenarios === 1 ? "cenário" : "cenários"}
+                          {c.totalCenarios} {c.totalCenarios === 1 ? "cenário" : "cenários"}
                         </p>
-                        <p className="text-xs text-muted-foreground mt-2">
-                          <span className="text-foreground/80">Simulação:</span>{" "}
-                          <span className="text-muted-foreground">{c.nomeSimulacao}</span>
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          <span className="text-foreground/80">Data:</span> {created}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          <span className="text-foreground/80">Patrimônio:</span>{" "}
-                          <span className="text-primary font-medium">{fmtFull(c.moeda, c.patrimonio)}</span>
-                        </p>
+                        <p className="text-xs text-muted-foreground">{c.nomeSimulacao}</p>
+                        <p className="text-xs text-muted-foreground">{created}</p>
+                        <p className="text-xs text-[var(--accent)] font-medium">{fmtFull(c.moeda, c.patrimonio)}</p>
                       </div>
                       <ArrowRight className="w-5 h-5 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
                     </div>
@@ -247,4 +222,3 @@ export default function ClientesPage() {
     </div>
   )
 }
-

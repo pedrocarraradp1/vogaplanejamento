@@ -169,7 +169,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
       {/* Header */}
       <div>
         <p className="text-sm text-muted-foreground mb-1">Cadastro</p>
-        <h1 className="text-2xl font-semibold text-foreground">
+        <h1 className="page-title text-[24px] text-foreground">
           Objetivos <span className="text-primary">Financeiros</span>
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
@@ -178,7 +178,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
       </div>
 
       {/* Card Metas e Objetivos */}
-      <Card className="bg-card border-border">
+      <Card className="form-card">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             Metas e Objetivos
@@ -200,7 +200,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
               className="flex items-center gap-4 p-4 bg-secondary rounded-xl border border-white/5"
             >
               {/* Ícone estrela */}
-              <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
+              <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center text-white shrink-0">
                 <Star className="w-5 h-5" />
               </div>
               
@@ -224,7 +224,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
               </div>
               
               {/* Valor */}
-              <p className="text-emerald-400 font-semibold text-right shrink-0">
+              <p className="text-white font-semibold text-right shrink-0">
                 {formatCurrency(objetivo.valor)}
               </p>
 
@@ -277,18 +277,18 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
       </Card>
 
       {/* Botões de navegação */}
-      <div className="flex gap-3">
+      <div className="nav-footer">
         <Button
-          variant="outline"
+          variant="ghost"
+          className="btn-back"
           onClick={() => onNavigate("patrimonio")}
-          className="border-border text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Voltar
         </Button>
         <Button 
           onClick={() => onNavigate("fluxo-de-caixa")}
-          className="bg-primary hover:bg-primary/90 text-primary-foreground"
+          className="btn-next"
         >
           Próximo
           <ArrowRight className="w-4 h-4 ml-2" />
@@ -297,7 +297,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
 
       {/* Modal Objetivo */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="bg-card border-border rounded-2xl max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogContent className="form-card rounded-2xl max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-foreground">
               {editingObjetivo ? "Editar Objetivo" : "Adicionar Objetivo"}
@@ -309,7 +309,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
           
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+              <label className="field-label">
                 Descrição
               </label>
               {(() => {
@@ -330,10 +330,10 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                         setForm({ ...form, descricao: value })
                       }}
                     >
-                      <SelectTrigger className="bg-secondary border-border text-foreground">
+                      <SelectTrigger className="form-card text-foreground">
                         <SelectValue placeholder="Selecione" />
                       </SelectTrigger>
-                      <SelectContent className="bg-card border-border">
+                      <SelectContent className="form-card">
                         {OBJETIVOS_PREDEFINIDOS.map((o) => (
                           <SelectItem key={o} value={o}>
                             {o}
@@ -348,7 +348,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                         value={otherValue}
                         onChange={(e) => setForm({ ...form, descricao: e.target.value })}
                         placeholder="Descreva o objetivo..."
-                        className="bg-secondary border-border text-foreground placeholder:text-muted-foreground"
+                        className="form-card text-foreground placeholder:text-muted-foreground"
                       />
                     )}
                   </div>
@@ -358,7 +358,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+                <label className="field-label">
                   Prazo (anos)
                 </label>
                 <Input
@@ -366,35 +366,35 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                   value={form.prazoAnos || ""}
                   onChange={(e) => setForm({ ...form, prazoAnos: parseInt(e.target.value) || 0 })}
                   placeholder="0"
-                  className="bg-secondary border-border text-foreground placeholder:text-muted-foreground"
+                  className="form-card text-foreground placeholder:text-muted-foreground"
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+                <label className="field-label">
                   Valor Estimado (R$)
                 </label>
                 <Input
                   value={form.valor ? formatCurrency(form.valor) : ""}
                   onChange={(e) => setForm({ ...form, valor: parseCurrency(e.target.value) })}
                   placeholder="0,00"
-                  className="bg-secondary border-border text-foreground placeholder:text-muted-foreground"
+                  className="form-card text-foreground placeholder:text-muted-foreground"
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+              <label className="field-label">
                 Recorrente?
               </label>
               <Select
                 value={form.recorrente ? "sim" : "nao"}
                 onValueChange={handleRecorrenteChange}
               >
-                <SelectTrigger className="bg-secondary border-border text-foreground">
+                <SelectTrigger className="form-card text-foreground">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="bg-card border-border">
+                <SelectContent className="form-card">
                   <SelectItem value="nao">Não — acontece uma vez</SelectItem>
                   <SelectItem value="sim">Sim — repete periodicamente</SelectItem>
                 </SelectContent>
@@ -409,7 +409,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                   : "opacity-0 max-h-0 -translate-y-2 overflow-hidden"
               }`}
             >
-              <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+              <label className="field-label">
                 Repetir a cada (anos)
               </label>
               <Input
@@ -417,7 +417,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                 value={form.frequenciaAnos || ""}
                 onChange={(e) => setForm({ ...form, frequenciaAnos: parseInt(e.target.value) || 0 })}
                 placeholder="1"
-                className="bg-secondary border-border text-foreground placeholder:text-muted-foreground"
+                className="form-card text-foreground placeholder:text-muted-foreground"
               />
             </div>
 
@@ -430,7 +430,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
               }`}
             >
               <div className="space-y-2">
-                <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+                <label className="field-label">
                   Duração
                 </label>
                 <Select
@@ -444,10 +444,10 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                     }))
                   }}
                 >
-                  <SelectTrigger className="bg-secondary border-border text-foreground">
+                  <SelectTrigger className="form-card text-foreground">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-card border-border">
+                  <SelectContent className="form-card">
                     <SelectItem value="total">Todo o período</SelectItem>
                     <SelectItem value="personalizado">Personalizado</SelectItem>
                   </SelectContent>
@@ -461,7 +461,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                     : "opacity-0 max-h-0 -translate-y-2 overflow-hidden"
                 }`}
               >
-                <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+                <label className="field-label">
                   Por quantos anos?
                 </label>
                 <Input
@@ -469,14 +469,14 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                   value={form.duracaoAnos || ""}
                   onChange={(e) => setForm({ ...form, duracaoAnos: parseInt(e.target.value) || 0 })}
                   placeholder="Ex: 4"
-                  className="bg-secondary border-border text-foreground placeholder:text-muted-foreground"
+                  className="form-card text-foreground placeholder:text-muted-foreground"
                 />
               </div>
             </div>
 
             {/* Observações */}
             <div className="space-y-2 pt-2">
-              <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+              <label className="field-label">
                 Observações
               </label>
               <Textarea
@@ -484,7 +484,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                 value={form.observacoes ?? ""}
                 onChange={(e) => setForm({ ...form, observacoes: e.target.value })}
                 placeholder="Descreva detalhes do objetivo, premissas, prioridade..."
-                className="bg-secondary border-border text-foreground placeholder:text-muted-foreground resize-y"
+                className="form-card text-foreground placeholder:text-muted-foreground resize-y"
               />
             </div>
           </div>
@@ -499,7 +499,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
             </Button>
             <Button
               onClick={saveObjetivo}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground"
+              className="btn-next"
             >
               {editingObjetivo ? "Salvar" : "Adicionar"}
             </Button>

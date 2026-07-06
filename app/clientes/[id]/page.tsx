@@ -144,17 +144,17 @@ export default function ClienteDetailPage() {
   if (error) {
     return (
       <div className="min-h-screen bg-background">
-        <ClientesHeader voltarHref="/clientes" novoCenarioHref={novoCenarioHref} />
-        <div className="mx-auto max-w-[1200px] px-6 py-10 text-destructive text-sm">{error}</div>
+        <ClientesHeader novoCenarioHref={novoCenarioHref} />
+        <div style={{ padding: "40px 48px" }} className="text-destructive text-sm">{error}</div>
       </div>
     )
   }
 
   return (
     <div className="min-h-screen bg-background">
-      <ClientesHeader voltarHref="/clientes" novoCenarioHref={novoCenarioHref} />
+      <ClientesHeader novoCenarioHref={novoCenarioHref} />
 
-      <div className="mx-auto max-w-[1200px] px-6 py-6 space-y-6">
+      <div style={{ padding: "40px 48px" }} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <KpiStatCard
             label="Nome do cliente"

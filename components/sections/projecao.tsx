@@ -266,7 +266,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
       {/* Header */}
       <div className="space-y-1">
         <p className="text-sm text-muted-foreground">Projeção</p>
-        <h1 className="text-2xl font-semibold text-foreground">
+        <h1 className="page-title text-[24px] text-foreground">
           Premissas da <span className="text-primary">Projeção</span>
         </h1>
         <p className="text-sm text-muted-foreground">
@@ -275,25 +275,25 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
       </div>
 
       {/* Card 1 — Acumulação */}
-      <Card className="bg-card border-border">
+      <Card className="form-card">
         <CardHeader className="pb-4">
           <CardTitle className="text-base font-medium text-foreground">Acumulação</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label className="text-xs uppercase text-muted-foreground tracking-wide">Saldo Inicial Líquido (R$)</Label>
+              <Label className="field-label">Saldo Inicial Líquido (R$)</Label>
               <Input value={formatCurrency(saldoInicialCalculado)} readOnly
-                className="bg-card border-border text-foreground cursor-not-allowed opacity-70" />
+                className="form-card text-foreground cursor-not-allowed opacity-70" />
               <p className="text-xs text-muted-foreground">Calculado automaticamente: Ativos Líquidos − Passivos</p>
             </div>
             <div className="space-y-2">
-              <Label className="text-xs uppercase text-muted-foreground tracking-wide">Rendimento Anual Bruto (%)</Label>
+              <Label className="field-label">Rendimento Anual Bruto (%)</Label>
               <Input
                 type="number"
                 value={premissas.rendimentoBruto ?? ""}
                 onChange={e => setPremissas({ rendimentoBruto: parseFloat(e.target.value) || 0 })}
-                className="bg-card border-border text-foreground focus:border-primary" />
+                className="form-card text-foreground focus:border-primary" />
               <input
                 type="range"
                 min={0}
@@ -306,17 +306,17 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-xs uppercase text-muted-foreground tracking-wide">
+              <Label className="field-label">
                 Alíquota de Imposto sobre Rendimento
               </Label>
               <Select
                 value={String(premissas.aliquotaImpostoRendimento ?? 0.15)}
                 onValueChange={(v) => setPremissas({ aliquotaImpostoRendimento: parseFloat(v) || 0 })}
               >
-                <SelectTrigger className="bg-card border-border text-foreground focus:border-primary">
+                <SelectTrigger className="form-card text-foreground focus:border-primary">
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
-                <SelectContent className="bg-card border-border">
+                <SelectContent className="form-card">
                   <SelectItem value="0.15">15% — renda fixa longo prazo</SelectItem>
                   <SelectItem value="0.175">17,5% — renda fixa 2-4 anos</SelectItem>
                   <SelectItem value="0.20">20% — renda fixa 1-2 anos</SelectItem>
@@ -331,10 +331,10 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
               </p>
             </div>
             <div className="space-y-2">
-              <Label className="text-xs uppercase text-muted-foreground tracking-wide">Inflação Anual (%)</Label>
+              <Label className="field-label">Inflação Anual (%)</Label>
               <Input type="number" value={premissas.inflacao || ""}
                 onChange={e => setPremissas({ inflacao: parseFloat(e.target.value) || 0 })}
-                className="bg-card border-border text-foreground focus:border-primary" />
+                className="form-card text-foreground focus:border-primary" />
               <input
                 type="range"
                 min={0}
@@ -346,16 +346,16 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-xs uppercase text-muted-foreground tracking-wide">Idade Atual</Label>
+              <Label className="field-label">Idade Atual</Label>
               <Input type="number" value={idadeAtualCalculada || ""} readOnly
-                className="bg-card border-border text-foreground cursor-not-allowed opacity-70" />
+                className="form-card text-foreground cursor-not-allowed opacity-70" />
               <p className="text-xs text-muted-foreground">Calculada pela data de nascimento</p>
             </div>
             <div className="space-y-2">
-              <Label className="text-xs uppercase text-muted-foreground tracking-wide">Prazo de Simulação (anos)</Label>
+              <Label className="field-label">Prazo de Simulação (anos)</Label>
               <Input type="number" value={premissas.prazo || ""}
                 onChange={e => setPremissas({ prazo: parseInt(e.target.value) || 0 })}
-                className="bg-card border-border text-foreground focus:border-primary" />
+                className="form-card text-foreground focus:border-primary" />
               <input
                 type="range"
                 min={1}
@@ -371,21 +371,21 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
       </Card>
 
       {/* Card — Aporte Mensal */}
-      <Card className="bg-card border-border">
+      <Card className="form-card">
         <CardHeader className="pb-4">
           <CardTitle className="text-base font-medium text-foreground">Aporte Mensal</CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="space-y-2">
-            <Label className="text-xs uppercase text-muted-foreground tracking-wide">Modo de Aporte</Label>
+            <Label className="field-label">Modo de Aporte</Label>
             <Select
               value={aporteModo}
               onValueChange={(v) => setPremissas({ aporteModo: (v as "fixo" | "periodos") || "fixo" })}
             >
-              <SelectTrigger className="bg-card border-border text-foreground focus:border-primary">
+              <SelectTrigger className="form-card text-foreground focus:border-primary">
                 <SelectValue placeholder="Selecione" />
               </SelectTrigger>
-              <SelectContent className="bg-card border-border">
+              <SelectContent className="form-card">
                 <SelectItem value="fixo">Aporte fixo</SelectItem>
                 <SelectItem value="periodos">Personalizado por período</SelectItem>
               </SelectContent>
@@ -394,11 +394,11 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
 
           {aporteModo === "fixo" ? (
             <div className="space-y-2">
-              <Label className="text-xs uppercase text-muted-foreground tracking-wide">Aporte Mensal (R$)</Label>
+              <Label className="field-label">Aporte Mensal (R$)</Label>
               <Input
                 value={formatCurrency(aporteMensal)}
                 readOnly
-                className="bg-card border-border text-foreground cursor-not-allowed opacity-70"
+                className="form-card text-foreground cursor-not-allowed opacity-70"
               />
               <p className="text-xs text-muted-foreground">
                 Calculado automaticamente: Renda ({formatarMoedaCompleta(dadosPessoais.renda)}) − Despesa ({formatarMoedaCompleta(dadosPessoais.despesa)})
@@ -406,7 +406,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="rounded-lg bg-card border border-border px-4 py-3">
+              <div className="form-card px-4 py-3">
                 <p className="text-sm text-foreground font-medium">Personalizado por período (blocos de 5 anos)</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   Os valores são em poder de compra de hoje (reais). O sistema converte para nominal no início de cada período.
@@ -424,7 +424,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
                         Ano {b.inicio} ao {b.fim}
                       </p>
                       <div className="mt-3 space-y-2">
-                        <Label className="text-xs uppercase text-muted-foreground tracking-wide">Aporte (R$)</Label>
+                        <Label className="field-label">Aporte (R$)</Label>
                         <Input
                           value={formatCurrency(real)}
                           onChange={(e) => {
@@ -435,7 +435,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
                             setPremissas({ aportePeriodosReal: next, aporteModo: "periodos" })
                           }}
                           placeholder="0"
-                          className="bg-card border-border text-foreground focus:border-primary"
+                          className="form-card text-foreground focus:border-primary"
                         />
                         <p className="text-xs text-muted-foreground">
                           Equivalente a <span className="text-foreground">{formatarMoedaCompleta(nominalNoInicio)}</span>{" "}
@@ -452,17 +452,17 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
       </Card>
 
       {/* Card 2 — Aposentadoria */}
-      <Card className="bg-card border-border">
+      <Card className="form-card">
         <CardHeader className="pb-4">
           <CardTitle className="text-base font-medium text-foreground">Aposentadoria</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label className="text-xs uppercase text-muted-foreground tracking-wide">Idade de Aposentadoria</Label>
+              <Label className="field-label">Idade de Aposentadoria</Label>
               <Input type="number" value={premissas.idadeApos || ""}
                 onChange={e => setPremissas({ idadeApos: parseInt(e.target.value) || 0 })}
-                className="bg-card border-border text-foreground focus:border-primary" />
+                className="form-card text-foreground focus:border-primary" />
               <input
                 type="range"
                 min={30}
@@ -474,10 +474,10 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-xs uppercase text-muted-foreground tracking-wide">Retirada Mensal Desejada (R$)</Label>
+              <Label className="field-label">Retirada Mensal Desejada (R$)</Label>
               <Input value={formatCurrency(premissas.retiradaMensal)}
                 onChange={e => setPremissas({ retiradaMensal: parseCurrency(e.target.value) })}
-                className="bg-card border-border text-foreground focus:border-primary" />
+                className="form-card text-foreground focus:border-primary" />
               <input
                 type="range"
                 min={0}
@@ -489,14 +489,14 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-xs uppercase text-muted-foreground tracking-wide">
+              <Label className="field-label">
                 Renda Mensal na Aposentadoria (R$)
               </Label>
               <Input
                 value={formatCurrency(premissas.rendaAposentadoria ?? 0)}
                 onChange={(e) => setPremissas({ rendaAposentadoria: parseCurrency(e.target.value) })}
                 placeholder="0"
-                className="bg-card border-border text-foreground focus:border-primary"
+                className="form-card text-foreground focus:border-primary"
               />
               <input
                 type="range"
@@ -518,10 +518,10 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
             const rendaApos = premissas.rendaAposentadoria ?? 0
             const retiradaLiquida = Math.max(0, retiradaDesejada - rendaApos)
             const cobreTudo = rendaApos >= retiradaDesejada && retiradaDesejada > 0
-            const cor = cobreTudo ? "text-emerald-400" : "text-primary"
+            const cor = cobreTudo ? "text-white" : "text-primary"
 
             return (
-              <div className="rounded-lg bg-card border border-border px-4 py-3">
+              <div className="form-card px-4 py-3">
                 <p className={`text-sm font-medium ${cor}`}>
                   Retirada líquida do patrimônio: {formatarMoedaCompleta(retiradaLiquida)}
                 </p>
@@ -539,19 +539,19 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
       </Card>
 
       {/* Card 3 — Nova Entrada */}
-      <Card className="bg-card border-border">
+      <Card className="form-card">
         <CardHeader className="pb-4">
           <CardTitle className="text-base font-medium text-foreground">Nova Entrada</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label className="text-xs uppercase text-muted-foreground tracking-wide">Nova Entrada (R$)</Label>
+              <Label className="field-label">Nova Entrada (R$)</Label>
               <Input
                 value={premissas.novaEntrada ? formatCurrency(premissas.novaEntrada) : ""}
                 onChange={e => setPremissas({ novaEntrada: parseCurrency(e.target.value) })}
                 placeholder="Ex: 500.000 (herança, venda de imóvel...)"
-                className="bg-card border-border text-foreground focus:border-primary" />
+                className="form-card text-foreground focus:border-primary" />
               <input
                 type="range"
                 min={0}
@@ -564,12 +564,12 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
               <p className="text-xs text-muted-foreground">Entrada extraordinária corrigida pela inflação no ano previsto</p>
             </div>
             <div className="space-y-2">
-              <Label className="text-xs uppercase text-muted-foreground tracking-wide">Idade da Entrada</Label>
+              <Label className="field-label">Idade da Entrada</Label>
               <Input type="number"
                 value={premissas.idadeEntrada || ""}
                 onChange={e => setPremissas({ idadeEntrada: parseInt(e.target.value) || 0 })}
                 placeholder="Ex: 45"
-                className="bg-card border-border text-foreground focus:border-primary" />
+                className="form-card text-foreground focus:border-primary" />
               <input
                 type="range"
                 min={0}
@@ -595,7 +595,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
       </Card>
 
       {/* Card 5 — Simulação em Tempo Real */}
-      <Card className="bg-card border-border">
+      <Card className="form-card">
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-base font-medium text-foreground">Simulação em tempo real</CardTitle>
           {ToggleNominalReal}
@@ -606,7 +606,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
             <div className="bg-[rgba(30,92,230,0.08)] border border-primary/30 rounded-xl p-4">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Patrimônio na Aposentadoria</p>
+                  <p className="field-label">Patrimônio na Aposentadoria</p>
                   <p className="text-2xl font-bold text-primary mt-1">{formatarMoeda(kpis.patrimonioApos)}</p>
                   <p className="text-xs text-muted-foreground mt-1">{formatarMoeda(kpis.patrimonioAposReal)} em valor real</p>
                 </div>
@@ -616,7 +616,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
             <div className="bg-[rgba(34,199,135,0.08)] border border-[#22C787]/30 rounded-xl p-4">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Renda Mensal na Aposentadoria</p>
+                  <p className="field-label">Renda Mensal na Aposentadoria</p>
                   {(() => {
                     const anos = Math.max(0, (Number(premissas.idadeApos) || 0) - idadeAtualCalculada)
                     const patrimonioNominalApos = Number(kpis.patrimonioApos) || 0
@@ -652,7 +652,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
             <div className="bg-secondary border border-border rounded-xl p-4">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Liberdade Financeira</p>
+                  <p className="field-label">Liberdade Financeira</p>
                   <p className="text-2xl font-bold text-[#F5A623] mt-1">
                     {kpis.idadeLF ? `${kpis.idadeLF} anos` : "—"}
                   </p>
@@ -676,7 +676,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
                 <YAxis stroke="#4A5268" tick={{ fill: "#4A5268", fontSize: 12 }}
                   tickLine={false} axisLine={false} tickFormatter={formatarMoeda} />
                 <Tooltip
-                  contentStyle={{ backgroundColor: "#131929", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "#fff" }}
+                  contentStyle={{ backgroundColor: "var(--bg-page)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "#fff" }}
                   labelStyle={{ color: "#ffffff", fontWeight: 600 }}
                   itemStyle={{ color: "#ffffff" }}
                   formatter={(value: number, _name: string, props: any) => {
@@ -763,7 +763,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
       />
 
       {/* Card 4 — Modo de Cálculo */}
-      <Card className="bg-card border-border">
+      <Card className="form-card">
         <CardHeader className="pb-4">
           <CardTitle className="text-base font-medium text-foreground">Modo de Cálculo</CardTitle>
         </CardHeader>
@@ -779,14 +779,18 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
       </Card>
 
       {/* Footer */}
-      <div className="flex items-center gap-3 pt-4">
-        <Button variant="outline" onClick={() => onNavigate("fluxo-de-caixa")}
-          className="border-border text-muted-foreground hover:text-foreground hover:bg-white/5">
-          <ArrowLeft className="w-4 h-4 mr-2" />Voltar
+      <div className="nav-footer">
+        <Button
+          variant="ghost"
+          className="btn-back"
+          onClick={() => onNavigate("fluxo-de-caixa")}
+        >
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Voltar
         </Button>
-        <Button onClick={() => onNavigate("protecao")}
-          className="bg-primary hover:bg-primary/90 text-primary-foreground">
-          Próximo<ArrowRight className="w-4 h-4 ml-2" />
+        <Button onClick={() => onNavigate("protecao")} className="btn-next">
+          Próximo
+          <ArrowRight className="w-4 h-4 ml-2" />
         </Button>
       </div>
     </div>

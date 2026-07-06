@@ -62,7 +62,7 @@ function BeneficioFiscalPrevidenciaCard() {
   }, [rendaBrutaAnual, aportePGBL])
 
   return (
-    <Card className="bg-card border-border">
+    <Card className="form-card">
       <CardHeader className="pb-4">
         <CardTitle className="text-base font-medium text-foreground">Calculadora de Benefício Fiscal PGBL</CardTitle>
         <CardDescription>Simule a economia de imposto de renda com investimento em PGBL</CardDescription>
@@ -70,22 +70,22 @@ function BeneficioFiscalPrevidenciaCard() {
       <CardContent className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label className="text-xs uppercase text-muted-foreground tracking-wide">RENDA BRUTA ANUAL ({moeda === "USD" ? "US$" : "R$"})</Label>
+            <Label className="field-label">RENDA BRUTA ANUAL ({moeda === "USD" ? "US$" : "R$"})</Label>
             <Input
               value={formatCurrency(rendaBrutaAnual)}
               onChange={(e) => setRendaBrutaAnual(parseCurrency(e.target.value))}
               placeholder="0"
-              className="bg-card border-border text-foreground focus:border-primary"
+              className="form-card text-foreground focus:border-primary"
             />
             <p className="text-xs text-muted-foreground">Soma de todos os rendimentos tributáveis do ano</p>
           </div>
           <div className="space-y-2">
-            <Label className="text-xs uppercase text-muted-foreground tracking-wide">APORTE EM PGBL ({moeda === "USD" ? "US$" : "R$"})</Label>
+            <Label className="field-label">APORTE EM PGBL ({moeda === "USD" ? "US$" : "R$"})</Label>
             <Input
               value={formatCurrency(aportePGBL)}
               onChange={(e) => setAportePGBL(parseCurrency(e.target.value))}
               placeholder="0"
-              className="bg-card border-border text-foreground focus:border-primary"
+              className="form-card text-foreground focus:border-primary"
             />
             <p className="text-xs text-muted-foreground">Valor investido em PGBL no ano (limite: 12% da renda bruta)</p>
           </div>
@@ -217,7 +217,7 @@ export function ProtecaoFinanceira({ onNavigate }: ProtecaoFinanceiraProps) {
     : "Patrimônio suficiente para cobrir a necessidade sem seguro"
 
   const inputClass = "w-full px-4 py-3 bg-input border border-input-border rounded-lg text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
-  const labelClass = "block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2"
+  const labelClass = "block field-labelr mb-2"
 
   return (
     <div className="space-y-8">
@@ -322,7 +322,7 @@ export function ProtecaoFinanceira({ onNavigate }: ProtecaoFinanceiraProps) {
                 stroke="#8E96AC" fontSize={12} axisLine={false} tickLine={false} width={100} />
               <Tooltip
                 formatter={(value: number) => [formatCurrency(value), "Patrimônio Final"]}
-                contentStyle={{ backgroundColor: "#131929", border: "1px solid rgba(255,255,255,0.18)", borderRadius: "8px" }}
+                contentStyle={{ backgroundColor: "var(--bg-page)", border: "1px solid rgba(255,255,255,0.18)", borderRadius: "8px" }}
                 labelStyle={{ color: "#E8EBF2", fontWeight: 600 }}
                 itemStyle={{ color: "#ffffff" }}
               />
@@ -330,7 +330,7 @@ export function ProtecaoFinanceira({ onNavigate }: ProtecaoFinanceiraProps) {
               <Bar dataKey="value" radius={[0, 4, 4, 0]} name="Patrimônio Final">
                 {chartData.map((entry, index) => (
                   <Cell key={`cell-${index}`}
-                    fill={index === 0 ? "rgba(34,199,135,0.3)" : entry.value >= 0 ? "#1E5CE6" : "#EF4444"} />
+                    fill={index === 0 ? "rgba(34,199,135,0.3)" : entry.value >= 0 ? "var(--accent)" : "#EF4444"} />
                 ))}
               </Bar>
             </BarChart>
@@ -378,14 +378,18 @@ export function ProtecaoFinanceira({ onNavigate }: ProtecaoFinanceiraProps) {
       <BeneficioFiscalPrevidenciaCard />
 
       {/* Footer */}
-      <div className="flex items-center gap-4">
-        <Button variant="outline" onClick={() => onNavigate("projecao")}
-          className="border-border text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="w-4 h-4 mr-2" />Voltar
+      <div className="nav-footer">
+        <Button
+          variant="ghost"
+          className="btn-back"
+          onClick={() => onNavigate("projecao")}
+        >
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Voltar
         </Button>
-        <Button onClick={() => onNavigate("simulador-seguros")}
-          className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-3 text-base font-semibold">
-          Próximo<ArrowRight className="w-4 h-4 ml-2" />
+        <Button onClick={() => onNavigate("simulador-seguros")} className="btn-next">
+          Próximo
+          <ArrowRight className="w-4 h-4 ml-2" />
         </Button>
       </div>
     </div>

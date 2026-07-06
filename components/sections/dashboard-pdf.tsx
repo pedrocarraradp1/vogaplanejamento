@@ -46,7 +46,7 @@ export function DashboardPDF({
   const bg2   = "#0D1220"
   const white = "#E8EBF2"
   const muted = "#8E96AC"
-  const blue  = "#1E5CE6"
+  const blue  = "var(--accent)"
   const green = "#22C787"
   const amber = "#F5A623"
   const red   = "#EF4444"

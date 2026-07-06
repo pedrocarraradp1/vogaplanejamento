@@ -16,7 +16,7 @@ export function Cenarios({ onNavigate }: CenariosProps) {
     <div className="space-y-6">
       <div className="space-y-1">
         <p className="text-sm text-muted-foreground">Planejamento Patrimonial</p>
-        <h1 className="text-2xl font-semibold text-foreground">
+        <h1 className="page-title text-[24px] text-foreground">
           Cenários <span className="text-primary">de Investimento</span>
         </h1>
         <p className="text-sm text-muted-foreground">
@@ -30,18 +30,18 @@ export function Cenarios({ onNavigate }: CenariosProps) {
         editable
       />
 
-      <div className="flex items-center gap-3 pt-4">
+      <div className="nav-footer">
         <Button
-          variant="outline"
+          variant="ghost"
+          className="btn-back"
           onClick={() => onNavigate("projecao")}
-          className="border-border text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Voltar
         </Button>
         <Button
           onClick={() => onNavigate("sucessorio")}
-          className="bg-primary hover:bg-primary/90 text-primary-foreground"
+          className="btn-next"
         >
           Próximo
           <ArrowRight className="w-4 h-4 ml-2" />
