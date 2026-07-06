@@ -367,4 +367,70 @@
     background: var(--surface);
     border-radius: 8px;
   }
+
+  /* Layout otimizado para exportação PDF do Balanço Patrimonial */
+  #balanco-patrimonial-content.pdf-export-mode {
+    position: fixed;
+    left: -9999px;
+    top: 0;
+    width: 720px;
+    max-width: 720px;
+    background: #ffffff;
+    padding: 0;
+    z-index: -1;
+  }
+
+  #balanco-patrimonial-content.pdf-export-mode .pdf-hide {
+    display: none !important;
+  }
+
+  #balanco-patrimonial-content.pdf-export-mode .pdf-grid-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 12px !important;
+  }
+
+  #balanco-patrimonial-content.pdf-export-mode .pdf-grid-2 {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+  }
+
+  #balanco-patrimonial-content.pdf-export-mode .pdf-grid-indicadores {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 12px !important;
+  }
+
+  #balanco-patrimonial-content.pdf-export-mode .pdf-grid-balanco {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+  }
+
+  #balanco-patrimonial-content.pdf-export-mode .pdf-section {
+    margin-bottom: 14px;
+    break-inside: avoid;
+  }
+
+  #balanco-patrimonial-content.pdf-export-mode .pdf-section-card {
+    padding: 18px !important;
+    border-radius: 8px !important;
+  }
+
+  #balanco-patrimonial-content.pdf-export-mode .donut-com-legenda {
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 12px !important;
+  }
+
+  #balanco-patrimonial-content.pdf-export-mode .donut-com-legenda > div:first-child {
+    width: 180px !important;
+    height: 180px !important;
+  }
+
+  #balanco-patrimonial-content.pdf-export-mode .donut-com-legenda ul {
+    width: 100% !important;
+  }
+
+  #balanco-patrimonial-content.pdf-export-mode .donut-com-legenda li {
+    font-size: 12px !important;
+    margin-bottom: 8px !important;
+  }
 }

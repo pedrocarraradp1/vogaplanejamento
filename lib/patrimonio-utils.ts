@@ -86,6 +86,119 @@ export function isInstituicaoFinanceiraListada(value: string): value is Institui
   return (INSTITUICOES_FINANCEIRAS as readonly string[]).includes(value)
 }
 
+/** Empresário(a) ou profissão customizada que indique empresário. */
+export function isProfissaoEmpresario(profissao: string): boolean {
+  return /empres[aá]ri/i.test((profissao ?? "").trim())
+}
+
+/** Meta de reserva: empresário 12m, com filhos 9m, demais 6m. */
+export function metaReservaEmergenciaMeses(profissao: string, quantidadeFilhos: number): number {
+  if (isProfissaoEmpresario(profissao)) return 12
+  if (quantidadeFilhos > 0) return 9
+  return 6
+}
+
+export function descricaoMetaReservaEmergencia(profissao: string, quantidadeFilhos: number): string {
+  const meta = metaReservaEmergenciaMeses(profissao, quantidadeFilhos)
+  if (isProfissaoEmpresario(profissao)) return `Meta: ${meta} meses (empresário)`
+  if (quantidadeFilhos > 0) return `Meta: ${meta} meses (com filhos)`
+  return `Meta: ${meta} meses`
+}
+
+export type NivelSaude = "green" | "yellow" | "red"
+
+export function nivelReservaEmergencia(meses: number, meta: number): NivelSaude {
+  if (meses >= meta) return "green"
+  if (meses >= meta / 2) return "yellow"
+  return "red"
+}
+
+export const TOOLTIP_PATRIMONIO_LIQUIDO =
+  "Cálculo: soma de todos os ativos menos o total de passivos (saldo devedor).\n\nEsperado: patrimônio líquido positivo indica ativos superiores às dívidas."
+
+export const TOOLTIP_ATIVOS_TOTAIS =
+  "Cálculo: soma de ativos líquidos, imobilizado e participações societárias cadastrados.\n\nEsperado: quanto maior em relação aos passivos, mais sólida a posição patrimonial."
+
+export const TOOLTIP_PASSIVOS_TOTAIS =
+  "Cálculo: soma dos saldos devedores de todos os passivos cadastrados.\n\nEsperado: manter o menor percentual possível sobre o total de ativos."
+
+export function tooltipReservaEmergencia(profissao: string, quantidadeFilhos: number): string {
+  const meta = metaReservaEmergenciaMeses(profissao, quantidadeFilhos)
+  const perfil = isProfissaoEmpresario(profissao)
+    ? "empresário"
+    : quantidadeFilhos > 0
+      ? "com filhos"
+      : "sem filhos"
+  return [
+    "Cálculo: Ativos Líquidos ÷ Despesa Mensal (aba Dados Pessoais).",
+    "Considera apenas ativos do tipo Líquido.",
+    "",
+    "Meta recomendada:",
+    "• Empresário: 12 meses",
+    "• Com filhos: 9 meses",
+    "• Sem filhos: 6 meses",
+    "",
+    `Sua meta: ${meta} meses (${perfil}).`,
+    "",
+    "Indicador:",
+    "• Verde: ≥ meta",
+    "• Amarelo: ≥ metade da meta",
+    "• Vermelho: abaixo da metade da meta",
+  ].join("\n")
+}
+
+export const TOOLTIP_COMPROMETIMENTO_RENDA = [
+  "Cálculo: (soma das parcelas mensais dos passivos ÷ Renda Mensal) × 100.",
+  "A parcela usa o valor informado ou, se ausente, saldo devedor ÷ 120.",
+  "",
+  "Indicador:",
+  "• Verde: < 20%",
+  "• Amarelo: 20% a 30%",
+  "• Vermelho: > 30%",
+].join("\n")
+
+export const TOOLTIP_INDICE_LIQUIDEZ = [
+  "Cálculo: Ativos Líquidos ÷ Total de Passivos.",
+  "Mede a capacidade de cobrir dívidas com recursos líquidos.",
+  "",
+  "Indicador:",
+  "• Verde: > 1,5",
+  "• Amarelo: 1,0 a 1,5",
+  "• Vermelho: < 1,0",
+].join("\n")
+
+export const TOOLTIP_TAXA_POUPANCA = [
+  "Cálculo: (Renda Mensal − Despesa Mensal) ÷ Renda Mensal × 100.",
+  "Valores negativos são tratados como 0%.",
+  "",
+  "Indicador:",
+  "• Verde: > 20%",
+  "• Amarelo: 10% a 20%",
+  "• Vermelho: < 10%",
+].join("\n")
+
+export const TOOLTIP_CUSTO_JUROS_PROJETADO =
+  "Cálculo: por passivo, (parcela mensal × prazo restante em meses) − saldo devedor. Soma de todos os passivos.\nEstima o custo total de juros até quitar as dívidas.\n\nEsperado: quanto menor, menor o peso financeiro das dívidas."
+
+export const TOOLTIP_INDICE_ALAVANCAGEM =
+  "Cálculo: (Total de Passivos ÷ Ativos Totais) × 100.\n\nEsperado: quanto menor o percentual, menor a dependência de endividamento no patrimônio."
+
+/** Paleta de gráficos — tokens Voga (azuis, verde, cinza). */
+export const CORES_GRAFICO_VOGA = [
+  "#4B759B",
+  "#033252",
+  "#345E7B",
+  "#6B8FB0",
+  "#00954F",
+  "#9A9B9B",
+  "#C8E2F5",
+] as const
+
+export const COR_GRAFICO_LIQUIDOS = "#4B759B"
+export const COR_GRAFICO_IMOBILIZADO = "#033252"
+export const COR_GRAFICO_PREVIDENCIA = "#00954F"
+export const COR_GRAFICO_INVESTIMENTOS = "#345E7B"
+
 export const SECAO_LIQUIDO = {
   id: "liquidos",
   title: "Ativos Líquidos",
@@ -100,7 +213,7 @@ export const SECAO_IMOBILIZADO = {
   title: "Imobilizado",
   tipo: "Imobilizado",
   categorias: DESCRICOES_ATIVOS_POR_TIPO["Imobilizado"],
-  cor: "#1D9E75",
+  cor: "#033252",
   totalLabel: "Total",
 } as const
 
@@ -109,7 +222,7 @@ export const SECAO_PARTICIPACOES = {
   title: "Participações Societárias",
   tipo: "Participação Societária",
   categorias: DESCRICOES_ATIVOS_POR_TIPO["Participação Societária"],
-  cor: "#7C3AED",
+  cor: "#345E7B",
   totalLabel: "Total",
 } as const
 

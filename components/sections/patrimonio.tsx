@@ -15,6 +15,7 @@ import {
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts"
 import { Pencil, Plus } from "lucide-react"
 import { usePlano } from "@/lib/plano-context"
+import { exportBalancoPatrimonialPdf } from "@/lib/balanco-pdf-export"
 import {
   CATEGORIAS_PASSIVO,
   DESCRICOES_ATIVOS_POR_TIPO,
@@ -33,6 +34,23 @@ import {
   sumAtivoCategoria,
   INSTITUICOES_FINANCEIRAS,
   isInstituicaoFinanceiraListada,
+  metaReservaEmergenciaMeses,
+  descricaoMetaReservaEmergencia,
+  nivelReservaEmergencia,
+  tooltipReservaEmergencia,
+  TOOLTIP_PATRIMONIO_LIQUIDO,
+  TOOLTIP_ATIVOS_TOTAIS,
+  TOOLTIP_PASSIVOS_TOTAIS,
+  TOOLTIP_COMPROMETIMENTO_RENDA,
+  TOOLTIP_INDICE_LIQUIDEZ,
+  TOOLTIP_TAXA_POUPANCA,
+  TOOLTIP_CUSTO_JUROS_PROJETADO,
+  TOOLTIP_INDICE_ALAVANCAGEM,
+  CORES_GRAFICO_VOGA,
+  COR_GRAFICO_LIQUIDOS,
+  COR_GRAFICO_IMOBILIZADO,
+  COR_GRAFICO_PREVIDENCIA,
+  COR_GRAFICO_INVESTIMENTOS,
   type SecaoAtivoConfig,
   type TipoAtivoLabel,
 } from "@/lib/patrimonio-utils"
@@ -156,11 +174,14 @@ function InfoTooltip({ text }: { text: string }) {
   if (!text?.trim()) return null
   return (
     <div
-      style={{ position: "relative", display: "inline-flex", marginLeft: 5 }}
+      className="pdf-hide"
+      style={{ position: "relative", display: "inline-flex", marginLeft: 5, verticalAlign: "middle" }}
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={() => setOpen(false)}
     >
       <span
+        role="img"
+        aria-label="Informação"
         style={{
           width: 14,
           height: 14,
@@ -190,9 +211,11 @@ function InfoTooltip({ text }: { text: string }) {
             padding: "8px 10px",
             fontSize: 11,
             color: "#52514e",
-            width: 215,
+            width: 260,
+            maxWidth: "min(280px, 70vw)",
             zIndex: 50,
             lineHeight: 1.5,
+            whiteSpace: "pre-wrap",
             boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
           }}
         >
@@ -200,6 +223,15 @@ function InfoTooltip({ text }: { text: string }) {
         </div>
       )}
     </div>
+  )
+}
+
+function LabelComTooltip({ label, tooltip }: { label: string; tooltip?: string }) {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 0 }}>
+      {label}
+      {tooltip ? <InfoTooltip text={tooltip} /> : null}
+    </span>
   )
 }
 
@@ -224,7 +256,7 @@ function DonutComLegenda({
   }
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+    <div className="donut-com-legenda" style={{ display: "flex", alignItems: "center", gap: 16 }}>
       <div style={{ width: 155, height: 155, flexShrink: 0 }}>
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
@@ -293,11 +325,13 @@ function KpiCard({
   value,
   hint,
   valueColor = "#1A1A1A",
+  tooltip,
 }: {
   label: string
   value: string
   hint?: string
   valueColor?: string
+  tooltip?: string
 }) {
   return (
     <div style={{ background: "var(--surface)", borderRadius: 6, padding: "12px 14px" }}>
@@ -310,7 +344,7 @@ function KpiCard({
           marginBottom: 5,
         }}
       >
-        {label}
+        <LabelComTooltip label={label} tooltip={tooltip} />
       </div>
       <div style={{ fontSize: 18, fontWeight: 500, color: valueColor }}>{value}</div>
       {hint ? (
@@ -325,11 +359,13 @@ function IndicadorSaude({
   valor,
   nivel,
   progressPct,
+  tooltip,
 }: {
   label: string
   valor: string
   nivel: SemaphoreLevel
   progressPct: number
+  tooltip?: string
 }) {
   const borderColor = SEMAPHORE_BORDER[nivel]
   const pct = Math.min(100, Math.max(0, progressPct))
@@ -343,7 +379,7 @@ function IndicadorSaude({
       }}
     >
       <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".06em", color: "#9A9B9B", marginBottom: 5 }}>
-        {label}
+        <LabelComTooltip label={label} tooltip={tooltip} />
       </div>
       <div style={{ fontSize: 16, fontWeight: 500, color: "#1A1A1A", marginBottom: 8 }}>{valor}</div>
       <div style={{ height: 4, borderRadius: 2, background: "#D9D9D9", overflow: "hidden" }}>
@@ -351,12 +387,6 @@ function IndicadorSaude({
       </div>
     </div>
   )
-}
-
-function nivelReservaEmergencia(meses: number): SemaphoreLevel {
-  if (meses > 6) return "green"
-  if (meses >= 3) return "yellow"
-  return "red"
 }
 
 function nivelComprometimento(pct: number): SemaphoreLevel {
@@ -427,6 +457,7 @@ function AtivoListaBarRow({
         <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
           <button
             type="button"
+            className="pdf-hide"
             onClick={startEdit}
             aria-label="Editar valor"
             style={{
@@ -636,23 +667,27 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
 
   const dataDonutGrupos = useMemo(
     () => [
-      { name: "Imobilizado", value: imobilizado, fill: "#4B759B" },
-      { name: "Previdência", value: totalPrevidencia, fill: "#5DCAA5" },
-      { name: "Investimentos", value: totalInvestimentos, fill: "#7F77DD" },
-      { name: "Líquidos", value: totalLiquidosRest, fill: "#EF9F27" },
+      { name: "Imobilizado", value: imobilizado, fill: COR_GRAFICO_IMOBILIZADO },
+      { name: "Previdência", value: totalPrevidencia, fill: COR_GRAFICO_PREVIDENCIA },
+      { name: "Investimentos", value: totalInvestimentos, fill: COR_GRAFICO_INVESTIMENTOS },
+      { name: "Líquidos", value: totalLiquidosRest, fill: COR_GRAFICO_LIQUIDOS },
     ],
     [imobilizado, totalPrevidencia, totalInvestimentos, totalLiquidosRest],
   )
 
   const dataDonutLiquidos = useMemo(() => {
-    const cores = ["#EF9F27", "#4B759B", "#5DCAA5", "#7F77DD", "#C0392B", "#00954F"]
     return ativos
       .filter((a) => (a.tipo ?? "").trim() === "Líquido" && (Number(a.valor) || 0) > 0)
-      .map((a, i) => ({
-        name: normalizeAtivoDescricao(a.descricao) || "Outros",
-        value: Number(a.valor) || 0,
-        fill: cores[i % cores.length],
-      }))
+      .map((a, i) => {
+        const desc = normalizeAtivoDescricao(a.descricao) || "Outros"
+        const inst = (a.instituicao ?? "").trim()
+        const name = inst ? `${desc} · ${inst}` : desc
+        return {
+          name,
+          value: Number(a.valor) || 0,
+          fill: CORES_GRAFICO_VOGA[i % CORES_GRAFICO_VOGA.length],
+        }
+      })
       .sort((a, b) => b.value - a.value)
   }, [ativos])
 
@@ -701,6 +736,10 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
 
   const rendaMensal = dadosPessoais.renda || 0
   const despesaMensal = dadosPessoais.despesa || 0
+  const quantidadeFilhos = dadosPessoais.filhos?.length ?? 0
+  const metaReservaEmergencia = metaReservaEmergenciaMeses(dadosPessoais.profissao ?? "", quantidadeFilhos)
+  const hintReservaEmergencia = descricaoMetaReservaEmergencia(dadosPessoais.profissao ?? "", quantidadeFilhos)
+  const tooltipReserva = tooltipReservaEmergencia(dadosPessoais.profissao ?? "", quantidadeFilhos)
   const capacidadePoupanca = Math.max(0, rendaMensal - despesaMensal)
   const reservaEmergenciaMeses = despesaMensal > 0 ? ativosLiquidos / despesaMensal : 0
   const comprometimentoRendaPct = rendaMensal > 0 ? (somaParcelasMensais / rendaMensal) * 100 : 0
@@ -737,13 +776,13 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
     return [
       {
         titulo: "Líquidos",
-        cor: "#EF9F27",
+        cor: COR_GRAFICO_LIQUIDOS,
         itens: filtro("Líquido", ["Outros"]),
         subtotal: filtro("Líquido", ["Outros"]).reduce((s, i) => s + i.valor, 0),
       },
       {
         titulo: "Investimentos",
-        cor: "#7F77DD",
+        cor: COR_GRAFICO_INVESTIMENTOS,
         itens: [
           ...filtro("Líquido", ["Ativos Nacionais", "Ativos Internacionais"]),
           ...filtro("Participação Societária"),
@@ -752,13 +791,13 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
       },
       {
         titulo: "Previdência",
-        cor: "#5DCAA5",
+        cor: COR_GRAFICO_PREVIDENCIA,
         itens: filtro("Líquido", ["Previdência Privada"]),
         subtotal: totalPrevidencia,
       },
       {
         titulo: "Imobilizado",
-        cor: "#4B759B",
+        cor: COR_GRAFICO_IMOBILIZADO,
         itens: filtro("Imobilizado"),
         subtotal: imobilizado,
       },
@@ -783,123 +822,12 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
   }
 
   const exportarPDF = async () => {
-    const [{ default: html2canvas }, jspdfMod] = await Promise.all([
-      import("html2canvas"),
-      // @ts-expect-error — bundle ESM do jsPDF para evitar import node no SSR
-      import("jspdf/dist/jspdf.es.min.js"),
-    ])
-    const jsPDF = (jspdfMod as { jsPDF?: typeof import("jspdf").jsPDF; default?: typeof import("jspdf").jsPDF }).jsPDF
-      ?? (jspdfMod as { default: typeof import("jspdf").jsPDF }).default
-
-    const el = document.getElementById("balanco-patrimonial-content")
-    if (!el) return
-
-    const botoes = el.querySelectorAll(".no-print")
-    botoes.forEach((b) => {
-      ;(b as HTMLElement).style.visibility = "hidden"
-    })
-
-    const canvas = await html2canvas(el, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: "#ffffff",
-      logging: false,
-    })
-
-    botoes.forEach((b) => {
-      ;(b as HTMLElement).style.visibility = "visible"
-    })
-
-    const imgData = canvas.toDataURL("image/png")
-    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" })
-
-    const pageW = pdf.internal.pageSize.getWidth()
-    const pageH = pdf.internal.pageSize.getHeight()
-    const margin = 12
-    const contentW = pageW - margin * 2
-    const imgH = (canvas.height * contentW) / canvas.width
-
-    pdf.setFillColor(1, 33, 55)
-    pdf.rect(0, 0, pageW, 52, "F")
-
-    pdf.setFillColor(75, 117, 155)
-    pdf.rect(0, 52, pageW, 1.5, "F")
-
-    pdf.setTextColor(255, 255, 255)
-    pdf.setFontSize(20)
-    pdf.setFont("helvetica", "bold")
-    pdf.text("BALANÇO PATRIMONIAL", margin, 22)
-
-    pdf.setFontSize(10)
-    pdf.setFont("helvetica", "normal")
-    pdf.setTextColor(200, 226, 245)
-    pdf.text("Demonstrativo completo de ativos e passivos", margin, 30)
-
     const nomCliente = dadosPessoais?.nome || "Cliente"
     const dataRef = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
-    pdf.setFontSize(9)
-    pdf.setTextColor(160, 190, 220)
-    pdf.text(`Cliente: ${nomCliente}`, margin, 40)
-    pdf.text(`Data de referência: ${dataRef}`, margin, 46)
-    pdf.text("Classificação: Confidencial", pageW - margin - 40, 46)
-
-    pdf.setFontSize(8)
-    pdf.setTextColor(100, 130, 160)
-    pdf.text("Voga | BTG Pactual | Planejamento Financeiro Pessoal", margin, 52 - 3)
-
-    let yPos = 58
-    const pageContentH = pageH - yPos - 12
-
-    if (imgH <= pageContentH) {
-      pdf.addImage(imgData, "PNG", margin, yPos, contentW, imgH)
-    } else {
-      let remainingH = imgH
-      let sourceY = 0
-      let firstPage = true
-
-      while (remainingH > 0) {
-        const sliceH = firstPage ? pageContentH : pageH - 20
-        const actualSlice = Math.min(sliceH, remainingH)
-        const canvasSliceH = (actualSlice * canvas.width) / contentW
-
-        const sliceCanvas = document.createElement("canvas")
-        sliceCanvas.width = canvas.width
-        sliceCanvas.height = canvasSliceH
-        const ctx = sliceCanvas.getContext("2d")!
-        ctx.drawImage(canvas, 0, sourceY, canvas.width, canvasSliceH, 0, 0, canvas.width, canvasSliceH)
-
-        const sliceImg = sliceCanvas.toDataURL("image/png")
-        const startY = firstPage ? yPos : 12
-        pdf.addImage(sliceImg, "PNG", margin, startY, contentW, actualSlice)
-
-        pdf.setFillColor(1, 33, 55)
-        pdf.rect(0, pageH - 8, pageW, 8, "F")
-        pdf.setFontSize(7)
-        pdf.setTextColor(160, 190, 220)
-        pdf.text("Voga | BTG Pactual | Confidencial", margin, pageH - 3)
-        pdf.text(`${nomCliente} — Balanço Patrimonial`, pageW / 2, pageH - 3, { align: "center" })
-        pdf.text(dataRef, pageW - margin, pageH - 3, { align: "right" })
-
-        sourceY += canvasSliceH
-        remainingH -= actualSlice
-
-        if (remainingH > 0) {
-          pdf.addPage()
-          firstPage = false
-        }
-      }
-    }
-
-    pdf.setFillColor(1, 33, 55)
-    pdf.rect(0, pageH - 8, pageW, 8, "F")
-    pdf.setFontSize(7)
-    pdf.setTextColor(160, 190, 220)
-    pdf.text("Voga | BTG Pactual | Confidencial", margin, pageH - 3)
-    pdf.text(`${nomCliente} — Balanço Patrimonial`, pageW / 2, pageH - 3, { align: "center" })
-    pdf.text(dataRef, pageW - margin, pageH - 3, { align: "right" })
-
-    const nomeArq = `Balanco_Patrimonial_${nomCliente.replace(/\s+/g, "_")}_${new Date().getFullYear()}.pdf`
-    pdf.save(nomeArq)
+    await exportBalancoPatrimonialPdf("balanco-patrimonial-content", {
+      clientName: nomCliente,
+      referenceDate: dataRef,
+    })
   }
 
   const abrirModalAtivo = () => openAddAtivo(SECAO_LIQUIDO)
@@ -913,11 +841,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
     return participacoes
   }
 
-  const totalCorSecao = (secao: SecaoAtivoConfig) => {
-    if (secao.id === "liquidos") return "var(--accent)"
-    if (secao.id === "imobilizado") return "#00954F"
-    return "#7C3AED"
-  }
+  const totalCorSecao = (secao: SecaoAtivoConfig) => secao.cor
 
   const onAtivoTipoChange = (tipo: TipoAtivoLabel) => {
     setAddAtivoForm((prev) => ({
@@ -952,7 +876,8 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
 
   return (
     <div id="balanco-patrimonial-content">
-      {/* 1. Cabeçalho */}
+      {/* 1. Cabeçalho (somente tela) */}
+      <div className="pdf-hide">
       <p style={{ fontSize: 11, color: "var(--accent)", marginBottom: 8 }}>Cadastro</p>
       <div
         style={{
@@ -1037,9 +962,12 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
           </button>
         </div>
       </div>
+      </div>
 
       {/* 2. KPIs */}
+      <div className="pdf-section">
       <div
+        className="pdf-grid-kpis"
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
@@ -1052,12 +980,18 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
           value={formatCurrency(patrimonioLiquidoResumo)}
           hint="Ativos − Passivos"
           valueColor="#00954F"
+          tooltip={TOOLTIP_PATRIMONIO_LIQUIDO}
         />
-        <KpiCard label="Ativos totais" value={formatCurrency(patrimonioTotal)} />
+        <KpiCard
+          label="Ativos totais"
+          value={formatCurrency(patrimonioTotal)}
+          tooltip={TOOLTIP_ATIVOS_TOTAIS}
+        />
         <KpiCard
           label="Passivos totais"
           value={formatCurrency(totalPassivos)}
           valueColor="#C0392B"
+          tooltip={TOOLTIP_PASSIVOS_TOTAIS}
         />
         <KpiCard
           label="Reserva emergência"
@@ -1066,12 +1000,16 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
               ? `${reservaEmergenciaMeses.toFixed(1)} meses`
               : "—"
           }
-          hint="Ativos líquidos ÷ despesa mensal"
+          hint={hintReservaEmergencia}
+          tooltip={tooltipReserva}
         />
+      </div>
       </div>
 
       {/* 3. Gráficos donuts */}
+      <div className="pdf-section">
       <div
+        className="pdf-grid-2"
         style={{
           display: "grid",
           gridTemplateColumns: "1fr 1fr",
@@ -1079,28 +1017,32 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
           marginBottom: 12,
         }}
       >
-        <div style={{ background: "var(--surface)", borderRadius: 8, padding: 16 }}>
+        <div className="pdf-section-card" style={{ background: "var(--surface)", borderRadius: 8, padding: 16 }}>
           <p style={{ fontSize: 13, color: "#1A1A1A", marginBottom: 12, fontWeight: 500 }}>
             Composição total de ativos
           </p>
           <DonutComLegenda data={dataDonutGrupos} formatCurrency={formatCurrency} />
         </div>
-        <div style={{ background: "var(--surface)", borderRadius: 8, padding: 16 }}>
+        <div className="pdf-section-card" style={{ background: "var(--surface)", borderRadius: 8, padding: 16 }}>
           <p style={{ fontSize: 13, color: "#1A1A1A", marginBottom: 12, fontWeight: 500 }}>
             Composição dos ativos líquidos
           </p>
           <DonutComLegenda data={dataDonutLiquidos} formatCurrency={formatCurrency} />
           <p style={{ fontSize: 11, color: "#9A9B9B", marginTop: 12 }}>
-            Reserva de emergência:{" "}
+            <LabelComTooltip label="Reserva de emergência" tooltip={tooltipReserva} />
+            {": "}
             <strong style={{ color: "#1A1A1A" }}>
               {despesaMensal > 0 ? `${reservaEmergenciaMeses.toFixed(1)} meses` : "—"}
             </strong>
           </p>
         </div>
       </div>
+      </div>
 
       {/* 4. Barras + Passivos */}
+      <div className="pdf-section">
       <div
+        className="pdf-grid-2"
         style={{
           display: "grid",
           gridTemplateColumns: "1fr 1fr",
@@ -1108,7 +1050,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
           marginBottom: 12,
         }}
       >
-        <div style={{ background: "var(--surface)", borderRadius: 8, padding: 16 }}>
+        <div className="pdf-section-card" style={{ background: "var(--surface)", borderRadius: 8, padding: 16 }}>
           <p style={{ fontSize: 13, color: "#1A1A1A", marginBottom: 12, fontWeight: 500 }}>
             Ativos por grupo
           </p>
@@ -1155,7 +1097,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
           )}
         </div>
 
-        <div style={{ background: "var(--surface)", borderRadius: 8, padding: 16 }}>
+        <div className="pdf-section-card" style={{ background: "var(--surface)", borderRadius: 8, padding: 16 }}>
           <p style={{ fontSize: 13, color: "#1A1A1A", marginBottom: 12, fontWeight: 500 }}>
             Passivos e dívidas
           </p>
@@ -1229,18 +1171,30 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
             }}
           >
             <span>
-              Custo total de juros projetado:{" "}
+              <LabelComTooltip
+                label="Custo total de juros projetado"
+                tooltip={TOOLTIP_CUSTO_JUROS_PROJETADO}
+              />
+              {": "}
               <strong>{formatCurrency(custoJurosProjetado)}</strong>
             </span>
             <span>
-              Índice de alavancagem: <strong>{indiceAlavancagem.toFixed(1)}%</strong>
+              <LabelComTooltip
+                label="Índice de alavancagem"
+                tooltip={TOOLTIP_INDICE_ALAVANCAGEM}
+              />
+              {": "}
+              <strong>{indiceAlavancagem.toFixed(1)}%</strong>
             </span>
           </div>
         </div>
       </div>
+      </div>
 
       {/* 5. Indicadores de saúde */}
+      <div className="pdf-section">
       <div
+        className="pdf-grid-indicadores"
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
@@ -1251,32 +1205,37 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
         <IndicadorSaude
           label="Reserva emergência"
           valor={despesaMensal > 0 ? `${reservaEmergenciaMeses.toFixed(1)} meses` : "—"}
-          nivel={nivelReservaEmergencia(reservaEmergenciaMeses)}
-          progressPct={Math.min(100, (reservaEmergenciaMeses / 12) * 100)}
+          nivel={nivelReservaEmergencia(reservaEmergenciaMeses, metaReservaEmergencia)}
+          progressPct={Math.min(100, (reservaEmergenciaMeses / metaReservaEmergencia) * 100)}
+          tooltip={tooltipReserva}
         />
         <IndicadorSaude
           label="Comprometimento renda"
           valor={`${comprometimentoRendaPct.toFixed(1)}%`}
           nivel={nivelComprometimento(comprometimentoRendaPct)}
           progressPct={Math.min(100, comprometimentoRendaPct)}
+          tooltip={TOOLTIP_COMPROMETIMENTO_RENDA}
         />
         <IndicadorSaude
           label="Índice liquidez"
           valor={totalPassivos > 0 ? indiceLiquidez.toFixed(2) : "—"}
           nivel={nivelLiquidez(indiceLiquidez)}
           progressPct={Math.min(100, indiceLiquidez * 40)}
+          tooltip={TOOLTIP_INDICE_LIQUIDEZ}
         />
         <IndicadorSaude
           label="Taxa poupança"
           valor={`${taxaPoupancaPct.toFixed(1)}%`}
           nivel={nivelPoupanca(taxaPoupancaPct)}
           progressPct={Math.min(100, taxaPoupancaPct)}
+          tooltip={TOOLTIP_TAXA_POUPANCA}
         />
+      </div>
       </div>
 
       {/* 6. Balanço em linhas */}
-      <div style={{ background: "var(--surface)", borderRadius: 8, padding: 16, marginBottom: 16 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <div className="pdf-section pdf-section-card" style={{ background: "var(--surface)", borderRadius: 8, padding: 16, marginBottom: 16 }}>
+        <div className="pdf-grid-balanco" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           {/* Coluna Ativo */}
           <div>
             <div
@@ -1466,6 +1425,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
           return (
             <div
               key={secao.id}
+              className="pdf-section pdf-section-card"
               style={{
                 background: "var(--surface)",
                 borderRadius: 8,
