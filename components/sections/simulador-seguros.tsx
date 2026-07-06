@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
@@ -640,8 +640,8 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
         <div className="space-y-1">
           <p className="text-sm text-muted-foreground">Planejamento</p>
           <h1 className="text-2xl font-semibold text-foreground flex items-center gap-2">
-            <ShieldCheck className="h-7 w-7 text-[#1E5CE6]" />
-            Simulador de <span className="text-[#1E5CE6]">Seguros</span>
+            <ShieldCheck className="h-7 w-7 text-primary" />
+            Simulador de <span className="text-primary">Seguros</span>
           </h1>
           <p className="text-sm text-muted-foreground max-w-xl">
             Comparador completo: alocação prev/invest, MAG, KPIs e gráficos em modo nominal ou real.
@@ -655,17 +655,17 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
             type="single"
             value={modoRN}
             onValueChange={(v) => v && setModoRN(v as "nominal" | "real")}
-            className="rounded-lg border border-white/10 bg-[#131929] p-1"
+            className="rounded-lg border border-border bg-card p-1"
           >
             <ToggleGroupItem
               value="nominal"
-              className="data-[state=on]:bg-[#1E5CE6] data-[state=on]:text-white px-3 py-1.5 text-xs"
+              className="data-[state=on]:bg-primary data-[state=on]:text-white px-3 py-1.5 text-xs"
             >
               Nominal
             </ToggleGroupItem>
             <ToggleGroupItem
               value="real"
-              className="data-[state=on]:bg-[#1E5CE6] data-[state=on]:text-white px-3 py-1.5 text-xs"
+              className="data-[state=on]:bg-primary data-[state=on]:text-white px-3 py-1.5 text-xs"
             >
               Real
             </ToggleGroupItem>
@@ -674,7 +674,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
       </div>
 
       {/* SEÇÃO 1 */}
-      <Card className="bg-[#131929] border-white/10">
+      <Card className="bg-card border-border">
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-medium text-foreground">Patrimônio e alocação</CardTitle>
         </CardHeader>
@@ -688,7 +688,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
                 type="number"
                 value={patTotal || ""}
                 onChange={(e) => setPatTotal(Math.max(0, parseFloat(e.target.value) || 0))}
-                className="h-11 bg-[#0D1220] border-white/10 text-foreground tabular-nums"
+                className="form-input h-11 tabular-nums"
               />
               <p className="text-xs text-muted-foreground">
                 Base global: ativos líquidos − passivos ({fmtMoney(getPatrimonioLiquido(), moeda)}). Editável para
@@ -700,7 +700,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
           <div className="space-y-2">
             <div className="flex justify-between gap-2 text-sm">
               <span className="text-muted-foreground">% em previdência</span>
-              <span className="font-semibold text-[#1E5CE6] tabular-nums">
+              <span className="font-semibold text-primary tabular-nums">
                 {allocPrevPct}% prev / {investPct}% invest
               </span>
             </div>
@@ -714,24 +714,24 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="rounded-lg border border-white/10 bg-[#0D1220] p-4">
+            <div className="rounded-lg border border-border bg-secondary p-4">
               <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Em previdência</p>
               <p className="text-lg font-semibold tabular-nums text-foreground">{fmtMoney(patP, moeda)}</p>
             </div>
-            <div className="rounded-lg border border-white/10 bg-[#0D1220] p-4">
+            <div className="rounded-lg border border-border bg-secondary p-4">
               <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Em investimento</p>
               <p className="text-lg font-semibold tabular-nums text-foreground">{fmtMoney(patI, moeda)}</p>
             </div>
-            <div className="rounded-lg border border-[#1E5CE6]/40 bg-[#1E5CE6]/10 p-4">
+            <div className="rounded-lg border border-primary/40 bg-primary/10 p-4">
               <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Capital segurado</p>
-              <p className="text-lg font-semibold tabular-nums text-[#1E5CE6]">{fmtMoney(capitalSegurado, moeda)}</p>
+              <p className="text-lg font-semibold tabular-nums text-primary">{fmtMoney(capitalSegurado, moeda)}</p>
             </div>
           </div>
 
           <div className="space-y-2">
             <div className="flex justify-between gap-2">
               <Label className="text-sm text-muted-foreground">Capital segurado (slider)</Label>
-              <span className="text-sm font-semibold text-[#1E5CE6] tabular-nums">
+              <span className="text-sm font-semibold text-primary tabular-nums">
                 {fmtMoney(capitalSegurado, moeda)}
               </span>
             </div>
@@ -770,9 +770,9 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
 
       {/* SEÇÃO 2 */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="bg-[#131929] border-[#1E5CE6]/30">
+        <Card className="bg-card border-primary/30">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-[#1E5CE6]">Previdência % a.a. líquida</CardTitle>
+            <CardTitle className="text-sm font-medium text-primary">Previdência % a.a. líquida</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -787,7 +787,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
                 value={irPrevKey ?? "15"}
                 onValueChange={(v) => setIrPrevKey((v || "15") as (typeof IR_PREV_OPCOES)[number]["v"])}
               >
-                <SelectTrigger className="h-9 bg-[#0D1220] border-white/10 text-sm">
+                <SelectTrigger className="h-9 bg-secondary border-border text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-card border-border">
@@ -801,7 +801,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-[#131929] border-emerald-500/30">
+        <Card className="bg-card border-emerald-500/30">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-emerald-400">Investimento % a.a. líquida</CardTitle>
           </CardHeader>
@@ -818,7 +818,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
                 value={irInvKey ?? "15"}
                 onValueChange={(v) => setIrInvKey((v || "15") as (typeof IR_INV_OPCOES)[number]["v"])}
               >
-                <SelectTrigger className="h-9 bg-[#0D1220] border-white/10 text-sm">
+                <SelectTrigger className="h-9 bg-secondary border-border text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-card border-border">
@@ -835,7 +835,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
       </div>
 
       {/* SEÇÃO 3 — Produto MAG */}
-      <Card className="bg-[#131929] border-white/10">
+      <Card className="bg-card border-border">
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-medium text-foreground">Vida Inteira Resgatável — Prazo de pagamento</CardTitle>
         </CardHeader>
@@ -850,14 +850,14 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
                 }}
                 className={cn(
                   "rounded-lg border px-3 py-3 text-center transition-all",
-                  "bg-[#0D1220] hover:bg-[#0D1220]/80",
+                  "bg-secondary hover:bg-secondary/80",
                   produtoIdx === i
-                    ? "border-[#1E5CE6] ring-2 ring-[#1E5CE6]/40"
-                    : "border-white/10",
+                    ? "border-primary ring-2 ring-[#1E5CE6]/40"
+                    : "border-border",
                 )}
               >
                 <p className="text-sm font-semibold text-foreground">Resgatável</p>
-                <p className="text-xs text-[#1E5CE6] font-medium tabular-nums">{p.subtitulo}</p>
+                <p className="text-xs text-primary font-medium tabular-nums">{p.subtitulo}</p>
               </button>
             ))}
           </div>
@@ -878,7 +878,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
                 Atualizando…
               </Badge>
             ) : fontePremio === "mag_api" ? (
-              <Badge className="border-transparent bg-[#1E5CE6] text-white hover:bg-[#1E5CE6]">
+              <Badge className="border-transparent bg-primary text-white hover:bg-primary">
                 Cotação MAG · {ANOSPAG}a
               </Badge>
             ) : (
@@ -891,7 +891,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
       </Card>
 
       {/* Projeção MAG ano a ano */}
-      <Card className="bg-[#131929] border-white/10">
+      <Card className="bg-card border-border">
         <CardHeader className="pb-2 space-y-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="text-base font-medium text-foreground">
@@ -905,10 +905,10 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
                   onClick={() => setModoProjecaoMag(modo)}
                   className={cn(
                     "rounded-lg border px-4 py-2 text-sm font-medium transition-all capitalize",
-                    "bg-[#0D1220] hover:bg-[#0D1220]/80",
+                    "bg-secondary hover:bg-secondary/80",
                     modoProjecaoMag === modo
-                      ? "border-[#1E5CE6] ring-2 ring-[#1E5CE6]/40 text-foreground"
-                      : "border-white/10 text-muted-foreground",
+                      ? "border-primary ring-2 ring-[#1E5CE6]/40 text-foreground"
+                      : "border-border text-muted-foreground",
                   )}
                 >
                   {modo === "nominal" ? "Nominal" : "Real"}
@@ -922,10 +922,10 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
           </p>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="overflow-x-auto rounded-lg border border-white/10">
+          <div className="overflow-x-auto rounded-lg border border-border">
             <Table>
               <TableHeader>
-                <TableRow className="border-white/10 hover:bg-transparent">
+                <TableRow className="border-border hover:bg-transparent">
                   <TableHead className="text-muted-foreground">Ano de vigência</TableHead>
                   <TableHead className="text-muted-foreground">Idade</TableHead>
                   <TableHead className="text-right text-muted-foreground">Contribuições realizadas</TableHead>
@@ -937,8 +937,8 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
                   <TableRow
                     key={row.ano}
                     className={cn(
-                      "border-white/10",
-                      row.destaque && "border-l-2 border-l-[#1E5CE6] bg-[#1E5CE6]/5",
+                      "border-border",
+                      row.destaque && "border-l-2 border-l-[#1E5CE6] bg-primary/5",
                     )}
                   >
                     <TableCell className="font-medium tabular-nums text-foreground">{row.ano}</TableCell>
@@ -964,26 +964,26 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
 
       {/* SEÇÃO 4 — KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <Card className="bg-[#131929] border-white/10">
+        <Card className="bg-card border-border">
           <CardContent className="pt-6 space-y-1">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Proteção dia 1 — Previdência</p>
             <p className="text-xl font-bold text-red-500 tabular-nums">{fmtMoney(0, moeda)}</p>
           </CardContent>
         </Card>
-        <Card className="bg-[#131929] border-white/10">
+        <Card className="bg-card border-border">
           <CardContent className="pt-6 space-y-1">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Proteção dia 1 — Seguro</p>
             <p className="text-xl font-bold text-emerald-400 tabular-nums">{fmtMoney(capitalSegurado, moeda)}</p>
           </CardContent>
         </Card>
-        <Card className="bg-[#131929] border-white/10">
+        <Card className="bg-card border-border">
           <CardContent className="pt-6 space-y-1">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Prêmio mensal ano 1</p>
             <p className="text-xs text-muted-foreground">pm + rend. inicial (est.)</p>
             <p className="text-xl font-semibold tabular-nums text-foreground">{fmtMoney(kpiPremioAno1, moeda)}</p>
           </CardContent>
         </Card>
-        <Card className="bg-[#131929] border-white/10">
+        <Card className="bg-card border-border">
           <CardContent className="pt-6 space-y-1">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Custo total prêmios ({ANOSPAG}a)</p>
             <p className="text-xl font-semibold tabular-nums text-foreground">{fmtMoney(custoNomTotal, moeda)}</p>
@@ -991,7 +991,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
             <p className="text-xs text-zinc-500">(prêmio corrigido por IPCA de {inflacaoPctDisplay}% a.a.)</p>
           </CardContent>
         </Card>
-        <Card className="bg-[#131929] border-emerald-500/20">
+        <Card className="bg-card border-emerald-500/20">
           <CardContent className="pt-6 space-y-1">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Capital segurado aos {expectativaVida} anos</p>
             <p className="text-xl font-semibold tabular-nums text-emerald-400">{fmtMoney(capitalCorrigidoExpectativa, moeda)}</p>
@@ -1003,7 +1003,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
       </div>
 
       {/* SEÇÃO 5 */}
-      <Card className="bg-[#131929] border-[#1E5CE6]/25">
+      <Card className="bg-card border-primary/25">
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-medium text-foreground">Insight</CardTitle>
         </CardHeader>
@@ -1013,7 +1013,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
       </Card>
 
       {/* SEÇÃO 6 */}
-      <Card className="bg-[#131929] border-white/10">
+      <Card className="bg-card border-border">
         <CardHeader>
           <CardTitle className="text-base font-medium text-foreground">Patrimônio total aos herdeiros</CardTitle>
           <p className="text-xs text-muted-foreground font-normal">
@@ -1057,7 +1057,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
       </Card>
 
       {/* SEÇÃO 7A — Comparativo rentabilidade anual */}
-      <Card className="bg-[#131929] border-white/10">
+      <Card className="bg-card border-border">
         <CardHeader>
           <CardTitle className="text-base font-medium text-foreground">
             Comparativo: Previdência vs Investimento Livre (após IR e seguro)
@@ -1094,7 +1094,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
       </Card>
 
       {/* SEÇÃO 7B — Custo anual do seguro */}
-      <Card className="bg-[#131929] border-white/10">
+      <Card className="bg-card border-border">
         <CardHeader>
           <CardTitle className="text-base font-medium text-foreground">
             Pagamento anual do seguro — prazo de {ANOSPAG} anos
@@ -1148,7 +1148,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
 
       {/* SEÇÃO 8 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="bg-[#131929] border-white/10">
+        <Card className="bg-card border-border">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-medium text-foreground">Cenário A</CardTitle>
           </CardHeader>
@@ -1177,11 +1177,11 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
                 {modoRN === "real" ? "Real" : "Nominal"}
               </Badge>
             </p>
-            <p className="text-xl font-bold text-[#1E5CE6] tabular-nums">{fmtMoney(finais.liqAF, moeda)}</p>
+            <p className="text-xl font-bold text-primary tabular-nums">{fmtMoney(finais.liqAF, moeda)}</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-[#131929] border-white/10">
+        <Card className="bg-card border-border">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-medium text-foreground">Cenário B</CardTitle>
           </CardHeader>
@@ -1247,13 +1247,13 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
         <Button
           variant="outline"
           onClick={() => onNavigate("protecao")}
-          className="border-white/10 bg-[#131929] text-muted-foreground hover:text-foreground hover:bg-white/5"
+          className="border-border bg-card text-muted-foreground hover:text-foreground hover:bg-white/5"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Voltar
         </Button>
-        <Button onClick={() => onNavigate("dashboard")} className="bg-primary hover:bg-primary/90 text-primary-foreground">
-          Dashboard
+        <Button onClick={() => onNavigate("sucessorio")} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+          Próximo
           <ArrowRight className="w-4 h-4 ml-2" />
         </Button>
       </div>

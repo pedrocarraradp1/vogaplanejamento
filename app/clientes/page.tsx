@@ -126,7 +126,7 @@ export default function ClientesPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#080C18] text-muted-foreground text-sm">
+      <div className="min-h-screen flex items-center justify-center bg-background text-muted-foreground text-sm">
         Carregando clientes…
       </div>
     )
@@ -138,10 +138,10 @@ export default function ClientesPage() {
       (error.toLowerCase().includes("could not find") || error.toLowerCase().includes("does not exist"))
 
     return (
-      <div className="min-h-screen bg-[#080C18]">
+      <div className="min-h-screen bg-background">
         <ClientesHeader voltarHref="/dashboard" novoCenarioHref="/dashboard" />
-        <div className="mx-auto max-w-[1200px] px-6 py-10 space-y-4">
-          <div className="rounded-xl border border-white/10 bg-[#131929] p-6">
+        <div className="mx-auto max-w-[1200px] px-10 py-10 space-y-4">
+          <div className="form-card">
             <p className="text-sm font-semibold text-destructive">Não foi possível carregar as simulações</p>
             <p className="text-sm text-muted-foreground mt-2">
               {isMissingTable
@@ -155,10 +155,15 @@ export default function ClientesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#080C18]">
+    <div className="min-h-screen bg-background">
       <ClientesHeader voltarHref="/dashboard" novoCenarioHref="/dashboard" />
 
-      <div className="mx-auto max-w-[1200px] px-6 py-6 space-y-6">
+      <div className="mx-auto max-w-[1200px] px-10 py-8 space-y-6">
+        <div className="space-y-1">
+          <h1 className="page-title">
+            Planejamento <span className="text-primary">Financeiro Pessoal</span>
+          </h1>
+        </div>
 
         {/* KPIs */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -179,14 +184,14 @@ export default function ClientesPage() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Buscar cliente por nome..."
-            className="pl-10 bg-[#131929] border-white/10 text-foreground focus:border-[#1E5CE6]"
+            className="form-input pl-10"
           />
         </div>
 
         {/* Lista */}
         {clientesFiltrados.length === 0 ? (
-          <div className="rounded-xl border border-white/10 bg-[#131929] p-10 text-center">
-            <div className="mx-auto w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
+          <div className="form-card p-10 text-center">
+            <div className="mx-auto w-12 h-12 rounded-full bg-secondary border border-border flex items-center justify-center">
               <FileText className="w-5 h-5 text-muted-foreground" />
             </div>
             <p className="text-sm font-semibold text-foreground mt-4">Nenhuma simulação salva ainda</p>
@@ -195,7 +200,7 @@ export default function ClientesPage() {
             </p>
             <div className="mt-6 flex justify-center">
               <Link href="/dashboard">
-                <Button className="bg-[#1E5CE6] hover:bg-[#1E5CE6]/90 text-white">
+                <Button className="rounded-md bg-primary hover:bg-primary/90 text-primary-foreground">
                   <Plus className="w-4 h-4 mr-2" />
                   Novo Cenário
                 </Button>
@@ -209,7 +214,7 @@ export default function ClientesPage() {
               const href = c.clienteId ? `/clientes/${c.clienteId}` : (c.simulacaoId ? `/simulacao/${c.simulacaoId}` : "/dashboard")
               return (
                 <Link key={c.key} href={href} className="group">
-                  <div className="bg-[#131929] border border-white/10 rounded-xl p-5 transition-colors group-hover:border-[#1E5CE6]/60">
+                  <div className="form-card p-5 transition-colors group-hover:border-primary/40">
                     <div className="flex items-start justify-between gap-4">
                       <div className="space-y-1">
                         <p className="text-sm font-semibold text-foreground">{c.nome}</p>
@@ -227,7 +232,7 @@ export default function ClientesPage() {
                         </p>
                         <p className="text-xs text-muted-foreground">
                           <span className="text-foreground/80">Patrimônio:</span>{" "}
-                          <span className="text-[#1E5CE6] font-medium">{fmtFull(c.moeda, c.patrimonio)}</span>
+                          <span className="text-primary font-medium">{fmtFull(c.moeda, c.patrimonio)}</span>
                         </p>
                       </div>
                       <ArrowRight className="w-5 h-5 text-muted-foreground transition-transform group-hover:translate-x-0.5" />

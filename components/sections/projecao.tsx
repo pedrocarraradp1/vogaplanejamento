@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useState, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -150,8 +150,8 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
   // Cenários foram extraídos para `components/ui/cenarios-investimento.tsx`
 
   const projecao = useMemo(
-    () => calcularProjecao(premissasCompletas, objetivosEngine, state.passivos),
-    [premissasCompletas, objetivosEngine, state.passivos]
+    () => calcularProjecao(premissasCompletas, objetivosEngine, state.passivos, displayMode),
+    [premissasCompletas, objetivosEngine, state.passivos, displayMode]
   )
 
   const fluxoAnual = useMemo(
@@ -160,9 +160,10 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
         premissasCompletas,
         objetivosEngine,
         state.passivos,
-        Number(premissas.aliquotaImpostoRendimento) || 0.15
+        Number(premissas.aliquotaImpostoRendimento) || 0.15,
+        displayMode,
       ),
-    [premissasCompletas, objetivosEngine, state.passivos, premissas.aliquotaImpostoRendimento]
+    [premissasCompletas, objetivosEngine, state.passivos, premissas.aliquotaImpostoRendimento, displayMode]
   )
 
   const passivosPorAno = useMemo(
@@ -182,6 +183,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
         inflacaoPct: Number(premissas.inflacao) || 0,
         objetivosPorAno: fluxoAnual.map((r) => r.objetivos),
         passivosPorAno,
+        retiradaPorAno: fluxoAnual.map((r) => r.retirada),
       }),
     [
       projecao,
@@ -235,7 +237,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
 
   const ToggleNominalReal = (
     <div className="flex items-center gap-3">
-      <div className="inline-flex rounded-lg bg-[#131929] p-1">
+      <div className="inline-flex rounded-lg bg-card p-1">
         {(["nominal", "real"] as const).map(mode => (
           <button
             key={mode}
@@ -282,7 +284,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
             <div className="space-y-2">
               <Label className="text-xs uppercase text-muted-foreground tracking-wide">Saldo Inicial Líquido (R$)</Label>
               <Input value={formatCurrency(saldoInicialCalculado)} readOnly
-                className="bg-[#131929] border-white/10 text-foreground cursor-not-allowed opacity-70" />
+                className="bg-card border-border text-foreground cursor-not-allowed opacity-70" />
               <p className="text-xs text-muted-foreground">Calculado automaticamente: Ativos Líquidos − Passivos</p>
             </div>
             <div className="space-y-2">
@@ -291,7 +293,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
                 type="number"
                 value={premissas.rendimentoBruto ?? ""}
                 onChange={e => setPremissas({ rendimentoBruto: parseFloat(e.target.value) || 0 })}
-                className="bg-[#131929] border-white/10 text-foreground focus:border-primary" />
+                className="bg-card border-border text-foreground focus:border-primary" />
               <input
                 type="range"
                 min={0}
@@ -311,7 +313,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
                 value={String(premissas.aliquotaImpostoRendimento ?? 0.15)}
                 onValueChange={(v) => setPremissas({ aliquotaImpostoRendimento: parseFloat(v) || 0 })}
               >
-                <SelectTrigger className="bg-[#131929] border-white/10 text-foreground focus:border-primary">
+                <SelectTrigger className="bg-card border-border text-foreground focus:border-primary">
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent className="bg-card border-border">
@@ -332,7 +334,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
               <Label className="text-xs uppercase text-muted-foreground tracking-wide">Inflação Anual (%)</Label>
               <Input type="number" value={premissas.inflacao || ""}
                 onChange={e => setPremissas({ inflacao: parseFloat(e.target.value) || 0 })}
-                className="bg-[#131929] border-white/10 text-foreground focus:border-primary" />
+                className="bg-card border-border text-foreground focus:border-primary" />
               <input
                 type="range"
                 min={0}
@@ -346,14 +348,14 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
             <div className="space-y-2">
               <Label className="text-xs uppercase text-muted-foreground tracking-wide">Idade Atual</Label>
               <Input type="number" value={idadeAtualCalculada || ""} readOnly
-                className="bg-[#131929] border-white/10 text-foreground cursor-not-allowed opacity-70" />
+                className="bg-card border-border text-foreground cursor-not-allowed opacity-70" />
               <p className="text-xs text-muted-foreground">Calculada pela data de nascimento</p>
             </div>
             <div className="space-y-2">
               <Label className="text-xs uppercase text-muted-foreground tracking-wide">Prazo de Simulação (anos)</Label>
               <Input type="number" value={premissas.prazo || ""}
                 onChange={e => setPremissas({ prazo: parseInt(e.target.value) || 0 })}
-                className="bg-[#131929] border-white/10 text-foreground focus:border-primary" />
+                className="bg-card border-border text-foreground focus:border-primary" />
               <input
                 type="range"
                 min={1}
@@ -380,7 +382,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
               value={aporteModo}
               onValueChange={(v) => setPremissas({ aporteModo: (v as "fixo" | "periodos") || "fixo" })}
             >
-              <SelectTrigger className="bg-[#131929] border-white/10 text-foreground focus:border-primary">
+              <SelectTrigger className="bg-card border-border text-foreground focus:border-primary">
                 <SelectValue placeholder="Selecione" />
               </SelectTrigger>
               <SelectContent className="bg-card border-border">
@@ -396,7 +398,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
               <Input
                 value={formatCurrency(aporteMensal)}
                 readOnly
-                className="bg-[#131929] border-white/10 text-foreground cursor-not-allowed opacity-70"
+                className="bg-card border-border text-foreground cursor-not-allowed opacity-70"
               />
               <p className="text-xs text-muted-foreground">
                 Calculado automaticamente: Renda ({formatarMoedaCompleta(dadosPessoais.renda)}) − Despesa ({formatarMoedaCompleta(dadosPessoais.despesa)})
@@ -404,7 +406,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="rounded-lg bg-[#131929] border border-white/10 px-4 py-3">
+              <div className="rounded-lg bg-card border border-border px-4 py-3">
                 <p className="text-sm text-foreground font-medium">Personalizado por período (blocos de 5 anos)</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   Os valores são em poder de compra de hoje (reais). O sistema converte para nominal no início de cada período.
@@ -417,7 +419,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
                   const inf = (Number(premissas.inflacao) || 0) / 100
                   const nominalNoInicio = real * Math.pow(1 + inf, b.inicio)
                   return (
-                    <div key={b.i} className="rounded-xl border border-[rgba(255,255,255,0.06)] bg-[#0D1220] p-4">
+                    <div key={b.i} className="rounded-xl border border-border bg-secondary p-4">
                       <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                         Ano {b.inicio} ao {b.fim}
                       </p>
@@ -433,7 +435,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
                             setPremissas({ aportePeriodosReal: next, aporteModo: "periodos" })
                           }}
                           placeholder="0"
-                          className="bg-[#131929] border-white/10 text-foreground focus:border-primary"
+                          className="bg-card border-border text-foreground focus:border-primary"
                         />
                         <p className="text-xs text-muted-foreground">
                           Equivalente a <span className="text-foreground">{formatarMoedaCompleta(nominalNoInicio)}</span>{" "}
@@ -460,7 +462,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
               <Label className="text-xs uppercase text-muted-foreground tracking-wide">Idade de Aposentadoria</Label>
               <Input type="number" value={premissas.idadeApos || ""}
                 onChange={e => setPremissas({ idadeApos: parseInt(e.target.value) || 0 })}
-                className="bg-[#131929] border-white/10 text-foreground focus:border-primary" />
+                className="bg-card border-border text-foreground focus:border-primary" />
               <input
                 type="range"
                 min={30}
@@ -475,7 +477,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
               <Label className="text-xs uppercase text-muted-foreground tracking-wide">Retirada Mensal Desejada (R$)</Label>
               <Input value={formatCurrency(premissas.retiradaMensal)}
                 onChange={e => setPremissas({ retiradaMensal: parseCurrency(e.target.value) })}
-                className="bg-[#131929] border-white/10 text-foreground focus:border-primary" />
+                className="bg-card border-border text-foreground focus:border-primary" />
               <input
                 type="range"
                 min={0}
@@ -494,7 +496,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
                 value={formatCurrency(premissas.rendaAposentadoria ?? 0)}
                 onChange={(e) => setPremissas({ rendaAposentadoria: parseCurrency(e.target.value) })}
                 placeholder="0"
-                className="bg-[#131929] border-white/10 text-foreground focus:border-primary"
+                className="bg-card border-border text-foreground focus:border-primary"
               />
               <input
                 type="range"
@@ -519,7 +521,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
             const cor = cobreTudo ? "text-emerald-400" : "text-primary"
 
             return (
-              <div className="rounded-lg bg-[#131929] border border-white/10 px-4 py-3">
+              <div className="rounded-lg bg-card border border-border px-4 py-3">
                 <p className={`text-sm font-medium ${cor}`}>
                   Retirada líquida do patrimônio: {formatarMoedaCompleta(retiradaLiquida)}
                 </p>
@@ -549,7 +551,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
                 value={premissas.novaEntrada ? formatCurrency(premissas.novaEntrada) : ""}
                 onChange={e => setPremissas({ novaEntrada: parseCurrency(e.target.value) })}
                 placeholder="Ex: 500.000 (herança, venda de imóvel...)"
-                className="bg-[#131929] border-white/10 text-foreground focus:border-primary" />
+                className="bg-card border-border text-foreground focus:border-primary" />
               <input
                 type="range"
                 min={0}
@@ -567,7 +569,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
                 value={premissas.idadeEntrada || ""}
                 onChange={e => setPremissas({ idadeEntrada: parseInt(e.target.value) || 0 })}
                 placeholder="Ex: 45"
-                className="bg-[#131929] border-white/10 text-foreground focus:border-primary" />
+                className="bg-card border-border text-foreground focus:border-primary" />
               <input
                 type="range"
                 min={0}
@@ -581,7 +583,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
             </div>
           </div>
           {premissas.novaEntrada > 0 && premissas.idadeEntrada > 0 && (
-            <div className="flex items-center gap-2 p-3 bg-[rgba(30,92,230,0.08)] rounded-lg border border-[#1E5CE6]/30">
+            <div className="flex items-center gap-2 p-3 bg-[rgba(30,92,230,0.08)] rounded-lg border border-primary/30">
               <Info className="w-4 h-4 text-primary" />
               <span className="text-sm text-foreground">
                 Entrada de <strong className="text-primary">{formatarMoedaCompleta(premissas.novaEntrada)}</strong> prevista
@@ -601,7 +603,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
         <CardContent className="space-y-6">
           {/* KPIs */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-[rgba(30,92,230,0.08)] border border-[#1E5CE6]/30 rounded-xl p-4">
+            <div className="bg-[rgba(30,92,230,0.08)] border border-primary/30 rounded-xl p-4">
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Patrimônio na Aposentadoria</p>
@@ -647,7 +649,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
                 <DollarSign className="w-5 h-5 text-[#22C787]" />
               </div>
             </div>
-            <div className="bg-[#0D1220] border border-[rgba(255,255,255,0.06)] rounded-xl p-4">
+            <div className="bg-secondary border border-border rounded-xl p-4">
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Liberdade Financeira</p>
@@ -778,11 +780,11 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
 
       {/* Footer */}
       <div className="flex items-center gap-3 pt-4">
-        <Button variant="outline" onClick={() => onNavigate("objetivos")}
+        <Button variant="outline" onClick={() => onNavigate("fluxo-de-caixa")}
           className="border-border text-muted-foreground hover:text-foreground hover:bg-white/5">
           <ArrowLeft className="w-4 h-4 mr-2" />Voltar
         </Button>
-        <Button onClick={() => onNavigate("sucessorio")}
+        <Button onClick={() => onNavigate("protecao")}
           className="bg-primary hover:bg-primary/90 text-primary-foreground">
           Próximo<ArrowRight className="w-4 h-4 ml-2" />
         </Button>

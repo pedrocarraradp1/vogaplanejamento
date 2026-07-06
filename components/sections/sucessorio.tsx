@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -221,7 +221,7 @@ export function Sucessorio({ onNavigate }: SucessorioProps) {
   }, [buscarPremioMAG])
 
   const handleProximo = () => {
-    onNavigate("protecao")
+    onNavigate("dashboard")
   }
 
   return (
@@ -264,7 +264,7 @@ export function Sucessorio({ onNavigate }: SucessorioProps) {
                     // OUTROS: mantém valor atual e permite editar no input abaixo
                   }}
                 >
-                  <SelectTrigger className="bg-[#131929] border-white/10 text-foreground focus:border-primary focus:ring-1 focus:ring-primary">
+                  <SelectTrigger className="bg-card border-border text-foreground focus:border-primary focus:ring-1 focus:ring-primary">
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
                   <SelectContent className="bg-card border-border">
@@ -282,7 +282,7 @@ export function Sucessorio({ onNavigate }: SucessorioProps) {
                     type="number"
                     value={sucessao.itcmd || ""}
                     onChange={(e) => setSucessao({ itcmd: parseFloat(e.target.value) || 0 })}
-                    className="bg-[#131929] border-white/10 text-foreground focus:border-primary focus:ring-1 focus:ring-primary"
+                    className="bg-card border-border text-foreground focus:border-primary focus:ring-1 focus:ring-primary"
                     placeholder="Ex: 4"
                   />
                 )}
@@ -303,7 +303,7 @@ export function Sucessorio({ onNavigate }: SucessorioProps) {
                 type="number"
                 value={sucessao.honorarios || ""}
                 onChange={(e) => setSucessao({ honorarios: parseFloat(e.target.value) || 0 })}
-                className="bg-[#131929] border-white/10 text-foreground focus:border-primary focus:ring-1 focus:ring-primary"
+                className="bg-card border-border text-foreground focus:border-primary focus:ring-1 focus:ring-primary"
               />
             </div>
 
@@ -315,7 +315,7 @@ export function Sucessorio({ onNavigate }: SucessorioProps) {
                 type="number"
                 value={sucessao.cartoriais || ""}
                 onChange={(e) => setSucessao({ cartoriais: parseFloat(e.target.value) || 0 })}
-                className="bg-[#131929] border-white/10 text-foreground focus:border-primary focus:ring-1 focus:ring-primary"
+                className="bg-card border-border text-foreground focus:border-primary focus:ring-1 focus:ring-primary"
               />
             </div>
 
@@ -327,7 +327,7 @@ export function Sucessorio({ onNavigate }: SucessorioProps) {
                 type="number"
                 value={sucessao.herdeiros || ""}
                 onChange={(e) => setSucessao({ herdeiros: parseInt(e.target.value) || 0 })}
-                className="bg-[#131929] border-white/10 text-foreground focus:border-primary focus:ring-1 focus:ring-primary"
+                className="bg-card border-border text-foreground focus:border-primary focus:ring-1 focus:ring-primary"
               />
             </div>
           </div>
@@ -377,7 +377,7 @@ export function Sucessorio({ onNavigate }: SucessorioProps) {
                 value={produtoSelecionado}
                 onValueChange={setProdutoSelecionado}
               >
-                <SelectTrigger className="bg-[#131929] border-white/10 text-foreground focus:border-primary focus:ring-1 focus:ring-primary">
+                <SelectTrigger className="bg-card border-border text-foreground focus:border-primary focus:ring-1 focus:ring-primary">
                   <SelectValue placeholder="Selecione o produto" />
                 </SelectTrigger>
                 <SelectContent className="bg-card border-border max-h-72">
@@ -398,7 +398,7 @@ export function Sucessorio({ onNavigate }: SucessorioProps) {
                 step={1000}
                 value={capitalSegurado || ""}
                 onChange={(e) => setCapitalSegurado(parseFloat(e.target.value) || 0)}
-                className="bg-[#131929] border-white/10 text-foreground focus:border-primary focus:ring-1 focus:ring-primary tabular-nums"
+                className="bg-card border-border text-foreground focus:border-primary focus:ring-1 focus:ring-primary tabular-nums"
               />
             </div>
 
@@ -412,7 +412,7 @@ export function Sucessorio({ onNavigate }: SucessorioProps) {
                 }
                 onValueChange={(v) => setDadosPessoais({ sexo: v as "M" | "F" })}
               >
-                <SelectTrigger className="bg-[#131929] border-white/10 text-foreground focus:border-primary focus:ring-1 focus:ring-primary">
+                <SelectTrigger className="bg-card border-border text-foreground focus:border-primary focus:ring-1 focus:ring-primary">
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent className="bg-card border-border">
@@ -428,7 +428,7 @@ export function Sucessorio({ onNavigate }: SucessorioProps) {
                 value={dadosPessoais.uf || "SP"}
                 onValueChange={(v) => setDadosPessoais({ uf: v })}
               >
-                <SelectTrigger className="bg-[#131929] border-white/10 text-foreground focus:border-primary focus:ring-1 focus:ring-primary">
+                <SelectTrigger className="bg-card border-border text-foreground focus:border-primary focus:ring-1 focus:ring-primary">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-card border-border max-h-60">
@@ -442,7 +442,7 @@ export function Sucessorio({ onNavigate }: SucessorioProps) {
             </div>
           </div>
 
-          <div className="rounded-lg border border-white/10 bg-[#131929]/50 p-4 space-y-3">
+          <div className="rounded-lg border border-border bg-card/50 p-4 space-y-3">
             <div className="flex flex-wrap items-center gap-2 justify-between">
               <span className="text-sm text-muted-foreground">Prêmio mensal estimado</span>
               <div className="flex items-center gap-2 flex-wrap">
@@ -490,7 +490,7 @@ export function Sucessorio({ onNavigate }: SucessorioProps) {
       <div className="flex items-center gap-3 pt-4">
         <Button
           variant="outline"
-          onClick={() => onNavigate("projecao")}
+          onClick={() => onNavigate("simulador-seguros")}
           className="border-border text-muted-foreground hover:text-foreground hover:bg-white/5"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />

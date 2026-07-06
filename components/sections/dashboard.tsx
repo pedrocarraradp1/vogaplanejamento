@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useMemo, useState } from "react"
 import { createRoot, type Root } from "react-dom/client"
@@ -70,8 +70,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   , [objetivos])
 
   const projecao = useMemo(() =>
-    calcularProjecao(premissasCompletas, objetivosEngine, state.passivos)
-  , [premissasCompletas, objetivosEngine, state.passivos])
+    calcularProjecao(premissasCompletas, objetivosEngine, state.passivos, viewMode)
+  , [premissasCompletas, objetivosEngine, state.passivos, viewMode])
 
   const fluxoAnual = useMemo(
     () =>
@@ -79,9 +79,10 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         premissasCompletas,
         objetivosEngine,
         state.passivos,
-        Number(premissas.aliquotaImpostoRendimento) || 0.15
+        Number(premissas.aliquotaImpostoRendimento) || 0.15,
+        viewMode,
       ),
-    [premissasCompletas, objetivosEngine, state.passivos, premissas.aliquotaImpostoRendimento]
+    [premissasCompletas, objetivosEngine, state.passivos, premissas.aliquotaImpostoRendimento, viewMode]
   )
 
   const kpis = useMemo(() =>
@@ -153,6 +154,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         inflacaoPct: Number(premissas.inflacao) || 0,
         objetivosPorAno: fluxoAnual.map((r) => r.objetivos),
         passivosPorAno,
+        retiradaPorAno: fluxoAnual.map((r) => r.retirada),
       }),
     [
       projecao,
@@ -352,11 +354,11 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   ]
 
   const kpiStyle = (cor: string) => ({
-    blue:    { bg: "bg-[rgba(30,92,230,0.08)]",  border: "border-[#1E5CE6]/30",             valor: "text-[#1E5CE6]"  },
+    blue:    { bg: "bg-[rgba(30,92,230,0.08)]",  border: "border-primary/30",             valor: "text-primary"  },
     green:   { bg: "bg-[rgba(34,199,135,0.08)]", border: "border-[#22C787]/30",             valor: "text-[#22C787]"  },
-    yellow:  { bg: "bg-[#0D1220]",               border: "border-[rgba(255,255,255,0.06)]", valor: "text-[#F5A623]"  },
-    neutral: { bg: "bg-[#0D1220]",               border: "border-[rgba(255,255,255,0.06)]", valor: "text-foreground" },
-  }[cor] ?? { bg: "bg-[#0D1220]", border: "border-[rgba(255,255,255,0.06)]", valor: "text-foreground" })
+    yellow:  { bg: "bg-secondary",               border: "border-border", valor: "text-[#F5A623]"  },
+    neutral: { bg: "bg-secondary",               border: "border-border", valor: "text-foreground" },
+  }[cor] ?? { bg: "bg-secondary", border: "border-border", valor: "text-foreground" })
 
   return (
     <div className="space-y-6" id="dashboard-content">
@@ -365,7 +367,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       <div className="space-y-1">
         <p className="text-sm text-muted-foreground">Diagnóstico Financeiro</p>
         <h1 className="text-2xl font-semibold text-foreground">
-          Diagnóstico <span className="text-[#1E5CE6]">{dadosPessoais.nome || "do Cliente"}</span>
+          Diagnóstico <span className="text-primary">{dadosPessoais.nome || "do Cliente"}</span>
         </h1>
         <p className="text-sm text-muted-foreground">
           Gerado em {new Date().toLocaleDateString(moeda === "USD" ? "en-US" : "pt-BR")} · Projeção Padrão
@@ -396,7 +398,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       </div>
 
       {/* Distribuição de Ativos */}
-      <Card className="bg-[#0D1220] border-[rgba(255,255,255,0.06)]">
+      <Card className="bg-secondary border-border">
         <CardHeader>
           <CardTitle className="text-foreground text-lg font-medium">Distribuição de Ativos</CardTitle>
         </CardHeader>
@@ -532,10 +534,10 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       </Card>
 
       {/* Evolução Patrimonial */}
-      <Card className="bg-[#0D1220] border-[rgba(255,255,255,0.06)]">
+      <Card className="bg-secondary border-border">
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-foreground text-lg font-medium">Evolução Patrimonial</CardTitle>
-          <div className="inline-flex rounded-lg bg-[#131929] p-1">
+          <div className="inline-flex rounded-lg bg-card p-1">
             {(["nominal","real"] as const).map(m => (
               <button key={m} onClick={() => setViewMode(m)}
                 className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
@@ -641,21 +643,21 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       <CenariosInvestimento editable={false} />
 
       {/* Planejamento Sucessório */}
-      <Card className="bg-[#0D1220] border-[rgba(255,255,255,0.06)]">
+      <Card className="bg-secondary border-border">
         <CardHeader>
           <CardTitle className="text-foreground text-lg font-medium">Planejamento Sucessório</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Seção 1 — Distribuição Patrimonial */}
-            <div className="space-y-4 rounded-xl border border-[rgba(255,255,255,0.06)] bg-[#0D1220] p-5">
+            <div className="space-y-4 rounded-xl border border-border bg-secondary p-5">
               <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Distribuição Patrimonial</h4>
               <div className="space-y-0">
-                <div className="flex justify-between gap-4 py-2.5 border-b border-[rgba(255,255,255,0.06)]">
+                <div className="flex justify-between gap-4 py-2.5 border-b border-border">
                   <span className="text-sm text-muted-foreground">Patrimônio Total</span>
                   <span className="text-sm font-medium text-foreground text-right tabular-nums">{fmtFull(patrimonioTotalSucessao)}</span>
                 </div>
-                <div className="py-2.5 border-b border-[rgba(255,255,255,0.06)]">
+                <div className="py-2.5 border-b border-border">
                   <div className="flex justify-between gap-4">
                     <span className="text-sm text-muted-foreground">
                       Meação (Cônjuge) <span className="text-muted-foreground/80">(50%)</span>
@@ -666,11 +668,11 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                     Não há incidência de ITCMD sobre a meação
                   </p>
                 </div>
-                <div className="flex justify-between gap-4 py-2.5 border-b border-[rgba(255,255,255,0.06)]">
+                <div className="flex justify-between gap-4 py-2.5 border-b border-border">
                   <span className="text-sm text-muted-foreground">Valor da Herança</span>
                   <span className="text-sm font-medium text-foreground text-right tabular-nums">{fmtFull(inventario.heranca)}</span>
                 </div>
-                <div className="flex justify-between gap-4 py-2.5 border-b border-[rgba(255,255,255,0.06)]">
+                <div className="flex justify-between gap-4 py-2.5 border-b border-border">
                   <span className="text-sm text-muted-foreground">Número de Herdeiros</span>
                   <span className="text-sm font-medium text-foreground">{sucessao.herdeiros}</span>
                 </div>
@@ -682,18 +684,18 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             </div>
 
             {/* Seção 2 — Custos do Inventário */}
-            <div className="space-y-4 rounded-xl border border-[rgba(255,255,255,0.06)] bg-[#0D1220] p-5">
+            <div className="space-y-4 rounded-xl border border-border bg-secondary p-5">
               <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Custos do Inventário</h4>
               <div className="space-y-0">
-                <div className="flex justify-between gap-4 py-2.5 border-b border-[rgba(255,255,255,0.06)]">
+                <div className="flex justify-between gap-4 py-2.5 border-b border-border">
                   <span className="text-sm text-muted-foreground">ITCMD ({sucessao.itcmd}%)</span>
                   <span className="text-sm font-medium text-foreground text-right tabular-nums">{fmtFull(inventario.custoITCMD)}</span>
                 </div>
-                <div className="flex justify-between gap-4 py-2.5 border-b border-[rgba(255,255,255,0.06)]">
+                <div className="flex justify-between gap-4 py-2.5 border-b border-border">
                   <span className="text-sm text-muted-foreground">Custos Cartoriais ({sucessao.cartoriais}%)</span>
                   <span className="text-sm font-medium text-foreground text-right tabular-nums">{fmtFull(inventario.custoCart)}</span>
                 </div>
-                <div className="flex justify-between gap-4 py-2.5 border-b border-[rgba(255,255,255,0.06)]">
+                <div className="flex justify-between gap-4 py-2.5 border-b border-border">
                   <span className="text-sm text-muted-foreground">Honorários Advocatícios ({sucessao.honorarios}%)</span>
                   <span className="text-sm font-medium text-foreground text-right tabular-nums">{fmtFull(inventario.custoHon)}</span>
                 </div>
@@ -702,7 +704,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                   <span className="text-sm font-bold text-[#EF4444] text-right tabular-nums">{fmtFull(inventario.custoTotal)}</span>
                 </div>
                 <div className="pt-1">
-                  <span className="inline-flex rounded-full border border-[rgba(255,255,255,0.06)] bg-[#131929] px-3 py-1.5 text-xs font-medium text-muted-foreground">
+                  <span className="inline-flex rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground">
                     Representa {inventario.percentualCusto}% do patrimônio total
                   </span>
                 </div>
@@ -710,8 +712,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             </div>
           </div>
 
-          <div className="bg-[#1E5CE6]/10 border border-[#1E5CE6]/30 rounded-xl p-6">
-            <p className="text-xs font-medium text-[#1E5CE6] uppercase tracking-wide mb-2">Capital Segurável Recomendado</p>
+          <div className="bg-primary/10 border border-primary/30 rounded-xl p-6">
+            <p className="text-xs font-medium text-primary uppercase tracking-wide mb-2">Capital Segurável Recomendado</p>
             <p className="text-3xl font-bold text-white mb-2">{fmtFull(protecaoResult.capitalSeguravel)}</p>
             <p className="text-sm text-muted-foreground">
               {protecao.anosCob} anos de custo de vida ({fmtFull(protecao.custoVida * 12 * protecao.anosCob)})
@@ -726,7 +728,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       </Card>
 
       {/* Projeção Detalhada */}
-      <Card className="bg-[#0D1220] border-[rgba(255,255,255,0.06)]">
+      <Card className="bg-secondary border-border">
         <CardHeader>
           <CardTitle className="text-foreground text-lg font-medium">Projeção Detalhada</CardTitle>
         </CardHeader>
@@ -734,7 +736,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-[rgba(255,255,255,0.06)]">
+                <tr className="border-b border-border">
                   {["Idade","Patrimônio Nominal","Patrimônio Real","Renda Mensal Real","Fase"].map(h => (
                     <th key={h} className={`py-3 px-4 text-xs font-medium text-muted-foreground uppercase tracking-wide ${h === "Idade" ? "text-left" : h === "Fase" ? "text-center" : "text-right"}`}>{h}</th>
                   ))}
@@ -742,7 +744,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               </thead>
               <tbody>
                 {projecaoDetalhada.map(row => (
-                  <tr key={row.idade} className="border-b border-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.02)]">
+                  <tr key={row.idade} className="border-b border-border hover:bg-[rgba(255,255,255,0.02)]">
                     <td className="py-3 px-4"><span className="text-lg font-semibold text-foreground">{row.idade}</span></td>
                     <td className={`py-3 px-4 text-right text-sm font-medium ${row.saldoNominal >= 0 ? "text-[#22C787]" : "text-[#EF4444]"}`}>{fmtFull(row.saldoNominal)}</td>
                     <td className={`py-3 px-4 text-right text-sm font-medium ${row.saldoReal >= 0 ? "text-[#22C787]" : "text-[#EF4444]"}`}>{fmtFull(row.saldoReal)}</td>
@@ -762,11 +764,11 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
       {/* Footer */}
       <div className="flex items-center justify-between pt-4">
-        <Button variant="ghost" onClick={() => onNavigate("protecao")} className="text-muted-foreground hover:text-foreground">
+        <Button variant="ghost" onClick={() => onNavigate("sucessorio")} className="text-muted-foreground hover:text-foreground">
           <ArrowLeft className="w-4 h-4 mr-2" />Editar
         </Button>
         <Button onClick={exportarPDF} disabled={exportando}
-          className="bg-[#1E5CE6] hover:bg-[#1E5CE6]/90 text-white px-6">
+          className="bg-primary hover:bg-primary/90 text-white px-6">
           <Download className="w-4 h-4 mr-2" />
           {exportando ? "Gerando PDF..." : "Exportar PDF"}
         </Button>

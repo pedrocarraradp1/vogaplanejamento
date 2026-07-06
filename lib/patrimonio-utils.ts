@@ -72,7 +72,7 @@ export const SECAO_LIQUIDO = {
   title: "Ativos Líquidos",
   tipo: "Líquido",
   categorias: DESCRICOES_ATIVOS_POR_TIPO["Líquido"],
-  cor: "#1E5CE6",
+  cor: "#4A90D9",
   totalLabel: "Total",
 } as const
 

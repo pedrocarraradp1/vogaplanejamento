@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useCallback, useMemo, type ReactNode } from "react"
 import { Input } from "@/components/ui/input"
@@ -177,7 +177,7 @@ function PatrimonioBarRow({
                 if (e.key === "Enter") commit(draft)
                 if (e.key === "Escape") setEditing(false)
               }}
-              className="h-8 w-32 text-right bg-[#0D1220] border-white/10 text-foreground text-sm tabular-nums"
+              className="h-8 w-32 text-right bg-secondary border-border text-foreground text-sm tabular-nums"
             />
           ) : (
             <button
@@ -221,8 +221,8 @@ function PatrimonioSection({
   children: ReactNode
 }) {
   return (
-    <section className="rounded-xl bg-[#131929] border border-white/10 p-5 md:p-6">
-      <div className="flex flex-col gap-3 mb-4 pb-4 border-b border-white/10">
+    <section className="rounded-xl bg-card border border-border p-5 md:p-6">
+      <div className="flex flex-col gap-3 mb-4 pb-4 border-b border-border">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <h2 className="text-base font-semibold text-foreground">{title}</h2>
           <div className="flex flex-wrap items-center gap-2 sm:justify-end">
@@ -256,7 +256,7 @@ function PatrimonioCharts({
   const donutAtivo = dataDonut.filter((d) => d.value > 0)
 
   return (
-    <section className="rounded-xl bg-[#131929] border border-white/10 p-5 md:p-6">
+    <section className="rounded-xl bg-card border border-border p-5 md:p-6">
       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-4">
         Visualização
       </p>
@@ -662,7 +662,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
             totalValue={formatCurrency(total)}
             totalClassName={
               secao.id === "liquidos"
-                ? "text-[#1E5CE6]"
+                ? "text-primary"
                 : secao.id === "imobilizado"
                   ? "text-[#1D9E75]"
                   : "text-[#7C3AED]"
@@ -734,7 +734,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
         )}
       </PatrimonioSection>
 
-      <div className="rounded-xl bg-[#131929] border border-white/10 p-5 md:p-6">
+      <div className="rounded-xl bg-card border border-border p-5 md:p-6">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-center sm:text-left">
           <div>
             <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Ativos Totais</p>
@@ -752,7 +752,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
             <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
               Patrimônio Líquido
             </p>
-            <p className="text-xl font-bold text-[#1E5CE6] tabular-nums">
+            <p className="text-xl font-bold text-primary tabular-nums">
               {formatCurrency(patrimonioLiquidoResumo)}
             </p>
           </div>
@@ -761,7 +761,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
 
       <Dialog open={addModal != null} onOpenChange={(open) => !open && setAddModal(null)}>
         <DialogContent
-          className={`bg-[#131929] border-white/[0.18] rounded-2xl max-h-[90vh] overflow-y-auto ${
+          className={`bg-card border-border rounded-2xl max-h-[90vh] overflow-y-auto ${
             addModal?.kind === "passivo" ? "max-w-lg" : "max-w-md"
           }`}
         >
@@ -785,10 +785,10 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                   value={ativoTipoSelect}
                   onValueChange={(v) => onAtivoTipoChange(v as TipoAtivoLabel)}
                 >
-                  <SelectTrigger className="bg-[#0D1220] border-white/10 text-foreground">
+                  <SelectTrigger className="bg-secondary border-border text-foreground">
                     <SelectValue placeholder="Selecione o tipo" />
                   </SelectTrigger>
-                  <SelectContent className="bg-[#131929] border-white/10">
+                  <SelectContent className="bg-card border-border">
                     {TIPOS_ATIVO.map((t) => (
                       <SelectItem key={t} value={t}>
                         {t}
@@ -807,10 +807,10 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                     setAddAtivoForm((prev) => ({ ...prev, descricao }))
                   }
                 >
-                  <SelectTrigger className="bg-[#0D1220] border-white/10 text-foreground">
+                  <SelectTrigger className="bg-secondary border-border text-foreground">
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
-                  <SelectContent className="bg-[#131929] border-white/10">
+                  <SelectContent className="bg-card border-border">
                     {DESCRICOES_ATIVOS_POR_TIPO[ativoTipoSelect].map((d) => (
                       <SelectItem key={d} value={d}>
                         {d}
@@ -829,7 +829,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                     setAddAtivoForm({ ...addAtivoForm, valor: parseCurrency(e.target.value) })
                   }
                   placeholder="0"
-                  className="bg-[#0D1220] border-white/10 text-foreground tabular-nums"
+                  className="bg-secondary border-border text-foreground tabular-nums"
                 />
               </div>
               <div className="space-y-2">
@@ -840,7 +840,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                   value={addAtivoForm.instituicao}
                   onChange={(e) => setAddAtivoForm({ ...addAtivoForm, instituicao: e.target.value })}
                   placeholder="Ex: BTG Pactual, Brasília-DF..."
-                  className="bg-[#0D1220] border-white/10 text-foreground"
+                  className="bg-secondary border-border text-foreground"
                 />
               </div>
               <div className="space-y-2">
@@ -856,10 +856,10 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                     }))
                   }
                 >
-                  <SelectTrigger className="bg-[#0D1220] border-white/10 text-foreground">
+                  <SelectTrigger className="bg-secondary border-border text-foreground">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-[#131929] border-white/10">
+                  <SelectContent className="bg-card border-border">
                     <SelectItem value="nao">Não</SelectItem>
                     <SelectItem value="sim">Sim</SelectItem>
                   </SelectContent>
@@ -881,10 +881,10 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                     setAddPassivoForm((prev) => ({ ...prev, categoria: value }))
                   }
                 >
-                  <SelectTrigger className="bg-[#0D1220] border-white/10 text-foreground">
+                  <SelectTrigger className="bg-secondary border-border text-foreground">
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
-                  <SelectContent className="bg-[#131929] border-white/10">
+                  <SelectContent className="bg-card border-border">
                     {CATEGORIAS_PASSIVO.map((cat) => (
                       <SelectItem key={cat} value={cat}>
                         {cat}
@@ -903,7 +903,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                     setAddPassivoForm((prev) => ({ ...prev, descricao: e.target.value }))
                   }
                   placeholder="Ex: Financiamento Apto SP"
-                  className="bg-[#0D1220] border-white/10 text-foreground"
+                  className="bg-secondary border-border text-foreground"
                 />
               </div>
               <div className="space-y-2">
@@ -919,7 +919,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                     }))
                   }
                   placeholder="0"
-                  className="bg-[#0D1220] border-white/10 text-foreground tabular-nums"
+                  className="bg-secondary border-border text-foreground tabular-nums"
                 />
               </div>
               <div className="space-y-2">
@@ -935,7 +935,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                     }))
                   }
                   placeholder="0"
-                  className="bg-[#0D1220] border-white/10 text-foreground tabular-nums"
+                  className="bg-secondary border-border text-foreground tabular-nums"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -955,7 +955,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                       }))
                     }
                     placeholder="0"
-                    className="bg-[#0D1220] border-white/10 text-foreground"
+                    className="bg-secondary border-border text-foreground"
                   />
                 </div>
                 <div className="space-y-2">
@@ -974,7 +974,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                       }))
                     }
                     placeholder="0"
-                    className="bg-[#0D1220] border-white/10 text-foreground"
+                    className="bg-secondary border-border text-foreground"
                   />
                 </div>
               </div>
@@ -988,7 +988,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                     setAddPassivoForm((prev) => ({ ...prev, instituicao: e.target.value }))
                   }
                   placeholder="Ex: Caixa Econômica, Itaú"
-                  className="bg-[#0D1220] border-white/10 text-foreground"
+                  className="bg-secondary border-border text-foreground"
                 />
               </div>
               <div className="space-y-2">
@@ -1001,7 +1001,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                     setAddPassivoForm((prev) => ({ ...prev, bemVinculado: e.target.value }))
                   }
                   placeholder="Opcional — Ex: Apartamento SP"
-                  className="bg-[#0D1220] border-white/10 text-foreground"
+                  className="bg-secondary border-border text-foreground"
                 />
               </div>
             </div>

@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { PlanoState } from "@/lib/plano-context"
@@ -31,7 +31,7 @@ export function MeuDiagnosticoView({ state }: MeuDiagnosticoViewProps) {
       <div className="space-y-1">
         <p className="text-sm text-muted-foreground">Diagnóstico compartilhado</p>
         <h1 className="text-2xl font-semibold text-foreground">
-          Olá, <span className="text-[#1E5CE6]">{dadosPessoais.nome || "Cliente"}</span>
+          Olá, <span className="text-primary">{dadosPessoais.nome || "Cliente"}</span>
         </h1>
         <p className="text-sm text-muted-foreground">
           Esta visão é somente leitura, preparada pelo seu assessor. Para dúvidas, fale com o escritório.
@@ -40,14 +40,14 @@ export function MeuDiagnosticoView({ state }: MeuDiagnosticoViewProps) {
 
       {kpis ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card className="border-[#1E5CE6]/30 bg-[rgba(30,92,230,0.08)]">
+          <Card className="border-primary/30 bg-[rgba(30,92,230,0.08)]">
             <CardHeader className="pb-2">
               <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                 Patrimônio na aposentadoria
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold text-[#1E5CE6]">{fmtK(kpis.patrimonioApos)}</p>
+              <p className="text-2xl font-bold text-primary">{fmtK(kpis.patrimonioApos)}</p>
               <p className="text-xs text-muted-foreground mt-1">{fmtK(kpis.patrimonioAposReal)} em valor real</p>
             </CardContent>
           </Card>

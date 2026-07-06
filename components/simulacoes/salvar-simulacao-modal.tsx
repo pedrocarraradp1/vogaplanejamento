@@ -176,7 +176,7 @@ export function SalvarSimulacaoModal() {
           {isUpdate ? "Atualizar Cenário" : "Salvar Cenário"}
         </Button>
       </DialogTrigger>
-      <DialogContent className="bg-[#0D1220] border border-[rgba(255,255,255,0.08)] text-foreground">
+      <DialogContent className="bg-card border border-border text-foreground">
         <DialogHeader>
           <DialogTitle>{isUpdate ? "Atualizar cenário" : "Salvar cenário"}</DialogTitle>
           <DialogDescription className="text-muted-foreground">
@@ -191,7 +191,7 @@ export function SalvarSimulacaoModal() {
               value={nomeCenario}
               onChange={(e) => setNomeCenario(e.target.value)}
               placeholder="Ex: Conservador, Agressivo, Aposentadoria aos 55"
-              className="bg-[#131929] border-white/10 text-foreground focus:border-primary"
+              className="form-input"
             />
           </div>
 
@@ -202,7 +202,7 @@ export function SalvarSimulacaoModal() {
                 value={nomeCliente}
                 onChange={(e) => setNomeCliente(e.target.value)}
                 placeholder="Ex: João Silva"
-                className="bg-[#131929] border-white/10 text-foreground focus:border-primary"
+                className="form-input"
               />
             </div>
           )}

@@ -37,6 +37,8 @@ export interface BuildDadosFluxoOptions {
   inflacaoPct: number
   objetivosPorAno: number[]
   passivosPorAno: number[]
+  /** Retirada anual nominal do motor (`calcularFluxoAnual`), alinhada ao `displayMode`. */
+  retiradaPorAno?: number[]
 }
 
 /**
@@ -56,6 +58,7 @@ export function buildDadosFluxoGrafico(
     inflacaoPct,
     objetivosPorAno,
     passivosPorAno,
+    retiradaPorAno,
   } = options
 
   const inf = inflacaoPct / 100
@@ -66,43 +69,26 @@ export function buildDadosFluxoGrafico(
     const t = Number(p.t) || 0
     const def = Math.pow(1 + inf, Math.max(0, t))
     const patrimonioNominal = Number(p.saldoNominal) || 0
-    const patrimonioReal =
-      Number(p.saldoReal) > 0 ? Number(p.saldoReal) : patrimonioNominal / def
+    const patrimonioReal = patrimonioNominal / def
 
     const isAposentado = i >= prazoAcumulacao
-    const anosDesdeAposentadoria = Math.max(0, i - prazoAcumulacao)
 
     const scaleFluxoNominal = (v: number) =>
       displayMode === "nominal" ? v : v / def
 
-    const rendimento = Math.round(
-      Math.max(
-        0,
-        displayMode === "nominal"
-          ? patrimonioNominal * taxaLiqAnual
-          : patrimonioReal * taxaLiqAnual,
-      ),
-    )
+    const patrimonioBase =
+      displayMode === "nominal" ? patrimonioNominal : patrimonioReal
+
+    const rendimento = Math.round(Math.max(0, patrimonioBase * taxaLiqAnual))
     const aporte = !isAposentado ? Math.round(scaleFluxoNominal(aporteMensal * 12)) : 0
     const objetivosPos = objetivosPorAno[i] ?? 0
     const objetivos = -Math.round(scaleFluxoNominal(objetivosPos))
     const passivosPos = passivosPorAno[i] ?? 0
     const passivos = -Math.round(scaleFluxoNominal(passivosPos))
 
-    let retiradaAno = 0
-    let metaRenda = metaAnual
-    if (isAposentado) {
-      if (displayMode === "real") {
-        // Poder de compra fixo em reais de hoje — não aplica IPCA
-        retiradaAno = metaAnual
-        metaRenda = metaAnual
-      } else {
-        // Valor nominal futuro cresce com IPCA a partir da aposentadoria
-        const fatorIpca = Math.pow(1 + inf, anosDesdeAposentadoria)
-        retiradaAno = metaAnual * fatorIpca
-        metaRenda = retiradaAno
-      }
-    }
+    const retiradaMotor = isAposentado ? Number(retiradaPorAno?.[i]) || 0 : 0
+    const retiradaAno = retiradaMotor
+    const metaRenda = isAposentado ? retiradaAno : metaAnual
     const retirada = -Math.round(retiradaAno)
 
     const entradasTotal = rendimento + aporte

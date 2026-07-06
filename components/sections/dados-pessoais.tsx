@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useMemo } from "react"
 import { Input } from "@/components/ui/input"
@@ -59,14 +59,11 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
     <div className="space-y-8">
       {/* Header */}
       <div className="space-y-2">
-        <div className="flex items-center gap-2 text-sm text-primary">
-          <span className="text-muted-foreground">—</span>
-          <span>Novo Plano</span>
-        </div>
-        <h1 className="text-3xl font-semibold text-foreground">
-          Dados <span className="text-[#2D6DF5]">Pessoais</span>
+        <p className="page-breadcrumb">Novo Plano</p>
+        <h1 className="page-title">
+          Dados <span className="text-primary">Pessoais</span>
         </h1>
-        <p className="text-muted-foreground">
+        <p className="page-subtitle">
           Informações básicas para o diagnóstico financeiro personalizado
         </p>
       </div>
@@ -76,7 +73,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
         <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           Identificação
         </span>
-        <div className="rounded-xl bg-card border border-border p-6">
+        <div className="form-card">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Nome Completo */}
             <div className="space-y-2">
@@ -91,7 +88,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
                 value={dadosPessoais.nome}
                 onChange={(e) => setDadosPessoais({ nome: e.target.value })}
                 placeholder="Nome do cliente"
-                className="h-11 bg-[#131929] border-[rgba(255,255,255,0.14)] text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
+                className="form-input h-11 placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
               />
             </div>
 
@@ -119,7 +116,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
                   setDadosPessoais({ cpf: digits })
                 }}
                 placeholder="000.000.000-00"
-                className="h-11 bg-[#131929] border-[rgba(255,255,255,0.14)] text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30 tabular-nums"
+                className="form-input h-11 placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30 tabular-nums"
               />
             </div>
 
@@ -142,7 +139,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
                 value={dadosPessoais.conjuge}
                 onChange={(e) => setDadosPessoais({ conjuge: e.target.value })}
                 placeholder="Nome do cônjuge"
-                className="h-11 bg-[#131929] border-[rgba(255,255,255,0.14)] text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
+                className="form-input h-11 placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
               />
             </div>
 
@@ -172,7 +169,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
                         setDadosPessoais({ profissao: value })
                       }}
                     >
-                      <SelectTrigger className="h-11 bg-[#131929] border-[rgba(255,255,255,0.14)] text-foreground focus:border-primary focus:ring-1 focus:ring-primary/30">
+                      <SelectTrigger className="form-input h-11 focus:border-primary focus:ring-1 focus:ring-primary/30">
                         <SelectValue placeholder="Selecione" />
                       </SelectTrigger>
                       <SelectContent className="bg-card border-border">
@@ -191,7 +188,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
                         value={otherValue}
                         onChange={(e) => setDadosPessoais({ profissao: e.target.value })}
                         placeholder="Digite sua profissão"
-                        className="h-11 bg-[#131929] border-[rgba(255,255,255,0.14)] text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
+                        className="form-input h-11 placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
                       />
                     )}
                   </div>
@@ -212,7 +209,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
                 type="date"
                 value={dadosPessoais.nascimento}
                 onChange={(e) => setDadosPessoais({ nascimento: e.target.value })}
-                className="h-11 bg-[#131929] border-[rgba(255,255,255,0.14)] text-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
+                className="form-input h-11 focus:border-primary focus:ring-1 focus:ring-primary/30"
               />
             </div>
 
@@ -233,7 +230,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
                   }
                 }}
               >
-                <SelectTrigger className="h-11 bg-[#131929] border-[rgba(255,255,255,0.14)] text-foreground focus:border-primary focus:ring-1 focus:ring-primary/30">
+                <SelectTrigger className="form-input h-11 focus:border-primary focus:ring-1 focus:ring-primary/30">
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent className="bg-card border-border">
@@ -257,7 +254,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
                 value={dadosPessoais.regime || "Comunhão Parcial de Bens"}
                 onValueChange={(value) => setDadosPessoais({ regime: value })}
               >
-                <SelectTrigger className="h-11 bg-[#131929] border-[rgba(255,255,255,0.14)] text-foreground focus:border-primary focus:ring-1 focus:ring-primary/30">
+                <SelectTrigger className="form-input h-11 focus:border-primary focus:ring-1 focus:ring-primary/30">
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent className="bg-card border-border">
@@ -287,7 +284,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
               >
                 <SelectTrigger
                   id="sexo"
-                  className="h-11 bg-[#131929] border-[rgba(255,255,255,0.14)] text-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
+                  className="form-input h-11 focus:border-primary focus:ring-1 focus:ring-primary/30"
                 >
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
@@ -323,7 +320,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
                   setDadosPessoais({ filhos: cur.slice(0, nextCount) })
                 }}
                 placeholder="0"
-                className="h-11 bg-[#131929] border-[rgba(255,255,255,0.14)] text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
+                className="form-input h-11 placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
               />
             </div>
           </div>
@@ -359,7 +356,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
                         setDadosPessoais({ filhos: cur })
                       }}
                       placeholder="Nome do filho"
-                      className="h-11 bg-[#131929] border-[rgba(255,255,255,0.14)] text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
+                      className="form-input h-11 placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
                     />
                   </div>
                   <div className="space-y-2">
@@ -378,7 +375,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
                         cur[idx] = { ...(cur[idx] ?? { nome: "", dataNascimento: "" }), dataNascimento: e.target.value }
                         setDadosPessoais({ filhos: cur })
                       }}
-                      className="h-11 bg-[#131929] border-[rgba(255,255,255,0.14)] text-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
+                      className="form-input h-11 focus:border-primary focus:ring-1 focus:ring-primary/30"
                     />
                   </div>
                 </div>
@@ -412,7 +409,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
                   value={formatCurrency(dadosPessoais.renda)}
                   onChange={(e) => setDadosPessoais({ renda: parseCurrency(e.target.value) })}
                   placeholder="0,00"
-                  className="h-11 pl-10 bg-[#131929] border-[rgba(255,255,255,0.14)] text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
+                  className="h-11 pl-10 bg-card border-border text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
                 />
               </div>
             </div>
@@ -434,7 +431,7 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
                   value={formatCurrency(dadosPessoais.despesa)}
                   onChange={(e) => setDadosPessoais({ despesa: parseCurrency(e.target.value) })}
                   placeholder="0,00"
-                  className="h-11 pl-10 bg-[#131929] border-[rgba(255,255,255,0.14)] text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
+                  className="h-11 pl-10 bg-card border-border text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
                 />
               </div>
             </div>
@@ -457,11 +454,8 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
       </div>
 
       {/* Rodapé */}
-      <div className="flex justify-start pt-4">
-        <Button 
-          onClick={() => onNavigate("patrimonio")}
-          className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
-        >
+      <div className="flex justify-end pt-4">
+        <Button onClick={() => onNavigate("patrimonio")} className="btn-next">
           Próximo
           <ArrowRight className="h-4 w-4" />
         </Button>

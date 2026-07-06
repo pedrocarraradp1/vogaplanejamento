@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -197,7 +197,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
           {objetivos.map((objetivo) => (
             <div
               key={objetivo.id}
-              className="flex items-center gap-4 p-4 bg-[#0D1220] rounded-xl border border-white/5"
+              className="flex items-center gap-4 p-4 bg-secondary rounded-xl border border-white/5"
             >
               {/* Ícone estrela */}
               <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
@@ -287,7 +287,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
           Voltar
         </Button>
         <Button 
-          onClick={() => onNavigate("projecao")}
+          onClick={() => onNavigate("fluxo-de-caixa")}
           className="bg-primary hover:bg-primary/90 text-primary-foreground"
         >
           Próximo
@@ -297,7 +297,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
 
       {/* Modal Objetivo */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="bg-[#131929] border-white/[0.18] rounded-2xl max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-card border-border rounded-2xl max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-foreground">
               {editingObjetivo ? "Editar Objetivo" : "Adicionar Objetivo"}
@@ -330,10 +330,10 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                         setForm({ ...form, descricao: value })
                       }}
                     >
-                      <SelectTrigger className="bg-[#0D1220] border-white/10 text-foreground">
+                      <SelectTrigger className="bg-secondary border-border text-foreground">
                         <SelectValue placeholder="Selecione" />
                       </SelectTrigger>
-                      <SelectContent className="bg-[#131929] border-white/10">
+                      <SelectContent className="bg-card border-border">
                         {OBJETIVOS_PREDEFINIDOS.map((o) => (
                           <SelectItem key={o} value={o}>
                             {o}
@@ -348,7 +348,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                         value={otherValue}
                         onChange={(e) => setForm({ ...form, descricao: e.target.value })}
                         placeholder="Descreva o objetivo..."
-                        className="bg-[#0D1220] border-white/10 text-foreground placeholder:text-muted-foreground"
+                        className="bg-secondary border-border text-foreground placeholder:text-muted-foreground"
                       />
                     )}
                   </div>
@@ -366,7 +366,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                   value={form.prazoAnos || ""}
                   onChange={(e) => setForm({ ...form, prazoAnos: parseInt(e.target.value) || 0 })}
                   placeholder="0"
-                  className="bg-[#0D1220] border-white/10 text-foreground placeholder:text-muted-foreground"
+                  className="bg-secondary border-border text-foreground placeholder:text-muted-foreground"
                 />
               </div>
 
@@ -378,7 +378,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                   value={form.valor ? formatCurrency(form.valor) : ""}
                   onChange={(e) => setForm({ ...form, valor: parseCurrency(e.target.value) })}
                   placeholder="0,00"
-                  className="bg-[#0D1220] border-white/10 text-foreground placeholder:text-muted-foreground"
+                  className="bg-secondary border-border text-foreground placeholder:text-muted-foreground"
                 />
               </div>
             </div>
@@ -391,10 +391,10 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                 value={form.recorrente ? "sim" : "nao"}
                 onValueChange={handleRecorrenteChange}
               >
-                <SelectTrigger className="bg-[#0D1220] border-white/10 text-foreground">
+                <SelectTrigger className="bg-secondary border-border text-foreground">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="bg-[#131929] border-white/10">
+                <SelectContent className="bg-card border-border">
                   <SelectItem value="nao">Não — acontece uma vez</SelectItem>
                   <SelectItem value="sim">Sim — repete periodicamente</SelectItem>
                 </SelectContent>
@@ -417,7 +417,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                 value={form.frequenciaAnos || ""}
                 onChange={(e) => setForm({ ...form, frequenciaAnos: parseInt(e.target.value) || 0 })}
                 placeholder="1"
-                className="bg-[#0D1220] border-white/10 text-foreground placeholder:text-muted-foreground"
+                className="bg-secondary border-border text-foreground placeholder:text-muted-foreground"
               />
             </div>
 
@@ -444,10 +444,10 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                     }))
                   }}
                 >
-                  <SelectTrigger className="bg-[#0D1220] border-white/10 text-foreground">
+                  <SelectTrigger className="bg-secondary border-border text-foreground">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-[#131929] border-white/10">
+                  <SelectContent className="bg-card border-border">
                     <SelectItem value="total">Todo o período</SelectItem>
                     <SelectItem value="personalizado">Personalizado</SelectItem>
                   </SelectContent>
@@ -469,7 +469,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                   value={form.duracaoAnos || ""}
                   onChange={(e) => setForm({ ...form, duracaoAnos: parseInt(e.target.value) || 0 })}
                   placeholder="Ex: 4"
-                  className="bg-[#0D1220] border-white/10 text-foreground placeholder:text-muted-foreground"
+                  className="bg-secondary border-border text-foreground placeholder:text-muted-foreground"
                 />
               </div>
             </div>
@@ -484,7 +484,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                 value={form.observacoes ?? ""}
                 onChange={(e) => setForm({ ...form, observacoes: e.target.value })}
                 placeholder="Descreva detalhes do objetivo, premissas, prioridade..."
-                className="bg-[#0D1220] border-white/10 text-foreground placeholder:text-muted-foreground resize-y"
+                className="bg-secondary border-border text-foreground placeholder:text-muted-foreground resize-y"
               />
             </div>
           </div>

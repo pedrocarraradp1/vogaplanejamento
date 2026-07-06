@@ -135,7 +135,7 @@ export default function ClienteDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#080C18] text-muted-foreground text-sm">
+      <div className="min-h-screen flex items-center justify-center bg-background text-muted-foreground text-sm">
         Carregando cliente…
       </div>
     )
@@ -143,7 +143,7 @@ export default function ClienteDetailPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#080C18]">
+      <div className="min-h-screen bg-background">
         <ClientesHeader voltarHref="/clientes" novoCenarioHref={novoCenarioHref} />
         <div className="mx-auto max-w-[1200px] px-6 py-10 text-destructive text-sm">{error}</div>
       </div>
@@ -151,7 +151,7 @@ export default function ClienteDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#080C18]">
+    <div className="min-h-screen bg-background">
       <ClientesHeader voltarHref="/clientes" novoCenarioHref={novoCenarioHref} />
 
       <div className="mx-auto max-w-[1200px] px-6 py-6 space-y-6">
@@ -171,8 +171,8 @@ export default function ClienteDetailPage() {
         </div>
 
         {cenarios.length === 0 ? (
-          <div className="rounded-xl border border-white/10 bg-[#131929] p-10 text-center">
-            <div className="mx-auto w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
+          <div className="rounded-xl border border-border bg-card p-10 text-center">
+            <div className="mx-auto w-12 h-12 rounded-full bg-white/5 border border-border flex items-center justify-center">
               <FileText className="w-5 h-5 text-muted-foreground" />
             </div>
             <p className="text-sm font-semibold text-foreground mt-4">Nenhum cenário salvo</p>
@@ -181,7 +181,7 @@ export default function ClienteDetailPage() {
             </p>
             <div className="mt-6 flex justify-center">
               <Link href={novoCenarioHref}>
-                <Button className="bg-[#1E5CE6] hover:bg-[#1E5CE6]/90 text-white">
+                <Button className="bg-primary hover:bg-primary/90 text-white">
                   <Plus className="w-4 h-4 mr-2" />
                   Novo Cenário
                 </Button>

@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useMemo, useState } from "react"
 import { usePlano } from "@/lib/plano-context"
@@ -75,7 +75,7 @@ function BeneficioFiscalPrevidenciaCard() {
               value={formatCurrency(rendaBrutaAnual)}
               onChange={(e) => setRendaBrutaAnual(parseCurrency(e.target.value))}
               placeholder="0"
-              className="bg-[#131929] border-white/10 text-foreground focus:border-primary"
+              className="bg-card border-border text-foreground focus:border-primary"
             />
             <p className="text-xs text-muted-foreground">Soma de todos os rendimentos tributáveis do ano</p>
           </div>
@@ -85,13 +85,13 @@ function BeneficioFiscalPrevidenciaCard() {
               value={formatCurrency(aportePGBL)}
               onChange={(e) => setAportePGBL(parseCurrency(e.target.value))}
               placeholder="0"
-              className="bg-[#131929] border-white/10 text-foreground focus:border-primary"
+              className="bg-card border-border text-foreground focus:border-primary"
             />
             <p className="text-xs text-muted-foreground">Valor investido em PGBL no ano (limite: 12% da renda bruta)</p>
           </div>
         </div>
 
-        <div className="flex items-start gap-2 p-3 bg-[rgba(30,92,230,0.10)] rounded-lg border border-[#1E5CE6]/30">
+        <div className="flex items-start gap-2 p-3 bg-[rgba(30,92,230,0.10)] rounded-lg border border-primary/30">
             <Info className="w-4 h-4 text-primary mt-0.5" />
             <div className="text-sm text-foreground">
               Limite de Dedução:{" "}
@@ -109,7 +109,7 @@ function BeneficioFiscalPrevidenciaCard() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="rounded-xl border border-[rgba(255,255,255,0.06)] bg-[#0D1220] p-5">
+          <div className="rounded-xl border border-border bg-secondary p-5">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">SEM PGBL</p>
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-4">
@@ -123,7 +123,7 @@ function BeneficioFiscalPrevidenciaCard() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-[#22C787]/30 bg-[#0D1220] p-5">
+          <div className="rounded-xl border border-[#22C787]/30 bg-secondary p-5">
             <p className="text-xs font-semibold text-[#22C787] uppercase tracking-wide mb-4">COM PGBL</p>
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-4">
@@ -138,7 +138,7 @@ function BeneficioFiscalPrevidenciaCard() {
           </div>
         </div>
 
-        <div className="rounded-xl border border-[rgba(255,255,255,0.06)] bg-[#0D1220] p-5">
+        <div className="rounded-xl border border-border bg-secondary p-5">
           <p className="text-sm font-medium text-foreground mb-4">Observações Importantes</p>
           <ul className="space-y-2 text-sm text-muted-foreground">
             {[
@@ -234,7 +234,7 @@ export function ProtecaoFinanceira({ onNavigate }: ProtecaoFinanceiraProps) {
       </div>
 
       {/* Card 1 — Parâmetros */}
-      <div className="bg-card rounded-xl border border-card-border p-6">
+      <div className="bg-card rounded-xl border border-border p-6">
         <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-6">
           Parâmetros de Proteção
         </h2>
@@ -279,7 +279,7 @@ export function ProtecaoFinanceira({ onNavigate }: ProtecaoFinanceiraProps) {
       </div>
 
       {/* Card 2 — Detalhamento */}
-      <div className="bg-card rounded-xl border border-card-border p-6">
+      <div className="bg-card rounded-xl border border-border p-6">
         <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-6">
           Detalhamento da Necessidade
         </h2>
@@ -291,7 +291,7 @@ export function ProtecaoFinanceira({ onNavigate }: ProtecaoFinanceiraProps) {
             { label: "Necessidade Total",      valor: necessidadeTotal,            cor: "", bold: true },
             { label: "(-) Patrimônio Atual",   valor: patrimonioAtual,             cor: "text-success" },
           ].map(item => (
-            <div key={item.label} className="flex justify-between items-center py-2 border-b border-card-border">
+            <div key={item.label} className="flex justify-between items-center py-2 border-b border-border">
               <span className={`${item.bold ? "text-foreground font-bold" : "text-muted-foreground"}`}>{item.label}</span>
               <span className={`font-medium ${item.cor || "text-foreground"} ${item.bold ? "font-bold" : ""}`}>
                 {formatCurrency(item.valor)}
@@ -306,7 +306,7 @@ export function ProtecaoFinanceira({ onNavigate }: ProtecaoFinanceiraProps) {
       </div>
 
       {/* Card 3 — Comparação */}
-      <div className="bg-card rounded-xl border border-card-border p-6">
+      <div className="bg-card rounded-xl border border-border p-6">
         <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
           Comparação de Cenários
         </h2>
@@ -379,13 +379,13 @@ export function ProtecaoFinanceira({ onNavigate }: ProtecaoFinanceiraProps) {
 
       {/* Footer */}
       <div className="flex items-center gap-4">
-        <Button variant="outline" onClick={() => onNavigate("sucessorio")}
-          className="border-card-border text-muted-foreground hover:text-foreground">
+        <Button variant="outline" onClick={() => onNavigate("projecao")}
+          className="border-border text-muted-foreground hover:text-foreground">
           <ArrowLeft className="w-4 h-4 mr-2" />Voltar
         </Button>
-        <Button onClick={() => onNavigate("dashboard")}
+        <Button onClick={() => onNavigate("simulador-seguros")}
           className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-3 text-base font-semibold">
-          Gerar Diagnóstico<ArrowRight className="w-4 h-4 ml-2" />
+          Próximo<ArrowRight className="w-4 h-4 ml-2" />
         </Button>
       </div>
     </div>

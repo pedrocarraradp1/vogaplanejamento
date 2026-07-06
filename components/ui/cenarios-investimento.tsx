@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useMemo, useState } from "react"
 import { Info } from "lucide-react"
@@ -268,7 +268,7 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
         "Média",
         "#1E5CE6",
         "bg-[rgba(30,92,230,0.06)]",
-        "border-[#1E5CE6]/25",
+        "border-primary/25",
         cenarioModerado,
         pMod,
         projecaoModerada,
@@ -332,7 +332,7 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
 
   const ToggleNominalReal = (
     <div className="flex items-center gap-3">
-      <div className="inline-flex rounded-lg bg-[#131929] p-1">
+      <div className="inline-flex rounded-lg bg-card p-1">
         {(["nominal", "real"] as const).map((m) => (
           <button
             key={m}
@@ -418,12 +418,12 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
                           if (c.key === "moderado") setPremissas({ rentabilidadeModerado: v })
                           if (c.key === "agressivo") setPremissas({ rentabilidadeAgressivo: v })
                         }}
-                        className="bg-[#131929] border-white/10 text-foreground focus:border-primary pr-16"
+                        className="bg-card border-border text-foreground focus:border-primary pr-16"
                       />
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">% a.a.</span>
                     </div>
                   ) : (
-                    <div className="rounded-lg bg-[#131929] border border-white/10 px-3 py-2 text-sm text-foreground tabular-nums">
+                    <div className="rounded-lg bg-card border border-border px-3 py-2 text-sm text-foreground tabular-nums">
                       {c.taxaBruta}% a.a.
                     </div>
                   )}
@@ -432,14 +432,14 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
             ))}
           </div>
 
-          <div className="rounded-xl border border-[rgba(255,255,255,0.06)] bg-[#0D1220] overflow-hidden">
-            <div className="px-5 py-4 border-b border-[rgba(255,255,255,0.06)]">
+          <div className="rounded-xl border border-border bg-secondary overflow-hidden">
+            <div className="px-5 py-4 border-b border-border">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Comparação de Resultados</p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-[rgba(255,255,255,0.06)]">
+                  <tr className="border-b border-border">
                     <th className="py-3 px-4 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       Métrica
                     </th>
@@ -473,7 +473,7 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
                     },
                     { label: "Independência Financeira", values: cenarios.map((c) => (c.idadeIF ? `${c.idadeIF} anos` : "—")) },
                   ].map((row) => (
-                    <tr key={row.label} className="border-b border-[rgba(255,255,255,0.06)] last:border-b-0">
+                    <tr key={row.label} className="border-b border-border last:border-b-0">
                       <td className="py-3 px-4 text-sm text-muted-foreground">{row.label}</td>
                       {row.values.map((v, i) => (
                         <td key={i} className="py-3 px-4 text-right text-sm text-foreground tabular-nums">
@@ -487,7 +487,7 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
             </div>
           </div>
 
-          <div className="rounded-xl border border-[rgba(255,255,255,0.06)] bg-[#0D1220] p-5">
+          <div className="rounded-xl border border-border bg-secondary p-5">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">
               Evolução Patrimonial Comparativa
             </p>

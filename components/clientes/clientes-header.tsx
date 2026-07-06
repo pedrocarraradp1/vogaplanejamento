@@ -1,6 +1,5 @@
-import Image from "next/image"
+﻿import Image from "next/image"
 import Link from "next/link"
-import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 
 type ClientesHeaderProps = {
@@ -10,27 +9,27 @@ type ClientesHeaderProps = {
 
 export function ClientesHeader({ voltarHref, novoCenarioHref }: ClientesHeaderProps) {
   return (
-    <header className="h-16 bg-[#080C18] border-b border-white/10">
+    <header className="h-16 bg-navy border-b border-border">
       <div className="mx-auto max-w-[1200px] h-full px-6 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3 min-w-0 flex-1">
-          <Link href={voltarHref}>
-            <Button
-              variant="outline"
-              className="h-9 shrink-0 border-white/10 bg-[#131929] text-muted-foreground hover:text-foreground hover:bg-white/5"
-            >
-              ← Voltar
-            </Button>
+        <div className="flex items-center gap-4 min-w-0">
+          <Link href={voltarHref} className="btn-ghost-nav shrink-0">
+            ← Voltar
           </Link>
-          <Image src="/logo-voga.png" alt="Voga" width={96} height={32} className="h-8 w-auto shrink-0" />
-          <span className="text-sm sm:text-[18px] font-medium text-white truncate min-w-0 max-w-[200px] sm:max-w-none">
-            Planejamento Financeiro Pessoal
-          </span>
+          <Link href="/clientes" className="shrink-0">
+            <Image
+              src="/logo-voga.png"
+              alt="Voga"
+              width={120}
+              height={40}
+              className="h-8 w-auto brightness-0 invert"
+            />
+          </Link>
         </div>
         <Link href={novoCenarioHref} className="shrink-0">
-          <Button className="bg-[#1E5CE6] hover:bg-[#1E5CE6]/90 text-white">
-            <Plus className="w-4 h-4 mr-2" />
+          <span className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+            <Plus className="w-4 h-4" />
             Novo Cenário
-          </Button>
+          </span>
         </Link>
       </div>
     </header>

@@ -224,6 +224,20 @@ export function calcularPassivosPorAnoSeries(
 
 // ─── Projeção Patrimonial ─────────────────────────────────────────────────────
 
+export type DisplayModeProjecao = "nominal" | "real"
+
+/** Retirada anual na aposentadoria conforme o modo de exibição/simulação. */
+export function retiradaAnualAposentadoria(
+  retiradaEfetivaMensal: number,
+  t: number,
+  inflacaoAnual: number,
+  displayMode: DisplayModeProjecao = "nominal",
+): number {
+  const base = Math.max(0, retiradaEfetivaMensal) * 12
+  if (base === 0) return 0
+  return displayMode === "real" ? base : base * Math.pow(1 + inflacaoAnual, Math.max(0, t))
+}
+
 /**
  * Replica exatamente as fórmulas das sheets de Apoio do Excel Voga.
  *
@@ -234,8 +248,10 @@ export function calcularPassivosPorAnoSeries(
  *   saldo = saldo_prev*(1+r) + fvMensal(aporteM*(1+inf)^t, r) - objetivos_t - dividas_t
  *   + novaEntrada*(1+inf)^t  se idade == idadeEntrada
  *
- * Aposentadoria t>0:
+ * Aposentadoria t>0 (nominal):
  *   saldo = saldo_prev*(1+r) - retiradaM*12*(1+inf)^t
+ * Aposentadoria t>0 (real):
+ *   saldo = saldo_prev*(1+r) - retiradaM*12  (poder de compra fixo)
  *
  * Valor Real:
  *   saldoReal = saldoNominal / (1+inf)^t
@@ -243,7 +259,8 @@ export function calcularPassivosPorAnoSeries(
 export function calcularProjecao(
   premissas: Premissas,
   objetivos: Objetivo[],
-  passivos: Passivo[] = []
+  passivos: Passivo[] = [],
+  displayMode: DisplayModeProjecao = "nominal",
 ): ProjecaoAno[] {
   const r   = premissas.rendimento / 100
   const inf = premissas.inflacao   / 100
@@ -276,7 +293,8 @@ export function calcularProjecao(
     if (t === 0) {
       saldo = saldoInicial + fvMensal(aporteNominalAno, r) - objetivosAno - dividasAno + entradaAno
     } else if (isAposentado) {
-      saldo = saldo * (1 + r) - retiradaEfetiva * 12 * fatorInf + entradaAno
+      const retiradaAno = retiradaAnualAposentadoria(retiradaEfetiva, t, inf, displayMode)
+      saldo = saldo * (1 + r) - retiradaAno + entradaAno
     } else {
       saldo = saldo * (1 + r) + fvMensal(aporteNominalAno, r) - objetivosAno - dividasAno + entradaAno
     }
@@ -330,7 +348,8 @@ export function calcularFluxoAnual(
   premissas: Premissas,
   objetivos: Objetivo[],
   passivos: Passivo[] = [],
-  aliquotaIR = 0.15
+  aliquotaIR = 0.15,
+  displayMode: DisplayModeProjecao = "nominal",
 ): FluxoAnualRow[] {
   const r   = premissas.rendimento / 100
   const inf = premissas.inflacao   / 100
@@ -369,7 +388,9 @@ export function calcularFluxoAnual(
     const extra = entradaAno
     const objetivosVal = objetivosAno
     const dividasVal = dividasAno
-    const retirada = isAposentado ? retiradaEfetiva * 12 * fatorInf : 0
+    const retirada = isAposentado
+      ? retiradaAnualAposentadoria(retiradaEfetiva, t, inf, displayMode)
+      : 0
     const ir = rendimento * aliq
 
     const entradasTotal = aporte + rendimento + previdencia + inss + complemento + extra

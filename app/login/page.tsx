@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
@@ -92,7 +92,7 @@ export default function LoginPage() {
           </div>
 
           <div
-            className="flex rounded-lg border border-border/80 p-0.5 bg-[#0D1220]"
+            className="flex rounded-lg border border-border/80 p-0.5 bg-secondary"
             role="tablist"
             aria-label="Modo de acesso"
           >

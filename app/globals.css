@@ -4,39 +4,50 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: #080C18;
-  --foreground: #E8EBF2;
-  --card: #131929;
-  --card-foreground: #E8EBF2;
-  --popover: #131929;
-  --popover-foreground: #E8EBF2;
-  --primary: #1E5CE6;
+  /* Voga design tokens */
+  --color-navy: #0F1B2D;
+  --color-navy-light: #1A2B42;
+  --color-accent: #4A90D9;
+  --color-bg: #F4F5F7;
+  --color-surface: #FFFFFF;
+  --color-border: #E2E4E8;
+  --color-text: #1A1A2E;
+  --color-muted: #6B7280;
+
+  /* Shadcn / app mapping */
+  --background: var(--color-bg);
+  --foreground: var(--color-text);
+  --card: var(--color-surface);
+  --card-foreground: var(--color-text);
+  --popover: var(--color-surface);
+  --popover-foreground: var(--color-text);
+  --primary: var(--color-accent);
   --primary-foreground: #FFFFFF;
-  --secondary: #0D1220;
-  --secondary-foreground: #E8EBF2;
-  --muted: #131929;
-  --muted-foreground: #8E96AC;
-  --accent: #1E5CE6;
+  --secondary: var(--color-bg);
+  --secondary-foreground: var(--color-text);
+  --muted: var(--color-bg);
+  --muted-foreground: var(--color-muted);
+  --accent: var(--color-accent);
   --accent-foreground: #FFFFFF;
-  --destructive: oklch(0.577 0.245 27.325);
+  --destructive: #EF4444;
   --destructive-foreground: #FFFFFF;
-  --border: rgba(255, 255, 255, 0.07);
-  --input: rgba(255, 255, 255, 0.07);
-  --ring: #1E5CE6;
-  --chart-1: #1E5CE6;
+  --border: var(--color-border);
+  --input: var(--color-bg);
+  --ring: var(--color-accent);
+  --chart-1: var(--color-accent);
   --chart-2: #3B82F6;
   --chart-3: #60A5FA;
   --chart-4: #93C5FD;
   --chart-5: #BFDBFE;
-  --radius: 0.75rem;
-  --sidebar: #0D1220;
-  --sidebar-foreground: #E8EBF2;
-  --sidebar-primary: #1E5CE6;
+  --radius: 0.5rem;
+  --sidebar: var(--color-navy);
+  --sidebar-foreground: rgba(255, 255, 255, 0.75);
+  --sidebar-primary: var(--color-accent);
   --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: rgba(30, 92, 230, 0.10);
+  --sidebar-accent: rgba(255, 255, 255, 0.08);
   --sidebar-accent-foreground: #FFFFFF;
-  --sidebar-border: rgba(255, 255, 255, 0.07);
-  --sidebar-ring: #1E5CE6;
+  --sidebar-border: rgba(255, 255, 255, 0.1);
+  --sidebar-ring: var(--color-accent);
 }
 
 @theme inline {
@@ -66,10 +77,14 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --color-navy: var(--color-navy);
+  --color-navy-light: var(--color-navy-light);
+  --color-surface: var(--color-surface);
+  --color-text: var(--color-text);
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -85,6 +100,52 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+@layer components {
+  .field-label {
+    @apply text-[11px] font-medium uppercase tracking-wider text-muted-foreground;
+  }
+
+  .form-card {
+    @apply rounded-lg border border-border bg-card p-6;
+  }
+
+  .form-input {
+    @apply h-9 w-full rounded border border-border bg-input px-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30;
+  }
+
+  .page-breadcrumb {
+    @apply text-sm text-muted-foreground;
+  }
+
+  .page-title {
+    @apply text-[28px] font-semibold leading-tight text-foreground;
+  }
+
+  .page-subtitle {
+    @apply text-sm text-muted-foreground;
+  }
+
+  .btn-next {
+    @apply inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90;
+  }
+
+  .btn-ghost-nav {
+    @apply inline-flex items-center gap-2 rounded-md border border-white/30 bg-transparent px-4 py-2 text-sm font-medium text-white hover:bg-white/10;
+  }
+
+  .toggle-pill {
+    @apply inline-flex rounded-full border border-white/30 p-0.5;
+  }
+
+  .toggle-pill-item {
+    @apply rounded-full px-3 py-1.5 text-xs font-medium text-white/80 transition-all;
+  }
+
+  .toggle-pill-item-active {
+    @apply bg-primary text-white;
   }
 }

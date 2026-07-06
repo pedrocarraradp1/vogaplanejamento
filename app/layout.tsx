@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
-import Image from 'next/image'
 import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from '@/components/ui/toaster'
 import './globals.css'
@@ -34,7 +33,7 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: '#080C18',
+  themeColor: '#0F1B2D',
 }
 
 export default function RootLayout({
@@ -45,15 +44,6 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body className={`${inter.variable} font-sans antialiased`}>
-        <div style={{ position: 'fixed', top: 20, right: 24, zIndex: 50 }}>
-          <Image
-            src="/logo-voga.png"
-            alt="Voga"
-            width={160}
-            height={52}
-            style={{ objectFit: 'contain' }}
-          />
-        </div>
         {children}
         <Toaster />
         {process.env.NODE_ENV === 'production' && <Analytics />}

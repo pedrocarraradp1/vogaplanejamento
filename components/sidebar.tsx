@@ -1,11 +1,10 @@
 "use client"
 
 import { cn } from "@/lib/utils"
-import { Shield, ShieldCheck } from "lucide-react"
+import { ChevronRight } from "lucide-react"
 
 interface NavItem {
   id: string
-  number: number
   label: string
 }
 
@@ -17,26 +16,45 @@ interface NavGroup {
 const navGroups: NavGroup[] = [
   {
     title: "Cadastro do Cliente",
+    items: [{ id: "dados-pessoais", label: "Dados Pessoais" }],
+  },
+  {
+    title: "Planejamento Financeiro",
     items: [
-      { id: "dados-pessoais", number: 1, label: "Dados Pessoais" },
-      { id: "patrimonio", number: 2, label: "Patrimônio" },
-      { id: "objetivos", number: 3, label: "Objetivos" },
+      { id: "patrimonio", label: "Patrimônio" },
+      { id: "objetivos", label: "Objetivos" },
+      { id: "fluxo-de-caixa", label: "Fluxo de Caixa" },
+      { id: "diagnostico-financeiro", label: "Diagnóstico Financeiro" },
     ],
   },
   {
-    title: "Planejamento",
+    title: "Planejamento Patrimonial",
     items: [
-      { id: "projecao", number: 4, label: "Projeção" },
-      { id: "sucessorio", number: 5, label: "Sucessório" },
-      { id: "protecao", number: 6, label: "Proteção Financeira" },
-      { id: "simulador-seguros", number: 8, label: "Simulador de Seguros" },
+      { id: "projecao", label: "Projeção" },
+      { id: "cenarios", label: "Cenários" },
     ],
   },
   {
-    title: "Resultado",
+    title: "Planejamento Sucessório",
+    items: [{ id: "sucessorio", label: "Sucessório" }],
+  },
+  {
+    title: "Gestão de Risco e Proteção",
     items: [
-      { id: "dashboard", number: 9, label: "Dashboard" },
+      { id: "protecao", label: "Proteção Financeira" },
+      { id: "simulador-seguros", label: "Simulador de Seguros" },
     ],
+  },
+  {
+    title: "Planejamento Fiscal",
+    items: [
+      { id: "pgbl-vs-vgbl", label: "PGBL vs VGBL" },
+      { id: "eficiencia-tributaria", label: "Eficiência Tributária" },
+    ],
+  },
+  {
+    title: "Diagnóstico",
+    items: [{ id: "dashboard", label: "Dashboard" }],
   },
 ]
 
@@ -47,44 +65,30 @@ interface SidebarProps {
 
 export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
   return (
-    <aside className="fixed left-0 top-0 h-screen w-64 bg-sidebar border-r border-sidebar-border flex flex-col">
-      <nav className="flex-1 py-8 px-3 space-y-6 overflow-y-auto">
+    <aside className="fixed left-0 top-16 z-40 flex h-[calc(100vh-4rem)] w-64 flex-col bg-navy">
+      <nav className="flex-1 overflow-y-auto px-3 py-6 space-y-6">
         {navGroups.map((group) => (
           <div key={group.title}>
-            <h3 className="px-3 mb-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            <h3 className="px-3 mb-2 text-[11px] font-semibold uppercase tracking-widest text-white/40">
               {group.title}
             </h3>
-            <ul className="space-y-1">
+            <ul className="space-y-0.5">
               {group.items.map((item) => {
                 const isActive = activeSection === item.id
                 return (
                   <li key={item.id}>
                     <button
+                      type="button"
                       onClick={() => onSectionChange(item.id)}
                       className={cn(
-                        "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+                        "w-full flex items-center justify-between gap-2 px-3 py-2.5 text-sm font-medium transition-colors rounded-none",
                         isActive
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground border-l-2 border-primary"
-                          : "text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/50"
+                          ? "bg-white/[0.08] text-white border-r-[3px] border-primary"
+                          : "text-white/75 hover:bg-navy-light hover:text-white border-r-[3px] border-transparent"
                       )}
                     >
-                      <span
-                        className={cn(
-                          "w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold",
-                          isActive
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-muted-foreground"
-                        )}
-                      >
-                        {item.number}
-                      </span>
-                      {item.id === "protecao" && (
-                        <Shield className={cn("h-4 w-4", isActive ? "text-primary-foreground" : "text-muted-foreground")} />
-                      )}
-                      {item.id === "simulador-seguros" && (
-                        <ShieldCheck className={cn("h-4 w-4 shrink-0", isActive ? "text-primary-foreground" : "text-muted-foreground")} />
-                      )}
-                      {item.label}
+                      <span className="truncate text-left">{item.label}</span>
+                      {isActive && <ChevronRight className="h-4 w-4 shrink-0 text-white/90" />}
                     </button>
                   </li>
                 )

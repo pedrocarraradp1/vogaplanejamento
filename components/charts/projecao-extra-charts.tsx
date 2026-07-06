@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useMemo } from "react"
 import {
@@ -82,7 +82,7 @@ export function FluxoAnualChart({
                 const p = payload[0]?.payload as DadoFluxoGrafico
                 const corLiq = p.fluxoLiquido >= 0 ? "#1D9E75" : "#E24B4A"
                 return (
-                  <div className="rounded-lg border border-white/10 bg-[#131929] px-3 py-2 text-xs shadow-lg min-w-[200px]">
+                  <div className="rounded-lg border border-border bg-card px-3 py-2 text-xs shadow-lg min-w-[200px]">
                     <p className="font-semibold text-white">
                       Ano {p.t} · Idade {p.idade}
                     </p>
@@ -90,7 +90,7 @@ export function FluxoAnualChart({
                     <p className="mt-2 text-[#378ADD]">
                       Rendimento: {formatarMoedaCompleta(p.rendimento)}
                     </p>
-                    <p className="text-[#1E5CE6]">Aporte: {formatarMoedaCompleta(p.aporte)}</p>
+                    <p className="text-primary">Aporte: {formatarMoedaCompleta(p.aporte)}</p>
                     <p className="text-[#BA7517]">
                       Objetivos: {formatarMoedaCompleta(Math.abs(p.objetivos))}
                     </p>
@@ -227,7 +227,7 @@ export function RendaCarteiraChart({
                 const status = p.acimaMeta ? "Acima da meta" : "Abaixo da meta"
                 const corStatus = p.acimaMeta ? "#22C787" : "#EF4444"
                 return (
-                  <div className="rounded-lg border border-white/10 bg-[#131929] px-3 py-2 text-xs shadow-lg">
+                  <div className="rounded-lg border border-border bg-card px-3 py-2 text-xs shadow-lg">
                     <p className="font-semibold text-white">Idade {p.idade}</p>
                     {displayMode === "nominal" ? (
                       <>
