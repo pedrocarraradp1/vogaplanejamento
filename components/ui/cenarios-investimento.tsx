@@ -19,6 +19,7 @@ import {
   Tooltip as RechartsTooltip,
   Legend,
 } from "recharts"
+import { CHART_TOOLTIP_ITEM_STYLE, CHART_TOOLTIP_LABEL_STYLE, CHART_TOOLTIP_STYLE } from "@/lib/chart-tooltip"
 
 type DisplayMode = "nominal" | "real"
 
@@ -511,14 +512,9 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
                     tickFormatter={formatarMoeda}
                   />
                   <RechartsTooltip
-                    contentStyle={{
-                      backgroundColor: "var(--bg-page)",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      borderRadius: "8px",
-                      color: "#fff",
-                    }}
-                    labelStyle={{ color: "#ffffff", fontWeight: 600 }}
-                    itemStyle={{ color: "#ffffff" }}
+                    contentStyle={CHART_TOOLTIP_STYLE}
+                    labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                    itemStyle={CHART_TOOLTIP_ITEM_STYLE}
                     labelFormatter={(label) => `Idade: ${label} anos`}
                     formatter={(value: number) => fmtFull(value)}
                   />

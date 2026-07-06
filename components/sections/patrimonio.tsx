@@ -12,28 +12,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import {
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  Label,
-  LabelList,
-  ResponsiveContainer,
-} from "recharts"
-import { ArrowLeft, ArrowRight, Pencil, Plus } from "lucide-react"
-import { usePlano, type Passivo } from "@/lib/plano-context"
+import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts"
+import { ArrowLeft, ArrowRight } from "lucide-react"
+import { usePlano } from "@/lib/plano-context"
 import {
   CATEGORIAS_PASSIVO,
   DESCRICOES_ATIVOS_POR_TIPO,
-  SECOES_ATIVOS,
+  SECAO_LIQUIDO,
   TIPOS_ATIVO,
   isTipoAtivoLabel,
-  matchesAtivoCategoria,
   DEFAULT_CATEGORIA_PASSIVO,
   normalizeAtivoDescricao,
   normalizePassivo,
@@ -41,6 +28,7 @@ import {
   resolvePassivoCategoria,
   resolveTipoAtivoLabel,
   getSaldoDevedorPassivo,
+  getParcelaMensalPassivo,
   sumAtivoCategoria,
   type SecaoAtivoConfig,
   type TipoAtivoLabel,
@@ -50,21 +38,7 @@ interface PatrimonioProps {
   onNavigate: (section: string) => void
 }
 
-const TOOLTIP_STYLE = {
-  backgroundColor: "var(--bg-page)",
-  border: "1px solid rgba(255,255,255,0.1)",
-  borderRadius: "8px",
-} as const
-
 type DonutSlice = { name: string; value: number; fill: string }
-type BarraCategoria = { name: string; value: number; fill: string; pctTotal: number }
-type LinhaAtivo = {
-  id: string
-  label: string
-  sublabel?: string
-  valor: number
-  bemDeHeranca: boolean
-}
 
 type BemDeHerancaSelect = "sim" | "nao"
 
@@ -111,301 +85,243 @@ type AddModalState =
   | { kind: "passivo" }
   | null
 
-function PatrimonioBarRow({
-  label,
-  sublabel,
-  valor,
-  totalSecao,
-  barColor,
+type SemaphoreLevel = "green" | "yellow" | "red"
+
+const SEMAPHORE_BORDER: Record<SemaphoreLevel, string> = {
+  green: "#00954F",
+  yellow: "#EF9F27",
+  red: "#C0392B",
+}
+
+function InfoTooltip({ text }: { text: string }) {
+  const [open, setOpen] = useState(false)
+  if (!text?.trim()) return null
+  return (
+    <div
+      style={{ position: "relative", display: "inline-flex", marginLeft: 5 }}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      <span
+        style={{
+          width: 14,
+          height: 14,
+          borderRadius: "50%",
+          background: "#F0F2F5",
+          border: "0.5px solid #D9D9D9",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: "help",
+          fontSize: 9,
+          color: "#9A9B9B",
+          flexShrink: 0,
+        }}
+      >
+        i
+      </span>
+      {open && (
+        <div
+          style={{
+            position: "absolute",
+            left: 18,
+            top: -4,
+            background: "white",
+            border: "1px solid var(--border)",
+            borderRadius: 6,
+            padding: "8px 10px",
+            fontSize: 11,
+            color: "#52514e",
+            width: 215,
+            zIndex: 50,
+            lineHeight: 1.5,
+            boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+          }}
+        >
+          {text}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function DonutComLegenda({
+  data,
   formatCurrency,
-  valueClassName = "text-foreground",
-  onValueCommit,
+  footer,
 }: {
-  label: string
-  sublabel?: string
-  valor: number
-  totalSecao: number
-  barColor: string
-  formatCurrency: (value: number) => string
-  valueClassName?: string
-  onValueCommit: (valor: number) => void
+  data: DonutSlice[]
+  formatCurrency: (v: number) => string
+  footer?: ReactNode
 }) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState("")
+  const ativo = data.filter((d) => d.value > 0)
+  const total = ativo.reduce((s, d) => s + d.value, 0)
 
-  const pct = totalSecao > 0 ? Math.min(100, Math.round((valor / totalSecao) * 100)) : 0
-  const barWidth = totalSecao > 0 ? (valor / totalSecao) * 100 : 0
-
-  const startEdit = () => {
-    setDraft(valor > 0 ? formatCurrency(valor) : "")
-    setEditing(true)
-  }
-
-  const commit = (raw: string) => {
-    const cleaned = raw.replace(/[^\d]/g, "")
-    onValueCommit(parseInt(cleaned, 10) || 0)
-    setEditing(false)
+  if (total <= 0) {
+    return (
+      <p style={{ fontSize: 12, color: "#9A9B9B", textAlign: "center", padding: "40px 0" }}>
+        Sem dados para exibir
+      </p>
+    )
   }
 
   return (
-    <div className="py-3 border-b border-white/5 last:border-0 space-y-2">
-      <div className="flex items-center gap-3">
-        <div className="flex-1 min-w-0">
-          <span className="text-sm text-foreground block truncate">{label}</span>
-          {sublabel ? (
-            <span className="text-xs text-muted-foreground block truncate">{sublabel}</span>
-          ) : null}
-        </div>
-        <div className="flex items-center gap-1 shrink-0">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={startEdit}
-            className="h-7 w-7 text-muted-foreground hover:text-foreground"
-            aria-label="Editar valor"
-          >
-            <Pencil className="w-3.5 h-3.5" />
-          </Button>
-          {editing ? (
-            <Input
-              autoFocus
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onBlur={() => commit(draft)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") commit(draft)
-                if (e.key === "Escape") setEditing(false)
-              }}
-              className="h-8 w-32 text-right form-card text-foreground text-sm tabular-nums"
-            />
-          ) : (
-            <button
-              type="button"
-              onClick={startEdit}
-              className={`text-sm font-semibold tabular-nums hover:opacity-80 ${valueClassName}`}
+    <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+      <div style={{ width: 155, height: 155, flexShrink: 0 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={ativo}
+              dataKey="value"
+              nameKey="name"
+              cx="50%"
+              cy="50%"
+              innerRadius={48}
+              outerRadius={72}
+              paddingAngle={2}
+              stroke="transparent"
             >
-              {formatCurrency(valor)}
-            </button>
-          )}
-        </div>
+              {ativo.map((entry, i) => (
+                <Cell key={`${entry.name}-${i}`} fill={entry.fill} />
+              ))}
+            </Pie>
+          </PieChart>
+        </ResponsiveContainer>
       </div>
-      <div className="flex items-center gap-3">
-        <div className="flex-1 h-2 rounded-full bg-white/5 overflow-hidden">
-          <div
-            className="h-full rounded-full transition-all duration-300"
-            style={{ width: `${barWidth}%`, backgroundColor: barColor }}
-          />
-        </div>
-        <span className="text-xs text-muted-foreground tabular-nums w-9 text-right shrink-0">
-          {pct}%
-        </span>
+      <ul style={{ listStyle: "none", margin: 0, padding: 0, flex: 1, minWidth: 0 }}>
+        {data.map((item) => {
+          const pct = total > 0 ? ((item.value / total) * 100).toFixed(1) : "0.0"
+          return (
+            <li
+              key={item.name}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 11,
+                color: "#52514e",
+                marginBottom: 6,
+              }}
+            >
+              <span
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  background: item.fill,
+                  flexShrink: 0,
+                }}
+              />
+              <span style={{ flex: 1, minWidth: 0 }}>
+                {item.name}
+              </span>
+              <span style={{ color: "#9A9B9B", whiteSpace: "nowrap" }}>
+                {pct}%
+              </span>
+              <span style={{ fontWeight: 500, whiteSpace: "nowrap" }}>
+                {formatCurrency(item.value)}
+              </span>
+            </li>
+          )
+        })}
+      </ul>
+      {footer}
+    </div>
+  )
+}
+
+function KpiCard({
+  label,
+  value,
+  hint,
+  valueColor = "#1A1A1A",
+}: {
+  label: string
+  value: string
+  hint?: string
+  valueColor?: string
+}) {
+  return (
+    <div style={{ background: "var(--surface)", borderRadius: 6, padding: "12px 14px" }}>
+      <div
+        style={{
+          fontSize: 10,
+          textTransform: "uppercase",
+          letterSpacing: ".06em",
+          color: "#9A9B9B",
+          marginBottom: 5,
+        }}
+      >
+        {label}
+      </div>
+      <div style={{ fontSize: 18, fontWeight: 500, color: valueColor }}>{value}</div>
+      {hint ? (
+        <div style={{ fontSize: 10, color: "#9A9B9B", marginTop: 2 }}>{hint}</div>
+      ) : null}
+    </div>
+  )
+}
+
+function IndicadorSaude({
+  label,
+  valor,
+  nivel,
+  progressPct,
+}: {
+  label: string
+  valor: string
+  nivel: SemaphoreLevel
+  progressPct: number
+}) {
+  const borderColor = SEMAPHORE_BORDER[nivel]
+  const pct = Math.min(100, Math.max(0, progressPct))
+  return (
+    <div
+      style={{
+        background: "var(--surface)",
+        borderRadius: 6,
+        padding: "12px 14px",
+        borderLeft: `3px solid ${borderColor}`,
+      }}
+    >
+      <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".06em", color: "#9A9B9B", marginBottom: 5 }}>
+        {label}
+      </div>
+      <div style={{ fontSize: 16, fontWeight: 500, color: "#1A1A1A", marginBottom: 8 }}>{valor}</div>
+      <div style={{ height: 4, borderRadius: 2, background: "#D9D9D9", overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${pct}%`, background: borderColor, borderRadius: 2 }} />
       </div>
     </div>
   )
 }
 
-function PatrimonioSection({
-  title,
-  totalLabel,
-  totalValue,
-  totalClassName = "text-foreground",
-  headerAction,
-  children,
-}: {
-  title: string
-  totalLabel: string
-  totalValue: string
-  totalClassName?: string
-  headerAction?: ReactNode
-  children: ReactNode
-}) {
-  return (
-    <section className="form-card p-5 md:p-6">
-      <div className="flex flex-col gap-3 mb-4 pb-4 border-b border-border">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <h2 className="text-base font-semibold text-foreground">{title}</h2>
-          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-            {headerAction}
-            <p className={`text-lg md:text-xl font-bold tabular-nums ${totalClassName}`}>
-              {totalLabel} {totalValue}
-            </p>
-          </div>
-        </div>
-      </div>
-      <div>{children}</div>
-    </section>
-  )
+function nivelReservaEmergencia(meses: number): SemaphoreLevel {
+  if (meses > 6) return "green"
+  if (meses >= 3) return "yellow"
+  return "red"
 }
 
-function PatrimonioCharts({
-  dataDonut,
-  totalDonut,
-  dataBarras,
-  alturaBarras,
-  patrimonioTotal,
-  formatCurrency,
-}: {
-  dataDonut: DonutSlice[]
-  totalDonut: number
-  dataBarras: BarraCategoria[]
-  alturaBarras: number
-  patrimonioTotal: number
-  formatCurrency: (value: number) => string
-}) {
-  const donutAtivo = dataDonut.filter((d) => d.value > 0)
+function nivelComprometimento(pct: number): SemaphoreLevel {
+  if (pct < 20) return "green"
+  if (pct <= 30) return "yellow"
+  return "red"
+}
 
-  return (
-    <section className="form-card p-5 md:p-6">
-      <p className="field-labelr mb-4">
-        Visualização
-      </p>
-      <div className="flex flex-col lg:flex-row gap-8">
-        <div className="w-full lg:w-[40%] flex flex-col">
-          <p className="text-sm font-medium text-foreground mb-3">Distribuição de Ativos</p>
-          {totalDonut > 0 ? (
-            <>
-              <div className="h-[260px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={donutAtivo}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={64}
-                      outerRadius={100}
-                      paddingAngle={2}
-                      stroke="transparent"
-                    >
-                      {donutAtivo.map((entry, i) => (
-                        <Cell key={`${entry.name}-${i}`} fill={entry.fill} />
-                      ))}
-                      <Label
-                        position="center"
-                        content={({ viewBox }) => {
-                          const cx =
-                            (viewBox as { cx?: number; cy?: number } | undefined)?.cx ?? 0
-                          const cy =
-                            (viewBox as { cx?: number; cy?: number } | undefined)?.cy ?? 0
-                          return (
-                            <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
-                              <tspan x={cx} dy="-0.55em" fontSize={11} fill="#9CA3AF">
-                                Patrimônio Total
-                              </tspan>
-                              <tspan
-                                x={cx}
-                                dy="1.35em"
-                                fontSize={17}
-                                fontWeight={700}
-                                fill="var(--accent)"
-                              >
-                                {formatCurrency(patrimonioTotal)}
-                              </tspan>
-                            </text>
-                          )
-                        }}
-                      />
-                    </Pie>
-                    <Tooltip
-                      contentStyle={TOOLTIP_STYLE}
-                      labelStyle={{ color: "#ffffff", fontWeight: 600 }}
-                      itemStyle={{ color: "#ffffff" }}
-                      formatter={(v: number, name: string) => {
-                        const pct = totalDonut > 0 ? ((v / totalDonut) * 100).toFixed(1) : "0"
-                        return [`${formatCurrency(v)} (${pct}%)`, name]
-                      }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <ul className="mt-4 space-y-2">
-                {dataDonut.map((item) => {
-                  const pct =
-                    totalDonut > 0 ? ((item.value / totalDonut) * 100).toFixed(1) : "0.0"
-                  return (
-                    <li
-                      key={item.name}
-                      className="flex items-center gap-2 text-sm text-muted-foreground"
-                    >
-                      <span
-                        className="w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: item.fill }}
-                      />
-                      <span className="text-foreground flex-1 min-w-0 truncate">
-                        {item.name}: {formatCurrency(item.value)} | {pct}%
-                      </span>
-                    </li>
-                  )
-                })}
-              </ul>
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground text-center py-16">
-              Preencha os valores acima para ver a distribuição.
-            </p>
-          )}
-        </div>
+function nivelLiquidez(indice: number): SemaphoreLevel {
+  if (indice > 1.5) return "green"
+  if (indice >= 1) return "yellow"
+  return "red"
+}
 
-        <div className="w-full lg:w-[60%] flex flex-col min-w-0">
-          <p className="text-sm font-medium text-foreground mb-3">Subcategorias com valor</p>
-          {dataBarras.length > 0 ? (
-            <div className="w-full" style={{ height: alturaBarras }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  layout="vertical"
-                  data={dataBarras}
-                  margin={{ top: 4, right: 88, left: 4, bottom: 4 }}
-                >
-                  <XAxis type="number" hide domain={[0, "dataMax"]} />
-                  <YAxis
-                    type="category"
-                    dataKey="name"
-                    width={168}
-                    tick={{ fill: "#9CA3AF", fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <Tooltip
-                    cursor={{ fill: "rgba(255,255,255,0.04)" }}
-                    contentStyle={TOOLTIP_STYLE}
-                    labelStyle={{ color: "#ffffff", fontWeight: 600 }}
-                    itemStyle={{ color: "#ffffff" }}
-                    formatter={(v: number) => {
-                      const pct =
-                        dataBarras.find((b) => b.value === v)?.pctTotal?.toFixed(1) ?? "0"
-                      return [`${formatCurrency(v)} (${pct}% do total)`, "Valor"]
-                    }}
-                  />
-                  <Bar dataKey="value" radius={[0, 4, 4, 0]} maxBarSize={28}>
-                    {dataBarras.map((entry, i) => (
-                      <Cell key={`${entry.name}-${i}`} fill={entry.fill} />
-                    ))}
-                    <LabelList
-                      dataKey="value"
-                      position="right"
-                      formatter={(v: number) => formatCurrency(Number(v))}
-                      style={{ fill: "#E5E7EB", fontSize: 11, fontWeight: 600 }}
-                    />
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground text-center py-16">
-              Nenhuma subcategoria com valor informado.
-            </p>
-          )}
-        </div>
-      </div>
-    </section>
-  )
+function nivelPoupanca(pct: number): SemaphoreLevel {
+  if (pct > 20) return "green"
+  if (pct >= 10) return "yellow"
+  return "red"
 }
 
 export function Patrimonio({ onNavigate }: PatrimonioProps) {
-  const { state, setAtivos, setPassivos } = usePlano()
-  const { ativos, passivos, patrimonio, moeda } = state
+  const { state, setAtivos, setPassivos, getIdadeAtual } = usePlano()
+  const { ativos, passivos, patrimonio, moeda, dadosPessoais } = state
 
   const [addModal, setAddModal] = useState<AddModalState>(null)
   const [addAtivoForm, setAddAtivoForm] = useState<AddAtivoForm>(() => EMPTY_ATIVO_FORM())
@@ -492,47 +408,6 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
     [passivos, setPassivos],
   )
 
-  const linhasPorSecao = useMemo(() => {
-    const map = new Map<string, LinhaAtivo[]>()
-    for (const secao of SECOES_ATIVOS) {
-      const linhas = ativos
-        .filter((a) => (a.tipo ?? "").trim() === secao.tipo && (Number(a.valor) || 0) > 0)
-        .map((a) => {
-          const desc = normalizeAtivoDescricao(a.descricao)
-          const inst = (a.instituicao ?? "").trim()
-          return {
-            id: a.id,
-            label: desc || "Sem descrição",
-            sublabel: inst || undefined,
-            valor: Number(a.valor) || 0,
-            bemDeHeranca: a.heranca === true || a.bemDeHeranca === true,
-          }
-        })
-        .sort((a, b) => b.valor - a.valor)
-      map.set(secao.id, linhas)
-    }
-    return map
-  }, [ativos])
-
-  const linhasPassivo = useMemo(
-    () =>
-      passivos
-        .map((p) => {
-          const saldo = getSaldoDevedorPassivo(p)
-          const cat = resolvePassivoCategoria(p)
-          const parts = [cat, p.instituicao?.trim(), p.bemVinculado?.trim()].filter(Boolean)
-          return {
-            id: p.id,
-            label: p.descricao?.trim() || cat,
-            sublabel: parts.length > 1 ? parts.join(" · ") : cat !== p.descricao?.trim() ? cat : undefined,
-            valor: saldo,
-          }
-        })
-        .filter((l) => l.valor > 0)
-        .sort((a, b) => b.valor - a.valor),
-    [passivos],
-  )
-
   const ativosLiquidos = patrimonio.ativosLiquidos
   const imobilizado = patrimonio.imobilizado
   const participacoes = patrimonio.participacoes
@@ -540,37 +415,151 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
 
   const patrimonioTotal = ativosLiquidos + imobilizado + participacoes
   const patrimonioLiquidoResumo = patrimonioTotal - totalPassivos
+  const idadeAtual = getIdadeAtual()
 
-  const dataDonut = useMemo(
+  const totalPrevidencia = useMemo(
+    () => sumAtivoCategoria(ativos, "Líquido", "Previdência Privada"),
+    [ativos],
+  )
+  const totalInvestimentosLiq = useMemo(
+    () =>
+      sumAtivoCategoria(ativos, "Líquido", "Ativos Nacionais") +
+      sumAtivoCategoria(ativos, "Líquido", "Ativos Internacionais"),
+    [ativos],
+  )
+  const totalLiquidosRest = Math.max(0, ativosLiquidos - totalPrevidencia - totalInvestimentosLiq)
+  const totalInvestimentos = totalInvestimentosLiq + participacoes
+
+  const dataDonutGrupos = useMemo(
     () => [
-      { name: "Ativos Líquidos", value: ativosLiquidos, fill: "var(--accent)" },
-      { name: "Imobilizado", value: imobilizado, fill: "#1D9E75" },
-      { name: "Participações", value: participacoes, fill: "#7C3AED" },
+      { name: "Imobilizado", value: imobilizado, fill: "#4B759B" },
+      { name: "Previdência", value: totalPrevidencia, fill: "#5DCAA5" },
+      { name: "Investimentos", value: totalInvestimentos, fill: "#7F77DD" },
+      { name: "Líquidos", value: totalLiquidosRest, fill: "#EF9F27" },
     ],
-    [ativosLiquidos, imobilizado, participacoes],
+    [imobilizado, totalPrevidencia, totalInvestimentos, totalLiquidosRest],
   )
 
-  const totalDonut = dataDonut.reduce((s, d) => s + d.value, 0)
+  const dataDonutLiquidos = useMemo(() => {
+    const cores = ["#EF9F27", "#4B759B", "#5DCAA5", "#7F77DD", "#C0392B", "#00954F"]
+    return ativos
+      .filter((a) => (a.tipo ?? "").trim() === "Líquido" && (Number(a.valor) || 0) > 0)
+      .map((a, i) => ({
+        name: normalizeAtivoDescricao(a.descricao) || "Outros",
+        value: Number(a.valor) || 0,
+        fill: cores[i % cores.length],
+      }))
+      .sort((a, b) => b.value - a.value)
+  }, [ativos])
 
-  const dataBarras = useMemo(() => {
-    const todas: BarraCategoria[] = []
-    for (const secao of SECOES_ATIVOS) {
-      for (const cat of secao.categorias) {
-        const valor = sumAtivoCategoria(ativos, secao.tipo, cat)
-        if (valor > 0) {
-          todas.push({
-            name: cat,
-            value: valor,
-            fill: secao.cor,
-            pctTotal: patrimonioTotal > 0 ? (valor / patrimonioTotal) * 100 : 0,
-          })
-        }
+  const barrasGrupos = dataDonutGrupos
+
+  const passivosDetalhe = useMemo(
+    () =>
+      passivos
+        .map((p) => {
+          const saldo = getSaldoDevedorPassivo(p)
+          if (saldo <= 0) return null
+          const parcela = getParcelaMensalPassivo(p)
+          const taxa = Number(p.taxaJurosMensal) || 0
+          const prazo = Number(p.prazoRestanteMeses) || 0
+          const inst = (p.instituicao ?? "").trim()
+          const subtitulo = [
+            inst || null,
+            taxa > 0 ? `${taxa.toFixed(2)}% a.m.` : null,
+            prazo > 0 ? `${prazo} meses restantes` : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")
+          return { passivo: p, saldo, parcela, subtitulo }
+        })
+        .filter((x): x is NonNullable<typeof x> => x != null)
+        .sort((a, b) => b.saldo - a.saldo),
+    [passivos],
+  )
+
+  const somaParcelasMensais = useMemo(
+    () => passivos.reduce((s, p) => s + getParcelaMensalPassivo(p), 0),
+    [passivos],
+  )
+
+  const custoJurosProjetado = useMemo(
+    () =>
+      passivos.reduce((s, p) => {
+        const saldo = getSaldoDevedorPassivo(p)
+        const parcela = getParcelaMensalPassivo(p)
+        const prazo = Number(p.prazoRestanteMeses) || 0
+        const totalPago = parcela * prazo
+        return s + Math.max(0, totalPago - saldo)
+      }, 0),
+    [passivos],
+  )
+
+  const rendaMensal = dadosPessoais.renda || 0
+  const despesaMensal = dadosPessoais.despesa || 0
+  const capacidadePoupanca = Math.max(0, rendaMensal - despesaMensal)
+  const reservaEmergenciaMeses = despesaMensal > 0 ? ativosLiquidos / despesaMensal : 0
+  const comprometimentoRendaPct = rendaMensal > 0 ? (somaParcelasMensais / rendaMensal) * 100 : 0
+  const indiceLiquidez = totalPassivos > 0 ? ativosLiquidos / totalPassivos : 0
+  const taxaPoupancaPct = rendaMensal > 0 ? (capacidadePoupanca / rendaMensal) * 100 : 0
+  const indiceAlavancagem = patrimonioTotal > 0 ? (totalPassivos / patrimonioTotal) * 100 : 0
+
+  const gruposBalancoAtivo = useMemo(() => {
+    const mapItem = (a: (typeof ativos)[number]) => {
+      const desc = normalizeAtivoDescricao(a.descricao)
+      const inst = (a.instituicao ?? "").trim()
+      const tooltip = [inst, a.heranca || a.bemDeHeranca ? "Bem de herança" : null]
+        .filter(Boolean)
+        .join(" · ")
+      return {
+        id: a.id,
+        nome: desc || "Sem descrição",
+        subtitulo: inst || undefined,
+        tooltip,
+        valor: Number(a.valor) || 0,
       }
     }
-    return todas.sort((a, b) => b.value - a.value)
-  }, [ativos, patrimonioTotal])
+    const filtro = (tipo: string, cats?: string[]) =>
+      ativos
+        .filter((a) => {
+          if ((a.tipo ?? "").trim() !== tipo || (Number(a.valor) || 0) <= 0) return false
+          if (!cats) return true
+          const desc = normalizeAtivoDescricao(a.descricao)
+          return cats.includes(desc)
+        })
+        .map(mapItem)
+        .sort((a, b) => b.valor - a.valor)
 
-  const alturaBarras = Math.max(160, dataBarras.length * 48)
+    return [
+      {
+        titulo: "Líquidos",
+        cor: "#EF9F27",
+        itens: filtro("Líquido", ["Outros"]),
+        subtotal: filtro("Líquido", ["Outros"]).reduce((s, i) => s + i.valor, 0),
+      },
+      {
+        titulo: "Investimentos",
+        cor: "#7F77DD",
+        itens: [
+          ...filtro("Líquido", ["Ativos Nacionais", "Ativos Internacionais"]),
+          ...filtro("Participação Societária"),
+        ],
+        subtotal: totalInvestimentos,
+      },
+      {
+        titulo: "Previdência",
+        cor: "#5DCAA5",
+        itens: filtro("Líquido", ["Previdência Privada"]),
+        subtotal: totalPrevidencia,
+      },
+      {
+        titulo: "Imobilizado",
+        cor: "#4B759B",
+        itens: filtro("Imobilizado"),
+        subtotal: imobilizado,
+      },
+    ]
+  }, [ativos, totalInvestimentos, totalPrevidencia, imobilizado])
 
   const openAddAtivo = (secao: SecaoAtivoConfig) => {
     const tipo = isTipoAtivoLabel(secao.tipo) ? secao.tipo : "Líquido"
@@ -588,6 +577,15 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
     setAddPassivoForm(EMPTY_PASSIVO_FORM())
     setAddModal({ kind: "passivo" })
   }
+
+  const exportarPDF = () => {
+    if (typeof window !== "undefined") window.print()
+  }
+
+  const abrirModalAtivo = () => openAddAtivo(SECAO_LIQUIDO)
+  const abrirModalPassivo = openAddPassivo
+  const voltarSecao = () => onNavigate("dados-pessoais")
+  const proximaSecao = () => onNavigate("objetivos")
 
   const onAtivoTipoChange = (tipo: TipoAtivoLabel) => {
     setAddAtivoForm((prev) => ({
@@ -620,134 +618,503 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
     setAddModal(null)
   }
 
-  const addButton = (onClick: () => void) => (
-    <button type="button" onClick={onClick} className="btn-add-dashed">
-      <Plus className="w-3.5 h-3.5" />
-      Adicionar
-    </button>
-  )
-
-  const totalSecao = (secao: SecaoAtivoConfig) => {
-    if (secao.id === "liquidos") return ativosLiquidos
-    if (secao.id === "imobilizado") return imobilizado
-    return participacoes
-  }
-
   return (
-    <div className="space-y-6">
-      <div className="space-y-1">
-        <p className="text-sm text-muted-foreground">Cadastro</p>
-        <h1 className="page-title text-[24px]">
-          <span className="text-primary">Patrimônio</span>
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Levantamento completo de ativos e passivos do cliente
-        </p>
+    <div>
+      {/* 1. Cabeçalho */}
+      <p style={{ fontSize: 11, color: "var(--accent)", marginBottom: 8 }}>Cadastro</p>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          marginBottom: 20,
+          flexWrap: "wrap",
+          gap: 12,
+        }}
+      >
+        <div>
+          <h1 style={{ fontSize: 24, fontWeight: 400, color: "#1a1a1a", margin: 0 }}>
+            Balanço <span style={{ color: "var(--accent)" }}>Patrimonial</span>
+          </h1>
+          <p style={{ fontSize: 12, color: "#9A9B9B", marginTop: 3 }}>
+            {dadosPessoais.nome || "Cliente"} · {idadeAtual} anos · Atualizado hoje
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <button
+            type="button"
+            onClick={abrirModalPassivo}
+            style={{
+              background: "none",
+              border: "1px solid #C0392B",
+              borderRadius: 5,
+              padding: "6px 13px",
+              fontSize: 12,
+              color: "#C0392B",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+            }}
+          >
+            + Adicionar passivo
+          </button>
+          <button
+            type="button"
+            onClick={abrirModalAtivo}
+            style={{
+              background: "var(--accent)",
+              border: "none",
+              borderRadius: 5,
+              padding: "6px 13px",
+              fontSize: 12,
+              color: "white",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+            }}
+          >
+            + Adicionar ativo
+          </button>
+          <button
+            type="button"
+            onClick={exportarPDF}
+            style={{
+              background: "#012137",
+              border: "none",
+              borderRadius: 6,
+              padding: "6px 13px",
+              fontSize: 12,
+              color: "white",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            <svg width="13" height="14" viewBox="0 0 13 14" fill="none" aria-hidden>
+              <rect x="1" y="1" width="11" height="12" rx="2" stroke="white" strokeWidth="1.2" />
+              <path d="M4 5h5M4 7h5M4 9h3" stroke="white" strokeWidth="1.2" strokeLinecap="round" />
+              <path d="M9 11l1.5 1.5L12 11" stroke="#EF9F27" strokeWidth="1.2" strokeLinecap="round" />
+            </svg>
+            Exportar PDF
+          </button>
+        </div>
       </div>
 
-      {SECOES_ATIVOS.map((secao) => {
-        const linhas = linhasPorSecao.get(secao.id) ?? []
-        const total = totalSecao(secao)
-        return (
-          <PatrimonioSection
-            key={secao.id}
-            title={secao.title}
-            totalLabel={secao.totalLabel}
-            totalValue={formatCurrency(total)}
-            totalClassName={
-              secao.id === "liquidos"
-                ? "text-primary"
-                : secao.id === "imobilizado"
-                  ? "text-[#1D9E75]"
-                  : "text-[#7C3AED]"
-            }
-            headerAction={addButton(() => openAddAtivo(secao))}
-          >
-            {linhas.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-6">
-                Nenhum ativo cadastrado
-              </p>
-            ) : (
-              linhas.map((linha) => (
-                <div key={linha.id}>
-                  <PatrimonioBarRow
-                    label={linha.label}
-                    valor={linha.valor}
-                    totalSecao={total}
-                    barColor={secao.cor}
-                    formatCurrency={formatCurrency}
-                    valueClassName="text-foreground"
-                    onValueCommit={(v) => updateAtivoValor(linha.id, v)}
-                  />
-                  {(linha.sublabel || linha.bemDeHeranca) && (
-                    <p className="text-[11px] text-muted-foreground truncate -mt-1 pb-2 pl-0.5">
-                      {[linha.sublabel, linha.bemDeHeranca ? "Bem de herança" : null]
-                        .filter(Boolean)
-                        .join(" · ")}
+      {/* 2. KPIs */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+          gap: 10,
+          marginBottom: 16,
+        }}
+      >
+        <KpiCard
+          label="Patrimônio líquido"
+          value={formatCurrency(patrimonioLiquidoResumo)}
+          hint="Ativos − Passivos"
+          valueColor="#00954F"
+        />
+        <KpiCard label="Ativos totais" value={formatCurrency(patrimonioTotal)} />
+        <KpiCard
+          label="Passivos totais"
+          value={formatCurrency(totalPassivos)}
+          valueColor="#C0392B"
+        />
+        <KpiCard
+          label="Reserva emergência"
+          value={
+            despesaMensal > 0
+              ? `${reservaEmergenciaMeses.toFixed(1)} meses`
+              : "—"
+          }
+          hint="Ativos líquidos ÷ despesa mensal"
+        />
+      </div>
+
+      {/* 3. Gráficos donuts */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 12,
+          marginBottom: 12,
+        }}
+      >
+        <div style={{ background: "var(--surface)", borderRadius: 8, padding: 16 }}>
+          <p style={{ fontSize: 13, color: "#1A1A1A", marginBottom: 12, fontWeight: 500 }}>
+            Composição total de ativos
+          </p>
+          <DonutComLegenda data={dataDonutGrupos} formatCurrency={formatCurrency} />
+        </div>
+        <div style={{ background: "var(--surface)", borderRadius: 8, padding: 16 }}>
+          <p style={{ fontSize: 13, color: "#1A1A1A", marginBottom: 12, fontWeight: 500 }}>
+            Composição dos ativos líquidos
+          </p>
+          <DonutComLegenda data={dataDonutLiquidos} formatCurrency={formatCurrency} />
+          <p style={{ fontSize: 11, color: "#9A9B9B", marginTop: 12 }}>
+            Reserva de emergência:{" "}
+            <strong style={{ color: "#1A1A1A" }}>
+              {despesaMensal > 0 ? `${reservaEmergenciaMeses.toFixed(1)} meses` : "—"}
+            </strong>
+          </p>
+        </div>
+      </div>
+
+      {/* 4. Barras + Passivos */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 12,
+          marginBottom: 12,
+        }}
+      >
+        <div style={{ background: "var(--surface)", borderRadius: 8, padding: 16 }}>
+          <p style={{ fontSize: 13, color: "#1A1A1A", marginBottom: 12, fontWeight: 500 }}>
+            Ativos por grupo
+          </p>
+          {barrasGrupos.filter((g) => g.value > 0).length === 0 ? (
+            <p style={{ fontSize: 12, color: "#9A9B9B", textAlign: "center", padding: "24px 0" }}>
+              Nenhum ativo cadastrado
+            </p>
+          ) : (
+            barrasGrupos
+              .filter((g) => g.value > 0)
+              .map((grupo) => {
+                const pct = patrimonioTotal > 0 ? (grupo.value / patrimonioTotal) * 100 : 0
+                const barWidth = patrimonioTotal > 0 ? (grupo.value / patrimonioTotal) * 100 : 0
+                return (
+                  <div key={grupo.name} style={{ marginBottom: 14 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        fontSize: 12,
+                        marginBottom: 6,
+                      }}
+                    >
+                      <span style={{ color: "#1A1A1A" }}>{grupo.name}</span>
+                      <span style={{ color: "#52514e" }}>
+                        {formatCurrency(grupo.value)}{" "}
+                        <span style={{ color: "#9A9B9B" }}>({pct.toFixed(1)}%)</span>
+                      </span>
+                    </div>
+                    <div style={{ height: 8, borderRadius: 4, background: "#D9D9D9", overflow: "hidden" }}>
+                      <div
+                        style={{
+                          height: "100%",
+                          width: `${barWidth}%`,
+                          background: grupo.fill,
+                          borderRadius: 4,
+                        }}
+                      />
+                    </div>
+                  </div>
+                )
+              })
+          )}
+        </div>
+
+        <div style={{ background: "var(--surface)", borderRadius: 8, padding: 16 }}>
+          <p style={{ fontSize: 13, color: "#1A1A1A", marginBottom: 12, fontWeight: 500 }}>
+            Passivos e dívidas
+          </p>
+          {passivosDetalhe.length === 0 ? (
+            <p style={{ fontSize: 12, color: "#9A9B9B", textAlign: "center", padding: "24px 0" }}>
+              Nenhum passivo cadastrado
+            </p>
+          ) : (
+            <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+              {passivosDetalhe.map(({ passivo, saldo, parcela, subtitulo }) => (
+                <li
+                  key={passivo.id}
+                  style={{
+                    padding: "10px 0",
+                    borderBottom: "1px solid var(--border)",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 12,
+                  }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <p style={{ fontSize: 12, color: "#1A1A1A", margin: 0 }}>
+                      {passivo.descricao?.trim() || resolvePassivoCategoria(passivo)}
                     </p>
+                    {subtitulo ? (
+                      <p style={{ fontSize: 10, color: "#9A9B9B", margin: "2px 0 0" }}>{subtitulo}</p>
+                    ) : null}
+                  </div>
+                  <div style={{ textAlign: "right", flexShrink: 0 }}>
+                    <p style={{ fontSize: 12, fontWeight: 500, color: "#C0392B", margin: 0 }}>
+                      {formatCurrency(saldo)}
+                    </p>
+                    {parcela > 0 ? (
+                      <p style={{ fontSize: 10, color: "#9A9B9B", margin: "2px 0 0" }}>
+                        {formatCurrency(parcela)}/mês
+                      </p>
+                    ) : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          <button
+            type="button"
+            onClick={abrirModalPassivo}
+            style={{
+              marginTop: 12,
+              background: "none",
+              border: "1px dashed #C0392B",
+              borderRadius: 4,
+              padding: "6px 12px",
+              fontSize: 12,
+              color: "#C0392B",
+              cursor: "pointer",
+              width: "100%",
+            }}
+          >
+            + Adicionar passivo
+          </button>
+          <div
+            style={{
+              marginTop: 14,
+              paddingTop: 12,
+              borderTop: "1px solid var(--border)",
+              fontSize: 11,
+              color: "#52514e",
+              display: "flex",
+              flexDirection: "column",
+              gap: 4,
+            }}
+          >
+            <span>
+              Custo total de juros projetado:{" "}
+              <strong>{formatCurrency(custoJurosProjetado)}</strong>
+            </span>
+            <span>
+              Índice de alavancagem: <strong>{indiceAlavancagem.toFixed(1)}%</strong>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* 5. Indicadores de saúde */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+          gap: 10,
+          marginBottom: 16,
+        }}
+      >
+        <IndicadorSaude
+          label="Reserva emergência"
+          valor={despesaMensal > 0 ? `${reservaEmergenciaMeses.toFixed(1)} meses` : "—"}
+          nivel={nivelReservaEmergencia(reservaEmergenciaMeses)}
+          progressPct={Math.min(100, (reservaEmergenciaMeses / 12) * 100)}
+        />
+        <IndicadorSaude
+          label="Comprometimento renda"
+          valor={`${comprometimentoRendaPct.toFixed(1)}%`}
+          nivel={nivelComprometimento(comprometimentoRendaPct)}
+          progressPct={Math.min(100, comprometimentoRendaPct)}
+        />
+        <IndicadorSaude
+          label="Índice liquidez"
+          valor={totalPassivos > 0 ? indiceLiquidez.toFixed(2) : "—"}
+          nivel={nivelLiquidez(indiceLiquidez)}
+          progressPct={Math.min(100, indiceLiquidez * 40)}
+        />
+        <IndicadorSaude
+          label="Taxa poupança"
+          valor={`${taxaPoupancaPct.toFixed(1)}%`}
+          nivel={nivelPoupanca(taxaPoupancaPct)}
+          progressPct={Math.min(100, taxaPoupancaPct)}
+        />
+      </div>
+
+      {/* 6. Balanço em linhas */}
+      <div style={{ background: "var(--surface)", borderRadius: 8, padding: 16, marginBottom: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          {/* Coluna Ativo */}
+          <div>
+            <div
+              style={{
+                background: "#4B759B",
+                color: "white",
+                padding: "8px 12px",
+                borderRadius: "6px 6px 0 0",
+                fontSize: 12,
+                fontWeight: 500,
+              }}
+            >
+              ATIVO
+            </div>
+            <div style={{ background: "white", borderRadius: "0 0 6px 6px", overflow: "hidden" }}>
+              {gruposBalancoAtivo.map((grupo) => (
+                <div key={grupo.titulo}>
+                  <div
+                    style={{
+                      background: "#F0F2F5",
+                      padding: "8px 12px",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      fontSize: 11,
+                      fontWeight: 500,
+                      color: "#52514e",
+                    }}
+                  >
+                    <span>{grupo.titulo}</span>
+                    <span>{formatCurrency(grupo.subtotal)}</span>
+                  </div>
+                  {grupo.itens.length === 0 ? (
+                    <p style={{ fontSize: 11, color: "#9A9B9B", padding: "8px 12px", margin: 0 }}>
+                      Nenhum item
+                    </p>
+                  ) : (
+                    grupo.itens.map((item) => (
+                      <div
+                        key={item.id}
+                        style={{
+                          padding: "8px 12px",
+                          borderBottom: "1px solid var(--border)",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "flex-start",
+                          gap: 8,
+                        }}
+                      >
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ display: "flex", alignItems: "center" }}>
+                            <span style={{ fontSize: 12, color: "#1A1A1A" }}>{item.nome}</span>
+                            <InfoTooltip text={item.tooltip} />
+                          </div>
+                          {item.subtitulo ? (
+                            <p style={{ fontSize: 10, color: "#9A9B9B", margin: "2px 0 0" }}>
+                              {item.subtitulo}
+                            </p>
+                          ) : null}
+                        </div>
+                        <span style={{ fontSize: 12, fontWeight: 500, color: "#1A1A1A", flexShrink: 0 }}>
+                          {formatCurrency(item.valor)}
+                        </span>
+                      </div>
+                    ))
                   )}
                 </div>
-              ))
-            )}
-          </PatrimonioSection>
-        )
-      })}
-
-      <PatrimonioCharts
-        dataDonut={dataDonut}
-        totalDonut={totalDonut}
-        dataBarras={dataBarras}
-        alturaBarras={alturaBarras}
-        patrimonioTotal={patrimonioTotal}
-        formatCurrency={formatCurrency}
-      />
-
-      <PatrimonioSection
-        title="Passivos e Dívidas"
-        totalLabel="Total"
-        totalValue={formatCurrency(totalPassivos)}
-        totalClassName="text-[#E24B4A]"
-        headerAction={addButton(openAddPassivo)}
-      >
-        {linhasPassivo.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-6">Nenhum passivo cadastrado</p>
-        ) : (
-          linhasPassivo.map((linha) => (
-            <PatrimonioBarRow
-              key={linha.id}
-              label={linha.label}
-              sublabel={linha.sublabel}
-              valor={linha.valor}
-              totalSecao={totalPassivos}
-              barColor="#E24B4A"
-              formatCurrency={formatCurrency}
-              valueClassName="text-[#E24B4A]"
-              onValueCommit={(v) => updatePassivoSaldo(linha.id, v)}
-            />
-          ))
-        )}
-      </PatrimonioSection>
-
-      <div className="form-card p-5 md:p-6">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-center sm:text-left">
-          <div>
-            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Ativos Totais</p>
-            <p className="text-xl font-semibold text-[#1D9E75] tabular-nums">
-              {formatCurrency(patrimonioTotal)}
-            </p>
+              ))}
+              <div
+                style={{
+                  padding: "10px 12px",
+                  borderTop: "2px solid #4B759B",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "#1A1A1A",
+                }}
+              >
+                <span>Total Ativo</span>
+                <span>{formatCurrency(patrimonioTotal)}</span>
+              </div>
+            </div>
           </div>
+
+          {/* Coluna Passivo + PL */}
           <div>
-            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Passivos</p>
-            <p className="text-xl font-semibold text-[#E24B4A] tabular-nums">
-              {formatCurrency(totalPassivos)}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
-              Patrimônio Líquido
-            </p>
-            <p className="text-xl font-bold text-primary tabular-nums">
-              {formatCurrency(patrimonioLiquidoResumo)}
+            <div
+              style={{
+                background: "#C0392B",
+                color: "white",
+                padding: "8px 12px",
+                borderRadius: "6px 6px 0 0",
+                fontSize: 12,
+                fontWeight: 500,
+              }}
+            >
+              PASSIVO
+            </div>
+            <div style={{ background: "white", borderRadius: "0 0 6px 6px", overflow: "hidden" }}>
+              {passivosDetalhe.length === 0 ? (
+                <p style={{ fontSize: 11, color: "#9A9B9B", padding: "8px 12px", margin: 0 }}>
+                  Nenhum passivo cadastrado
+                </p>
+              ) : (
+                passivosDetalhe.map(({ passivo, saldo, parcela, subtitulo }) => (
+                  <div
+                    key={passivo.id}
+                    style={{
+                      padding: "8px 12px",
+                      borderBottom: "1px solid var(--border)",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                      gap: 8,
+                    }}
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <p style={{ fontSize: 12, color: "#1A1A1A", margin: 0 }}>
+                        {passivo.descricao?.trim() || resolvePassivoCategoria(passivo)}
+                      </p>
+                      {subtitulo ? (
+                        <p style={{ fontSize: 10, color: "#9A9B9B", margin: "2px 0 0" }}>{subtitulo}</p>
+                      ) : null}
+                      {parcela > 0 ? (
+                        <p style={{ fontSize: 10, color: "#C0392B", margin: "2px 0 0" }}>
+                          {formatCurrency(parcela)}/mês
+                        </p>
+                      ) : null}
+                    </div>
+                    <span style={{ fontSize: 12, fontWeight: 500, color: "#C0392B", flexShrink: 0 }}>
+                      {formatCurrency(saldo)}
+                    </span>
+                  </div>
+                ))
+              )}
+              <div
+                style={{
+                  padding: "10px 12px",
+                  borderTop: "2px solid #C0392B",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "#C0392B",
+                }}
+              >
+                <span>Total Passivo</span>
+                <span>{formatCurrency(totalPassivos)}</span>
+              </div>
+            </div>
+
+            <div
+              style={{
+                marginTop: 12,
+                background: "#00954F",
+                color: "white",
+                borderRadius: 6,
+                padding: "12px 14px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <span style={{ fontSize: 12, fontWeight: 500 }}>Patrimônio Líquido</span>
+              <span style={{ fontSize: 16, fontWeight: 600 }}>
+                {formatCurrency(patrimonioLiquidoResumo)}
+              </span>
+            </div>
+
+            <p style={{ fontSize: 11, color: "#9A9B9B", marginTop: 10, textAlign: "center" }}>
+              Ativo = Passivo + PL{" "}
+              <span style={{ color: "#00954F" }}>
+                {Math.abs(patrimonioTotal - totalPassivos - patrimonioLiquidoResumo) < 1 ? "✓" : "—"}
+              </span>
             </p>
           </div>
         </div>
@@ -1023,19 +1390,40 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
         </DialogContent>
       </Dialog>
 
-      <div className="flex items-center gap-3">
-        <Button
-          variant="ghost"
-          onClick={() => onNavigate("dados-pessoais")}
-          className="text-muted-foreground hover:text-foreground"
+      {/* 8. Navegação */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          gap: 10,
+          marginTop: 20,
+          paddingTop: 16,
+          borderTop: "1px solid #E8EAEB",
+        }}
+      >
+        <button
+          type="button"
+          onClick={voltarSecao}
+          style={{ background: "none", border: "none", color: "#9A9B9B", fontSize: 12, cursor: "pointer" }}
         >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Voltar
-        </Button>
-        <Button onClick={() => onNavigate("objetivos")} className="btn-next">
-          Próximo
-          <ArrowRight className="w-4 h-4 ml-2" />
-        </Button>
+          ‹ Voltar
+        </button>
+        <button
+          type="button"
+          onClick={proximaSecao}
+          style={{
+            background: "var(--accent)",
+            border: "none",
+            borderRadius: 5,
+            padding: "7px 18px",
+            fontSize: 12,
+            color: "white",
+            cursor: "pointer",
+            fontWeight: 500,
+          }}
+        >
+          Próximo ›
+        </button>
       </div>
     </div>
   )

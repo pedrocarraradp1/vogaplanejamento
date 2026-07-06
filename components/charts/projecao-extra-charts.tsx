@@ -82,8 +82,8 @@ export function FluxoAnualChart({
                 const p = payload[0]?.payload as DadoFluxoGrafico
                 const corLiq = p.fluxoLiquido >= 0 ? "#1D9E75" : "#E24B4A"
                 return (
-                  <div className="rounded-lg border border-border bg-card px-3 py-2 text-xs shadow-lg min-w-[200px]">
-                    <p className="font-semibold text-white">
+                  <div className="rounded-lg border border-border bg-white px-3 py-2 text-xs shadow-lg min-w-[200px] text-[var(--text-primary)]">
+                    <p className="font-semibold text-[var(--text-primary)]">
                       Ano {p.t} · Idade {p.idade}
                     </p>
                     <p className="text-muted-foreground mt-0.5">Fase: {p.fase}</p>
@@ -227,28 +227,28 @@ export function RendaCarteiraChart({
                 const status = p.acimaMeta ? "Acima da meta" : "Abaixo da meta"
                 const corStatus = p.acimaMeta ? "#22C787" : "#EF4444"
                 return (
-                  <div className="rounded-lg border border-border bg-card px-3 py-2 text-xs shadow-lg">
-                    <p className="font-semibold text-white">Idade {p.idade}</p>
+                  <div className="rounded-lg border border-border bg-white px-3 py-2 text-xs shadow-lg text-[var(--text-primary)]">
+                    <p className="font-semibold text-[var(--text-primary)]">Idade {p.idade}</p>
                     {displayMode === "nominal" ? (
                       <>
-                        <p className="mt-1 text-white">
+                        <p className="mt-1 text-[var(--text-primary)]">
                           Renda nominal: {formatarMoedaCompleta(p.rendaNominal)}
                         </p>
-                        <p className="text-white/90">
+                        <p className="text-[var(--text-label)]">
                           Poder de compra (hoje): {formatarMoedaCompleta(p.rendaPoderCompra)}
                         </p>
                       </>
                     ) : (
                       <>
-                        <p className="mt-1 text-white">
+                        <p className="mt-1 text-[var(--text-primary)]">
                           Renda real (Fisher): {formatarMoedaCompleta(p.rendaReal)}
                         </p>
-                        <p className="text-white/90">
+                        <p className="text-[var(--text-label)]">
                           Renda nominal (ref.): {formatarMoedaCompleta(p.rendaNominal)}
                         </p>
                       </>
                     )}
-                    <p className="text-white/80">Meta: {formatarMoedaCompleta(p.meta)}</p>
+                    <p className="text-[var(--text-label)]">Meta: {formatarMoedaCompleta(p.meta)}</p>
                     <p className="mt-1 font-medium" style={{ color: corStatus }}>
                       {status}
                     </p>

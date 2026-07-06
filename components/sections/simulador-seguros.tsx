@@ -17,6 +17,7 @@ import {
 import { ArrowLeft, ArrowRight, ShieldCheck } from "lucide-react"
 import { usePlano } from "@/lib/plano-context"
 import { getSaldoDevedorPassivo } from "@/lib/patrimonio-utils"
+import { CHART_TOOLTIP_ITEM_STYLE, CHART_TOOLTIP_LABEL_STYLE, CHART_TOOLTIP_STYLE } from "@/lib/chart-tooltip"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -1031,11 +1032,9 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
                 width={56}
               />
               <Tooltip
-                contentStyle={{
-                  backgroundColor: "var(--bg-page)",
-                  border: "1px solid rgba(255,255,255,0.1)",
-                  borderRadius: 8,
-                }}
+                contentStyle={CHART_TOOLTIP_STYLE}
+                labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                itemStyle={CHART_TOOLTIP_ITEM_STYLE}
                 formatter={(value: number | string) => [fmtMoney(Number(value), moeda), ""]}
               />
               <Legend />
@@ -1078,11 +1077,9 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
                 tickFormatter={(v: number) => fmtShort(v, moeda)}
               />
               <Tooltip
-                contentStyle={{
-                  backgroundColor: "var(--surface)",
-                  border: "1px solid rgba(255,255,255,0.1)",
-                  borderRadius: 8,
-                }}
+                contentStyle={CHART_TOOLTIP_STYLE}
+                labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                itemStyle={CHART_TOOLTIP_ITEM_STYLE}
                 formatter={(value: number | string) => fmtMoney(Number(value), moeda)}
               />
               <Legend />
@@ -1114,11 +1111,9 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
                 tickFormatter={(v: number) => fmtShort(v, moeda)}
               />
               <Tooltip
-                contentStyle={{
-                  backgroundColor: "var(--surface)",
-                  border: "1px solid rgba(255,255,255,0.1)",
-                  borderRadius: 8,
-                }}
+                contentStyle={CHART_TOOLTIP_STYLE}
+                labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                itemStyle={CHART_TOOLTIP_ITEM_STYLE}
                 formatter={(value: number | string, _n, p) => {
                   const row = p?.payload as { acumulado?: number } | undefined
                   const acum = row?.acumulado ?? 0

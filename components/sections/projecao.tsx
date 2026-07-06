@@ -20,6 +20,7 @@ import {
   type ProjecaoAno,
 } from "@/lib/engine"
 import { buildDadosFluxoGrafico, buildDadosRendaGrafico } from "@/lib/projecao-graficos-dados"
+import { CHART_TOOLTIP_ITEM_STYLE, CHART_TOOLTIP_LABEL_STYLE, CHART_TOOLTIP_STYLE } from "@/lib/chart-tooltip"
 import { CenariosInvestimento } from "@/components/ui/cenarios-investimento"
 import { FluxoAnualChart, RendaCarteiraChart } from "@/components/charts/projecao-extra-charts"
 
@@ -676,9 +677,9 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
                 <YAxis stroke="#4A5268" tick={{ fill: "#4A5268", fontSize: 12 }}
                   tickLine={false} axisLine={false} tickFormatter={formatarMoeda} />
                 <Tooltip
-                  contentStyle={{ backgroundColor: "var(--bg-page)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "#fff" }}
-                  labelStyle={{ color: "#ffffff", fontWeight: 600 }}
-                  itemStyle={{ color: "#ffffff" }}
+                  contentStyle={CHART_TOOLTIP_STYLE}
+                  labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                  itemStyle={CHART_TOOLTIP_ITEM_STYLE}
                   formatter={(value: number, _name: string, props: any) => {
                     const entry = props?.payload
                     const idade = Number(entry?.idade) || idadeAtualCalculada
