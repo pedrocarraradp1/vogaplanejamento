@@ -423,8 +423,10 @@ export function PlanoProvider({
 
   const getPatrimonioLiquido = useCallback(() => {
     // Projeção / proteção: ativos líquidos + previdência − passivos
-    return getAtivosFinanceiros() - getTotalPassivos()
-  }, [getAtivosFinanceiros, getTotalPassivos])
+    const { totalAtivosFinanceiros } = computeTotaisAtivos(state.ativos ?? [])
+    const totalPassivos = (state.passivos ?? []).reduce((s, p) => s + getSaldoDevedorPassivo(p), 0)
+    return totalAtivosFinanceiros - totalPassivos
+  }, [state.ativos, state.passivos])
 
   const getPatrimonioTotalConsolidado = useCallback(() => {
     return calcPatrimonioTotalConsolidado(state.ativos ?? [], state.passivos ?? [])

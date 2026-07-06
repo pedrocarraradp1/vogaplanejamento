@@ -12,6 +12,7 @@ import {
   ResponsiveContainer, ReferenceLine, Cell, Line,
 } from "recharts"
 import { usePlano } from "@/lib/plano-context"
+import { computeTotaisAtivos, getSaldoDevedorPassivo } from "@/lib/patrimonio-utils"
 import {
   calcularProjecao,
   calcularKPIs,
@@ -35,7 +36,11 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
 
   // ── Derivados automáticos ────────────────────────────────────────────────
   // Saldo inicial: ativos líquidos + previdência − passivos
-  const saldoInicialCalculado = useMemo(() => getPatrimonioLiquido(), [getPatrimonioLiquido])
+  const saldoInicialCalculado = useMemo(() => {
+    const { totalAtivosFinanceiros } = computeTotaisAtivos(ativos ?? [])
+    const totalPassivos = (passivos ?? []).reduce((s, p) => s + getSaldoDevedorPassivo(p), 0)
+    return totalAtivosFinanceiros - totalPassivos
+  }, [ativos, passivos])
 
   const idadeAtualCalculada = useMemo(() => {
     if (!dadosPessoais.nascimento) return 0

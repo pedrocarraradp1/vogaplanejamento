@@ -83,6 +83,7 @@ const LEGACY_TIPO_ATIVO: Record<string, TipoAtivoSlug> = {
   Líquido: "ativo_liquido",
   Imobilizado: "imobilizado",
   "Participação Societária": "participacao_societaria",
+  Previdência: "previdencia",
 }
 
 /** Descrições antigas → rótulo atual (migração / agregação). */
