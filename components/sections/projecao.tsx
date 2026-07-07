@@ -24,6 +24,23 @@ import { buildDadosFluxoGrafico, buildDadosRendaGrafico } from "@/lib/projecao-g
 import { CHART_TOOLTIP_PROPS } from "@/lib/chart-tooltip"
 import { CenariosInvestimento } from "@/components/ui/cenarios-investimento"
 import { FluxoAnualChart, RendaCarteiraChart } from "@/components/charts/projecao-extra-charts"
+import { IndependenciaChart, type PontoIndependencia } from "@/components/charts/independencia-chart"
+
+const GOLD = "#C9A84C"
+const GREEN = "#10B981"
+const RED = "#EF4444"
+
+/** Valor presente de uma anuidade (patrimônio necessário para pagar `pmtAnual` por `n` anos). */
+function pvAnuidade(pmtAnual: number, r: number, n: number) {
+  if (r === 0) return pmtAnual * n
+  return pmtAnual * (1 - Math.pow(1 + r, -n)) / r
+}
+
+/** Pagamento anual sustentável a partir de um patrimônio `pv` por `n` anos. */
+function pmtDeAnuidade(pv: number, r: number, n: number) {
+  if (r === 0) return pv / n
+  return pv * r / (1 - Math.pow(1 + r, -n))
+}
 
 interface ProjecaoProps {
   onNavigate: (section: string) => void
@@ -236,6 +253,86 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
     }))
   , [projecao, displayMode, premissas.inflacao, idadeAtualCalculada])
 
+  // ── Independência financeira (anuidade, sem taxa de retirada fixa) ─────────
+  const anoBase = new Date().getFullYear()
+  const horizonte = Math.max(1, Number(premissas.horizonteAposentadoria) || 35)
+  const rendaMensalDesejada = Number(premissas.retiradaMensal) || 0
+
+  const patrimonioNecessario = useMemo(
+    () => pvAnuidade(rendaMensalDesejada * 12, taxaReal, horizonte),
+    [rendaMensalDesejada, taxaReal, horizonte],
+  )
+
+  const idadeIndependencia = useMemo(() => {
+    for (const p of projecao) {
+      if ((Number(p.saldoReal) || 0) >= patrimonioNecessario) return p.idade
+    }
+    return null
+  }, [projecao, patrimonioNecessario])
+
+  const dadosIndependencia = useMemo<PontoIndependencia[]>(
+    () =>
+      projecao.map((p) => {
+        const patrimonio = Math.max(0, Number(p.saldoReal) || 0)
+        return {
+          idade: p.idade,
+          ano: anoBase + p.t,
+          patrimonio,
+          rendaSustentavel: Math.max(0, pmtDeAnuidade(patrimonio, taxaReal, horizonte) / 12),
+        }
+      }),
+    [projecao, taxaReal, horizonte, anoBase],
+  )
+
+  const anosAteIndependencia =
+    idadeIndependencia != null ? Math.max(0, idadeIndependencia - idadeAtualCalculada) : null
+
+  // ── Bloco 2: simulação de aporte necessário (inputs editáveis) ─────────────
+  const [b2, setB2] = useState<{
+    idadeAtual?: number
+    idadeApos?: number
+    renda?: number
+    horizonte?: number
+    patrimonio?: number
+    rentPct?: number
+  }>({})
+  const b2IdadeAtual = b2.idadeAtual ?? idadeAtualCalculada
+  const b2IdadeApos = b2.idadeApos ?? (Number(premissas.idadeApos) || 0)
+  const b2Renda = b2.renda ?? rendaMensalDesejada
+  const b2Horizonte = b2.horizonte ?? horizonte
+  const b2Patrimonio = b2.patrimonio ?? saldoInicialCalculado
+  const b2RentPct = b2.rentPct ?? taxaReal * 100
+  const b2Rent = b2RentPct / 100
+
+  const b2Resultado = useMemo(() => {
+    const alvo = pvAnuidade(b2Renda * 12, b2Rent, Math.max(1, b2Horizonte))
+    const nMeses = Math.max(0, (b2IdadeApos - b2IdadeAtual) * 12)
+    if (nMeses <= 0) {
+      return { alvo, aporteNecessario: 0, fvPatrimonio: b2Patrimonio, invalido: true }
+    }
+    const rMensal = Math.pow(1 + b2Rent, 1 / 12) - 1
+    const fvPatrimonio = b2Patrimonio * Math.pow(1 + rMensal, nMeses)
+    const fatorAnuidade =
+      rMensal === 0 ? nMeses : (Math.pow(1 + rMensal, nMeses) - 1) / rMensal
+    const aporteNecessario = Math.max(0, (alvo - fvPatrimonio) / fatorAnuidade)
+    return { alvo, aporteNecessario, fvPatrimonio, invalido: false }
+  }, [b2Renda, b2Rent, b2Horizonte, b2IdadeApos, b2IdadeAtual, b2Patrimonio])
+
+  const diffAporte = b2Resultado.aporteNecessario - aporteMensal
+
+  // ── Bloco 3: retirada mensal sustentável (inputs editáveis) ────────────────
+  const [b3, setB3] = useState<{ patrimonio?: number; horizonte?: number; rentPct?: number }>({})
+  const b3Patrimonio = b3.patrimonio ?? patrimonioNecessario
+  const b3Horizonte = b3.horizonte ?? horizonte
+  const b3RentPct = b3.rentPct ?? taxaReal * 100
+  const b3Rent = b3RentPct / 100
+  const retiradaSustentavel = Math.max(
+    0,
+    pmtDeAnuidade(b3Patrimonio, b3Rent, Math.max(1, b3Horizonte)) / 12,
+  )
+
+  const PAINEL_BG = "#F5F5F5"
+
   const ToggleNominalReal = (
     <div className="flex items-center gap-3">
       <div className="inline-flex rounded-lg bg-card p-1">
@@ -266,9 +363,9 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
     <div className="space-y-6">
       {/* Header */}
       <div className="space-y-1">
-        <p className="text-sm text-muted-foreground">Projeção</p>
+        <p className="text-sm text-muted-foreground">Planejamento</p>
         <h1 className="page-title text-[24px] text-foreground">
-          Premissas da <span className="text-primary">Projeção</span>
+          Projeções financeiras / <span className="text-primary">aposentadoria</span>
         </h1>
         <p className="text-sm text-muted-foreground">
           Parâmetros que alimentam o modelo de simulação patrimonial
@@ -774,6 +871,215 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
           <p className="text-sm text-muted-foreground">
             Simula a trajetória patrimonial até o prazo definido, com aportes, objetivos e fase de aposentadoria.
           </p>
+        </CardContent>
+      </Card>
+
+      {/* Bloco 1 — Tempo até a independência financeira */}
+      <Card className="form-card">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-base font-medium text-foreground">
+            Tempo até a independência financeira
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Patrimônio necessário calculado pelo valor presente de uma anuidade sobre a renda
+            desejada e o horizonte de aposentadoria ({horizonte} anos) — sem taxa de retirada fixa.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div style={{ background: PAINEL_BG, borderRadius: 12, padding: "14px 16px" }}>
+              <p className="text-xs text-muted-foreground mb-1">Independência em</p>
+              <p className="text-xl font-bold" style={{ color: GREEN }}>
+                {anosAteIndependencia != null ? `${anosAteIndependencia} anos` : "Além do prazo"}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {idadeIndependencia != null
+                  ? `Aos ${idadeIndependencia} anos · ${anoBase + (idadeIndependencia - idadeAtualCalculada)}`
+                  : "Ajuste aporte, prazo ou renda desejada"}
+              </p>
+            </div>
+            <div style={{ background: PAINEL_BG, borderRadius: 12, padding: "14px 16px" }}>
+              <p className="text-xs text-muted-foreground mb-1">Patrimônio necessário</p>
+              <p className="text-xl font-bold" style={{ color: GOLD }}>
+                {formatarMoedaCompleta(patrimonioNecessario)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Valor presente de {horizonte} anos de renda
+              </p>
+            </div>
+            <div style={{ background: PAINEL_BG, borderRadius: 12, padding: "14px 16px" }}>
+              <p className="text-xs text-muted-foreground mb-1">Renda mensal desejada</p>
+              <p className="text-xl font-bold text-foreground">
+                {formatarMoedaCompleta(rendaMensalDesejada)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">Em poder de compra de hoje</p>
+            </div>
+          </div>
+
+          <div style={{ background: PAINEL_BG, borderRadius: 12, padding: "16px" }}>
+            <IndependenciaChart
+              data={dadosIndependencia}
+              necessario={patrimonioNecessario}
+              idadeIndependencia={idadeIndependencia}
+              formatarMoeda={formatarMoeda}
+              formatarMoedaCompleta={formatarMoedaCompleta}
+            />
+            <p className="text-xs text-muted-foreground mt-2">
+              Barras: patrimônio acumulado ano a ano (poder de compra de hoje). Linha dourada:
+              patrimônio necessário. Linha verde: renda mensal já sustentável a cada ano.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Bloco 2 — Simulação de aporte necessário */}
+      <Card className="form-card">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-base font-medium text-foreground">
+            Simulação de aporte necessário
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Aporte mensal para atingir o patrimônio necessário até a aposentadoria (composição
+            mensal). Campos pré-preenchidos pelas premissas e editáveis para simulação.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label className="field-label">Idade atual</Label>
+              <Input
+                type="number"
+                value={b2IdadeAtual || ""}
+                onChange={(e) => setB2((s) => ({ ...s, idadeAtual: parseInt(e.target.value) || 0 }))}
+                className="form-card text-foreground focus:border-primary"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="field-label">Idade de aposentadoria</Label>
+              <Input
+                type="number"
+                value={b2IdadeApos || ""}
+                onChange={(e) => setB2((s) => ({ ...s, idadeApos: parseInt(e.target.value) || 0 }))}
+                className="form-card text-foreground focus:border-primary"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="field-label">Renda mensal desejada (R$)</Label>
+              <Input
+                value={formatCurrency(b2Renda)}
+                onChange={(e) => setB2((s) => ({ ...s, renda: parseCurrency(e.target.value) }))}
+                className="form-card text-foreground focus:border-primary"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="field-label">Horizonte de aposentadoria (anos)</Label>
+              <Input
+                type="number"
+                value={b2Horizonte || ""}
+                onChange={(e) => setB2((s) => ({ ...s, horizonte: parseInt(e.target.value) || 0 }))}
+                className="form-card text-foreground focus:border-primary"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="field-label">Patrimônio atual (R$)</Label>
+              <Input
+                value={formatCurrency(b2Patrimonio)}
+                onChange={(e) => setB2((s) => ({ ...s, patrimonio: parseCurrency(e.target.value) }))}
+                className="form-card text-foreground focus:border-primary"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="field-label">Rentabilidade real esperada (% a.a.)</Label>
+              <Input
+                type="number"
+                step={0.1}
+                value={Number(b2RentPct.toFixed(2))}
+                onChange={(e) => setB2((s) => ({ ...s, rentPct: parseFloat(e.target.value) || 0 }))}
+                className="form-card text-foreground focus:border-primary"
+              />
+            </div>
+          </div>
+
+          <div style={{ background: PAINEL_BG, borderRadius: 12, padding: "16px" }}>
+            <p className="text-xs text-muted-foreground mb-1">Aporte mensal necessário</p>
+            <p className="text-2xl font-bold" style={{ color: diffAporte > 0 ? RED : GREEN }}>
+              {b2Resultado.invalido ? "—" : formatarMoedaCompleta(b2Resultado.aporteNecessario)}
+            </p>
+            {!b2Resultado.invalido && (
+              <p className="text-sm mt-2" style={{ color: diffAporte > 0 ? RED : GREEN }}>
+                {diffAporte > 0 ? (
+                  <>
+                    Faltam <strong>{formatarMoedaCompleta(diffAporte)}</strong>/mês em relação ao
+                    aporte atual ({formatarMoedaCompleta(aporteMensal)}).
+                  </>
+                ) : (
+                  <>
+                    Sobram <strong>{formatarMoedaCompleta(Math.abs(diffAporte))}</strong>/mês — o
+                    aporte atual ({formatarMoedaCompleta(aporteMensal)}) já supera o necessário.
+                  </>
+                )}
+              </p>
+            )}
+            <p className="text-xs text-muted-foreground mt-2">
+              Alvo: {formatarMoedaCompleta(b2Resultado.alvo)}
+              {b2Resultado.invalido ? " · idade de aposentadoria deve ser maior que a idade atual" : ""}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Bloco 3 — Retirada mensal sustentável */}
+      <Card className="form-card">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-base font-medium text-foreground">
+            Retirada mensal sustentável
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Renda mensal que o patrimônio sustenta ao longo do horizonte, pela anuidade — sem taxa
+            de retirada fixa.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label className="field-label">Patrimônio na aposentadoria (R$)</Label>
+              <Input
+                value={formatCurrency(b3Patrimonio)}
+                onChange={(e) => setB3((s) => ({ ...s, patrimonio: parseCurrency(e.target.value) }))}
+                className="form-card text-foreground focus:border-primary"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="field-label">Horizonte de aposentadoria (anos)</Label>
+              <Input
+                type="number"
+                value={b3Horizonte || ""}
+                onChange={(e) => setB3((s) => ({ ...s, horizonte: parseInt(e.target.value) || 0 }))}
+                className="form-card text-foreground focus:border-primary"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="field-label">Rentabilidade real esperada (% a.a.)</Label>
+              <Input
+                type="number"
+                step={0.1}
+                value={Number(b3RentPct.toFixed(2))}
+                onChange={(e) => setB3((s) => ({ ...s, rentPct: parseFloat(e.target.value) || 0 }))}
+                className="form-card text-foreground focus:border-primary"
+              />
+            </div>
+          </div>
+
+          <div style={{ background: PAINEL_BG, borderRadius: 12, padding: "16px" }}>
+            <p className="text-xs text-muted-foreground mb-1">Retirada mensal sustentável</p>
+            <p className="text-2xl font-bold" style={{ color: GREEN }}>
+              {formatarMoedaCompleta(retiradaSustentavel)}
+            </p>
+            <p className="text-xs text-muted-foreground mt-2">
+              {formatarMoedaCompleta(b3Patrimonio)} distribuídos ao longo de {b3Horizonte} anos a{" "}
+              {b3RentPct.toFixed(1).replace(".", ",")}% a.a. real.
+            </p>
+          </div>
         </CardContent>
       </Card>
 

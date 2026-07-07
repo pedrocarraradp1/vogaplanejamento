@@ -22,7 +22,7 @@ const navGroups: NavGroup[] = [
     items: [
       { id: "patrimonio", label: "Balanço Patrimonial" },
       { id: "objetivos", label: "Objetivos" },
-      { id: "projecao", label: "Projeção" },
+      { id: "projecao", label: "Projeções / Aposentadoria" },
       { id: "cenarios", label: "Cenários" },
       { id: "fluxo-de-caixa", label: "Fluxo de Caixa" },
       { id: "diagnostico-financeiro", label: "Diagnóstico Financeiro" },

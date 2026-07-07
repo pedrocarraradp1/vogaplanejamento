@@ -123,6 +123,8 @@ export interface Premissas {
   rendaAposentadoria: number
   novaEntrada: number
   idadeEntrada: number
+  /** Horizonte de aposentadoria (anos que o patrimônio precisa durar). Padrão 35. */
+  horizonteAposentadoria?: number
   rentabilidadeConservador: number
   rentabilidadeModerado: number
   rentabilidadeAgressivo: number
@@ -233,6 +235,7 @@ const emptyPremissas: Premissas = {
   rendaAposentadoria: 0,
   novaEntrada:    0,
   idadeEntrada:   0,
+  horizonteAposentadoria: 35,
   rentabilidadeConservador: 7,
   rentabilidadeModerado: 10,
   rentabilidadeAgressivo: 13,
@@ -251,6 +254,7 @@ const defaultPremissas: Premissas = {
   rendaAposentadoria: 0,
   novaEntrada: 0,
   idadeEntrada: 0,
+  horizonteAposentadoria: 35,
   rentabilidadeConservador: 7,
   rentabilidadeModerado: 10,
   rentabilidadeAgressivo: 13,
