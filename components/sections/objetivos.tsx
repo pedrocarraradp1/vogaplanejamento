@@ -457,6 +457,11 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
     return max
   }, [anosVisiveis, capitalMap])
 
+  const totalPeriodo = useMemo(
+    () => anosVisiveis.reduce((s, y) => s + (capitalMap.get(y) ?? 0), 0),
+    [anosVisiveis, capitalMap],
+  )
+
   const rotuloStep = Math.max(1, Math.ceil(anosVisiveis.length / 12))
 
   const aplicarPresetPeriodo = (anos: number | "todos") => {
@@ -693,16 +698,61 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                   })}
                 </div>
 
-                <GraficoCapitalPorAno
-                  anosVisiveis={anosVisiveis}
-                  capitalMap={capitalMap}
-                  capitalPorObjetivoMap={capitalPorObjetivoMap}
-                  objetivos={objetivos}
-                  coresPorObjetivoId={coresPorObjetivoId}
-                  maxCapitalPeriodo={maxCapitalPeriodo}
-                  rotuloStep={rotuloStep}
-                  formatCurrency={formatCurrencyAlways}
-                />
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 20,
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <GraficoCapitalPorAno
+                      anosVisiveis={anosVisiveis}
+                      capitalMap={capitalMap}
+                      capitalPorObjetivoMap={capitalPorObjetivoMap}
+                      objetivos={objetivos}
+                      coresPorObjetivoId={coresPorObjetivoId}
+                      maxCapitalPeriodo={maxCapitalPeriodo}
+                      rotuloStep={rotuloStep}
+                      formatCurrency={formatCurrencyAlways}
+                    />
+                  </div>
+                  <div
+                    style={{
+                      flexShrink: 0,
+                      textAlign: "right",
+                      paddingLeft: 8,
+                      borderLeft: "1px solid rgba(0,0,0,0.08)",
+                      minWidth: 120,
+                    }}
+                  >
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: 11,
+                        color: "#6B7280",
+                        lineHeight: 1.3,
+                      }}
+                    >
+                      Total do período
+                    </p>
+                    <p
+                      style={{
+                        margin: "6px 0 0",
+                        fontSize: 18,
+                        fontWeight: 700,
+                        color: "#1A1A1A",
+                        fontVariantNumeric: "tabular-nums",
+                        lineHeight: 1.2,
+                      }}
+                    >
+                      {formatCurrencyAlways(totalPeriodo)}
+                    </p>
+                    <p style={{ margin: "4px 0 0", fontSize: 10, color: "#9CA3AF" }}>
+                      {Math.min(periodoInicio, periodoFim)}–{Math.max(periodoInicio, periodoFim)}
+                    </p>
+                  </div>
+                </div>
               </div>
 
               {/* 2. Alerta de concentração */}

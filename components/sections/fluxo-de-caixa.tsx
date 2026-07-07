@@ -8,23 +8,24 @@ import { Button } from "@/components/ui/button"
 import { ArrowLeft, ArrowRight } from "lucide-react"
 import { usePlano } from "@/lib/plano-context"
 import type { FluxoMesRealizado } from "@/lib/plano-context"
+import { calcularProjecao, calcularFluxoAnual, calcularPassivosPorAnoSeries } from "@/lib/engine"
+import { buildDadosFluxoGrafico } from "@/lib/projecao-graficos-dados"
 import {
   MESES_LABELS,
   MESES_LABELS_COMPLETOS,
   CORES_FLUXO_CAIXA,
   calcularRealizadoMensal,
   calcularOrcadoVsRealizado,
-  calcularProjecaoAnualOrcada,
-  rotuloStepAnos,
   formatBRL,
+  formatBRLSaida,
   formatPct,
 } from "@/lib/fluxo-caixa-utils"
 import {
   GraficoRealizadoMensal,
   GraficoOrcadoVsRealizado,
-  GraficoProjecaoAnual,
   LegendaFluxo,
 } from "@/components/charts/fluxo-caixa-charts"
+import { FluxoAnualChart } from "@/components/charts/projecao-extra-charts"
 
 interface FluxoDeCaixaProps {
   onNavigate: (section: string) => void
@@ -36,15 +37,6 @@ const LEGENDA_PAINEL1 = [
   { id: "rentabilidade", label: "Rentabilidade", fill: CORES_FLUXO_CAIXA.rentabilidade },
   { id: "receita", label: "Receita", fill: CORES_FLUXO_CAIXA.receita },
   { id: "despesa", label: "Despesa", fill: CORES_FLUXO_CAIXA.despesa },
-  { id: "saldo", label: "Saldo acumulado", fill: CORES_FLUXO_CAIXA.saldoAcumulado },
-]
-
-const LEGENDA_PAINEL3 = [
-  { id: "rentabilidade", label: "Rentabilidade", fill: CORES_FLUXO_CAIXA.rentabilidade },
-  { id: "aportes", label: "Aportes", fill: CORES_FLUXO_CAIXA.aportes },
-  { id: "passivos", label: "Passivos", fill: CORES_FLUXO_CAIXA.passivos },
-  { id: "objetivos", label: "Objetivos", fill: CORES_FLUXO_CAIXA.objetivos },
-  { id: "outros", label: "Outros", fill: CORES_FLUXO_CAIXA.outros },
 ]
 
 function ToggleDois({
@@ -95,18 +87,158 @@ export function FluxoDeCaixa({ onNavigate }: FluxoDeCaixaProps) {
   const saldoInicial = getSaldoInicialLiquido()
   const idadeAtual = getIdadeAtual()
 
+  const aporteMensal = Math.max(0, dadosPessoais.renda - dadosPessoais.despesa)
+
   const premissasCompletas = useMemo(
     () => ({
       ...premissas,
       saldoInicial,
-      aporteM: Math.max(0, dadosPessoais.renda - dadosPessoais.despesa),
+      aporteM: aporteMensal,
       idadeAtual,
       prazo: Math.max(1, Number(premissas.prazo) || 1),
     }),
-    [premissas, saldoInicial, dadosPessoais.renda, dadosPessoais.despesa, idadeAtual],
+    [premissas, saldoInicial, aporteMensal, idadeAtual],
   )
 
+  const objetivosEngine = useMemo(
+    () =>
+      objetivos.map((obj) => ({
+        id: obj.id,
+        descricao: obj.descricao,
+        prazoAnos: obj.prazoAnos,
+        valor: obj.valor,
+        recorrente: obj.recorrente,
+        frequenciaAnos: obj.frequenciaAnos,
+        duracaoTipo: obj.duracaoTipo,
+        duracaoAnos: obj.duracaoAnos,
+      })),
+    [objetivos],
+  )
+
+  const taxaAnualLiquida = Math.max(0, (Number(premissas.rendimento) || 0) / 100)
+
+  const projecaoNominal = useMemo(
+    () => calcularProjecao(premissasCompletas, objetivosEngine, passivos, "nominal"),
+    [premissasCompletas, objetivosEngine, passivos],
+  )
+
+  const fluxoAnualNominal = useMemo(
+    () =>
+      calcularFluxoAnual(
+        premissasCompletas,
+        objetivosEngine,
+        passivos,
+        Number(premissas.aliquotaImpostoRendimento) || 0.15,
+        "nominal",
+      ),
+    [premissasCompletas, objetivosEngine, passivos, premissas.aliquotaImpostoRendimento],
+  )
+
+  const dadosFluxoOrcado = useMemo(
+    () =>
+      buildDadosFluxoGrafico(projecaoNominal, {
+        taxaLiqAnual: taxaAnualLiquida,
+        aporteMensal,
+        idadeAtual,
+        idadeApos: Number(premissas.idadeApos) || 0,
+        rendaMensalMeta: Number(premissas.retiradaMensal) || 0,
+        displayMode: "nominal",
+        inflacaoPct: Number(premissas.inflacao) || 0,
+        objetivosPorAno: fluxoAnualNominal.map((r) => r.objetivos),
+        passivosPorAno: calcularPassivosPorAnoSeries(passivos, premissasCompletas.prazo),
+        retiradaPorAno: fluxoAnualNominal.map((r) => r.retirada),
+      }),
+    [
+      projecaoNominal,
+      fluxoAnualNominal,
+      passivos,
+      premissasCompletas.prazo,
+      premissas.inflacao,
+      premissas.idadeApos,
+      premissas.retiradaMensal,
+      taxaAnualLiquida,
+      aporteMensal,
+      idadeAtual,
+    ],
+  )
+
+  const projecao = useMemo(
+    () => calcularProjecao(premissasCompletas, objetivosEngine, passivos, displayModeP3),
+    [premissasCompletas, objetivosEngine, passivos, displayModeP3],
+  )
+
+  const fluxoAnual = useMemo(
+    () =>
+      calcularFluxoAnual(
+        premissasCompletas,
+        objetivosEngine,
+        passivos,
+        Number(premissas.aliquotaImpostoRendimento) || 0.15,
+        displayModeP3,
+      ),
+    [premissasCompletas, objetivosEngine, passivos, premissas.aliquotaImpostoRendimento, displayModeP3],
+  )
+
+  const passivosPorAno = useMemo(
+    () => calcularPassivosPorAnoSeries(passivos, premissasCompletas.prazo),
+    [passivos, premissasCompletas.prazo],
+  )
+
+  const dadosFluxo = useMemo(
+    () =>
+      buildDadosFluxoGrafico(projecao, {
+        taxaLiqAnual: taxaAnualLiquida,
+        aporteMensal,
+        idadeAtual,
+        idadeApos: Number(premissas.idadeApos) || 0,
+        rendaMensalMeta: Number(premissas.retiradaMensal) || 0,
+        displayMode: displayModeP3,
+        inflacaoPct: Number(premissas.inflacao) || 0,
+        objetivosPorAno: fluxoAnual.map((r) => r.objetivos),
+        passivosPorAno,
+        retiradaPorAno: fluxoAnual.map((r) => r.retirada),
+      }),
+    [
+      projecao,
+      fluxoAnual,
+      passivosPorAno,
+      displayModeP3,
+      premissas.inflacao,
+      premissas.idadeApos,
+      premissas.retiradaMensal,
+      taxaAnualLiquida,
+      aporteMensal,
+      idadeAtual,
+    ],
+  )
+
+  const patrimonioInicioOrcado = useMemo(() => {
+    const p0 = projecaoNominal[0]
+    if (!p0) return saldoInicial
+    return Number(p0.saldoNominal) || saldoInicial
+  }, [projecaoNominal, saldoInicial])
+
+  const dadosOrcadoVsReal = useMemo(() => {
+    const primeiroAno = dadosFluxoOrcado[0]
+    if (!primeiroAno) return []
+    return calcularOrcadoVsRealizado(
+      fluxoDeCaixa,
+      primeiroAno,
+      patrimonioInicioOrcado,
+      taxaAnualLiquida,
+    )
+  }, [fluxoDeCaixa, dadosFluxoOrcado, patrimonioInicioOrcado, taxaAnualLiquida])
+
   const fmt = (v: number) => formatBRL(v, moeda)
+
+  const formatarMoeda = (valor: number) => {
+    const prefix = moeda === "USD" ? "US$ " : "R$ "
+    if (Math.abs(valor) >= 1_000_000) return `${prefix}${(valor / 1_000_000).toFixed(1)}M`
+    if (Math.abs(valor) >= 1_000) return `${prefix}${(valor / 1_000).toFixed(0)}K`
+    return `${prefix}${valor.toFixed(0)}`
+  }
+
+  const formatarMoedaCompleta = (valor: number) => fmt(valor)
 
   const parseCurrency = (value: string) => parseInt(value.replace(/\D/g, ""), 10) || 0
   const formatCurrencyInput = (value: number) => {
@@ -121,42 +253,6 @@ export function FluxoDeCaixa({ onNavigate }: FluxoDeCaixaProps) {
     () => calcularRealizadoMensal(fluxoDeCaixa),
     [fluxoDeCaixa],
   )
-
-  const dadosOrcadoVsReal = useMemo(
-    () => calcularOrcadoVsRealizado(fluxoDeCaixa, premissas, dadosPessoais, saldoInicial),
-    [fluxoDeCaixa, premissas, dadosPessoais, saldoInicial],
-  )
-
-  const anosVisiveisP3 = useMemo(() => {
-    const inicio = Math.min(periodoInicio, periodoFim)
-    const fim = Math.max(periodoInicio, periodoFim)
-    const anos: number[] = []
-    for (let y = inicio; y <= fim; y++) anos.push(y)
-    return anos
-  }, [periodoInicio, periodoFim])
-
-  const projecaoAnual = useMemo(
-    () =>
-      calcularProjecaoAnualOrcada(
-        premissasCompletas,
-        objetivos,
-        passivos,
-        displayModeP3,
-        anosVisiveisP3[0] ?? anoCorrente,
-        anosVisiveisP3[anosVisiveisP3.length - 1] ?? anoPlanoFim,
-      ),
-    [
-      premissasCompletas,
-      objetivos,
-      passivos,
-      displayModeP3,
-      anosVisiveisP3,
-      anoCorrente,
-      anoPlanoFim,
-    ],
-  )
-
-  const stepP3 = rotuloStepAnos(anosVisiveisP3.length)
 
   const totaisAno = useMemo(() => {
     const rent = dadosRealizado.reduce((s, d) => s + d.rentabilidade, 0)
@@ -314,7 +410,7 @@ export function FluxoDeCaixa({ onNavigate }: FluxoDeCaixaProps) {
                 {
                   id: "d",
                   label: "Despesa",
-                  valor: fmt(d.despesa),
+                  valor: formatBRLSaida(d.despesa, moeda),
                   fill: CORES_FLUXO_CAIXA.despesa,
                 },
               ]}
@@ -419,13 +515,14 @@ export function FluxoDeCaixa({ onNavigate }: FluxoDeCaixaProps) {
           </div>
 
           <div style={{ background: PAINEL_BG, borderRadius: 12, padding: "16px" }}>
-            <LegendaFluxo itens={LEGENDA_PAINEL3} />
-            <GraficoProjecaoAnual
-              dados={projecaoAnual}
-              formatBRL={fmt}
-              anoInicio={anosVisiveisP3[0] ?? anoCorrente}
-              anoFim={anosVisiveisP3[anosVisiveisP3.length - 1] ?? anoPlanoFim}
-              stepAnos={stepP3}
+            <FluxoAnualChart
+              data={dadosFluxo}
+              periodoInicioAno={periodoInicio}
+              periodoFimAno={periodoFim}
+              anoBase={anoCorrente}
+              formatarMoeda={formatarMoeda}
+              formatarMoedaCompleta={formatarMoedaCompleta}
+              hideTitle
             />
           </div>
         </CardContent>

@@ -20,7 +20,12 @@ import {
   ReferenceArea,
   ReferenceDot,
 } from "recharts"
-import type { DadoFluxoGrafico, DadoRendaGrafico } from "@/lib/projecao-graficos-dados"
+import {
+  filtrarDadosFluxoPorPeriodo,
+  type DadoFluxoGrafico,
+  type DadoRendaGrafico,
+} from "@/lib/projecao-graficos-dados"
+import { formatMoedaSaida } from "@/lib/fluxo-caixa-utils"
 
 const CORES_FLUXO = {
   rendimento: "#378ADD",
@@ -51,20 +56,52 @@ export function FluxoAnualChart({
   data,
   formatarMoeda,
   formatarMoedaCompleta,
-}: { data: DadoFluxoGrafico[] } & ChartFormatters) {
-  const dados = data ?? []
-  const primeiroAno = dados[0]
+  hideTitle = false,
+  className,
+  periodoInicioAno,
+  periodoFimAno,
+  anoBase,
+}: {
+  data: DadoFluxoGrafico[]
+  hideTitle?: boolean
+  className?: string
+  /** Ano-calendário inicial do intervalo visível (ex: 2026). */
+  periodoInicioAno?: number
+  /** Ano-calendário final do intervalo visível (ex: 2076). */
+  periodoFimAno?: number
+  /** Ano-calendário do t=0 da projeção — normalmente o ano corrente. */
+  anoBase?: number
+} & ChartFormatters) {
+  const dadosVisiveis = useMemo(() => {
+    const all = data ?? []
+    if (
+      periodoInicioAno == null ||
+      periodoFimAno == null ||
+      anoBase == null
+    ) {
+      return all
+    }
+    return filtrarDadosFluxoPorPeriodo(all, anoBase, periodoInicioAno, periodoFimAno)
+  }, [data, periodoInicioAno, periodoFimAno, anoBase])
 
-  if (dados.length === 0) {
+  const primeiroAno = dadosVisiveis[0]
+  const chartKey = `${periodoInicioAno ?? "all"}-${periodoFimAno ?? "all"}-${dadosVisiveis.length}-${dadosVisiveis[0]?.idade ?? ""}-${dadosVisiveis[dadosVisiveis.length - 1]?.idade ?? ""}`
+
+  if (dadosVisiveis.length === 0) {
     return null
   }
 
   return (
-    <div className="mt-8 w-full min-w-0 space-y-2">
-      <h3 className="text-sm font-medium text-foreground">Fluxo Anual</h3>
+    <div className={`w-full min-w-0 space-y-2 ${className ?? (hideTitle ? "" : "mt-8")}`}>
+      {!hideTitle ? <h3 className="text-sm font-medium text-foreground">Fluxo Anual</h3> : null}
       <div className="w-full min-w-0" style={{ height: CHART_HEIGHT, minHeight: CHART_HEIGHT }}>
         <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
-          <ComposedChart data={dados} margin={{ top: 28, right: 24, left: 8, bottom: 4 }} stackOffset="sign">
+          <ComposedChart
+            key={chartKey}
+            data={dadosVisiveis}
+            margin={{ top: 28, right: 24, left: 8, bottom: 4 }}
+            stackOffset="sign"
+          >
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
             <XAxis
               dataKey="idade"
@@ -99,13 +136,13 @@ export function FluxoAnualChart({
                     </p>
                     <p style={CHART_TOOLTIP_ITEM_STYLE}>Aporte: {formatarMoedaCompleta(p.aporte)}</p>
                     <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, color: "#F5C97A" }}>
-                      Objetivos: {formatarMoedaCompleta(Math.abs(p.objetivos))}
+                      Objetivos: {formatMoedaSaida(formatarMoedaCompleta, p.objetivos)}
                     </p>
                     <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, color: "#C4B5FD" }}>
-                      Passivos: {formatarMoedaCompleta(Math.abs(p.passivos))}
+                      Passivos: {formatMoedaSaida(formatarMoedaCompleta, p.passivos)}
                     </p>
                     <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, color: "#F5A5A4" }}>
-                      Retirada: {formatarMoedaCompleta(Math.abs(p.retirada))}
+                      Retirada: {formatMoedaSaida(formatarMoedaCompleta, p.retirada)}
                     </p>
                     <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, color: "#7FE0B8" }}>
                       Meta renda (ref.): {formatarMoedaCompleta(p.metaRenda)}
@@ -146,6 +183,8 @@ export function FluxoAnualChart({
               name="retirada"
               stackId="fluxo"
               fill={CORES_FLUXO.retirada}
+              legendType="rect"
+              isAnimationActive={false}
             />
             <Line
               type="monotone"

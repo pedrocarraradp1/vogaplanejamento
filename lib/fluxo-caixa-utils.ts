@@ -1,5 +1,4 @@
-import type { DadosPessoais, Objetivo, Passivo, Premissas } from "@/lib/plano-context"
-import { calcularFluxoAnual } from "@/lib/engine"
+import type { DadoFluxoGrafico } from "@/lib/projecao-graficos-dados"
 
 export interface FluxoMesRealizado {
   rentabilidade: number
@@ -127,25 +126,36 @@ export function calcularRealizadoMensal(fluxo: FluxoDeCaixaState): MesRealizadoC
   })
 }
 
-export interface OrcadoMensal {
-  rentabilidade: number
-  receita: number
-  despesa: number
-}
+/** Mensaliza o orçado do 1º ano da projeção (mesma fonte do gráfico Fluxo Anual). */
+export function mensalizarOrcadoPrimeiroAno(
+  rendimentoAnual: number,
+  aporteAnual: number,
+  saidasAnual: number,
+  patrimonioInicio: number,
+  taxaAnualLiquida: number,
+): FluxoMesRealizado[] {
+  const taxaMensal = Math.pow(1 + taxaAnualLiquida, 1 / 12) - 1
+  const receitaM = aporteAnual / 12
+  const despesaM = saidasAnual / 12
 
-/** Orçado mensal derivado das premissas e dados pessoais. */
-export function calcularOrcadoMensal(
-  premissas: Premissas,
-  dadosPessoais: DadosPessoais,
-  saldoInicial: number,
-): OrcadoMensal {
-  const rendAnual = Math.max(0, Number(premissas.rendimento) || 0) / 100
-  const rentabilidade = Math.max(0, saldoInicial) * rendAnual / 12
-  return {
-    rentabilidade,
-    receita: Math.max(0, Number(dadosPessoais.renda) || 0),
-    despesa: Math.max(0, Number(dadosPessoais.despesa) || 0),
+  let pat = patrimonioInicio
+  const meses: FluxoMesRealizado[] = []
+  let rentAcum = 0
+
+  for (let m = 0; m < 11; m++) {
+    const rent = pat * taxaMensal
+    rentAcum += rent
+    meses.push({ rentabilidade: rent, receita: receitaM, despesa: despesaM })
+    pat = pat * (1 + taxaMensal) + receitaM - despesaM
   }
+
+  meses.push({
+    rentabilidade: rendimentoAnual - rentAcum,
+    receita: receitaM,
+    despesa: despesaM,
+  })
+
+  return meses
 }
 
 export interface MesOrcadoVsRealizado {
@@ -161,113 +171,36 @@ export interface MesOrcadoVsRealizado {
 
 export function calcularOrcadoVsRealizado(
   fluxo: FluxoDeCaixaState,
-  premissas: Premissas,
-  dadosPessoais: DadosPessoais,
-  saldoInicial: number,
+  primeiroAnoFluxo: DadoFluxoGrafico,
+  patrimonioInicio: number,
+  taxaAnualLiquida: number,
 ): MesOrcadoVsRealizado[] {
   const realizado = calcularRealizadoMensal(fluxo)
-  const orc = calcularOrcadoMensal(premissas, dadosPessoais, saldoInicial)
-  const fluxoOrcadoMes = fluxoLiquidoMes(orc)
+  const mesesOrcado = mensalizarOrcadoPrimeiroAno(
+    primeiroAnoFluxo.rendimento,
+    primeiroAnoFluxo.aporte,
+    primeiroAnoFluxo.saidasTotal,
+    patrimonioInicio,
+    taxaAnualLiquida,
+  )
 
   let acumOrc = 0
-  let acumReal = 0
 
   return realizado.map((r, i) => {
-    acumOrc += fluxoOrcadoMes
-    acumReal = r.saldoAcumulado
+    const orc = mesesOrcado[i] ?? mesVazio()
+    const fluxoOrc = fluxoLiquidoMes(orc)
+    acumOrc += fluxoOrc
     return {
       mes: i,
       label: r.label,
       labelCompleto: r.labelCompleto,
       orcadoAcumulado: acumOrc,
-      realizadoAcumulado: acumReal,
-      orcadoMes: fluxoOrcadoMes,
+      realizadoAcumulado: r.saldoAcumulado,
+      orcadoMes: fluxoOrc,
       realizadoMes: r.fluxoLiquido,
-      diferenca: acumReal - acumOrc,
+      diferenca: r.saldoAcumulado - acumOrc,
     }
   })
-}
-
-export interface CategoriaAnualOrcada {
-  rentabilidade: number
-  aportes: number
-  passivos: number
-  objetivos: number
-  outros: number
-}
-
-export interface AnoProjecaoOrcada {
-  ano: number
-  t: number
-  categorias: CategoriaAnualOrcada
-  entradasTotal: number
-  saidasTotal: number
-  fluxoLiquido: number
-}
-
-export function calcularProjecaoAnualOrcada(
-  premissasCompletas: Premissas,
-  objetivos: Objetivo[],
-  passivos: Passivo[],
-  displayMode: "real" | "nominal",
-  anoInicio: number,
-  anoFim: number,
-): AnoProjecaoOrcada[] {
-  const objetivosEngine = objetivos.map((o) => ({
-    id: o.id,
-    descricao: o.descricao,
-    prazoAnos: o.prazoAnos,
-    valor: o.valor,
-    recorrente: o.recorrente,
-    frequenciaAnos: o.frequenciaAnos,
-    duracaoTipo: o.duracaoTipo,
-    duracaoAnos: o.duracaoAnos,
-  }))
-
-  const rows = calcularFluxoAnual(
-    premissasCompletas,
-    objetivosEngine,
-    passivos,
-    Number(premissasCompletas.aliquotaImpostoRendimento) || 0.15,
-    displayMode,
-  )
-
-  const inf = Math.max(0, Number(premissasCompletas.inflacao) || 0) / 100
-
-  return rows
-    .map((row) => {
-      const ano = anoInicio + row.t
-      const deflator = Math.pow(1 + inf, Math.max(0, row.t))
-      const scale = (v: number) =>
-        displayMode === "real" ? v / deflator : v
-
-      const rentabilidade = scale(row.rendimento)
-      const aportes = scale(row.aporte)
-      const passivosVal = scale(row.dividas)
-      const objetivosVal = scale(row.objetivos)
-      const outros = scale(
-        row.retirada + row.ir + row.previdencia + row.inss + row.complemento + row.extra,
-      )
-
-      const entradasTotal = rentabilidade + aportes
-      const saidasTotal = passivosVal + objetivosVal + outros
-
-      return {
-        ano,
-        t: row.t,
-        categorias: {
-          rentabilidade,
-          aportes,
-          passivos: passivosVal,
-          objetivos: objetivosVal,
-          outros,
-        },
-        entradasTotal,
-        saidasTotal,
-        fluxoLiquido: entradasTotal - saidasTotal,
-      }
-    })
-    .filter((r) => r.ano >= anoInicio && r.ano <= anoFim)
 }
 
 export function rotuloStepAnos(qtd: number): number {
@@ -291,6 +224,18 @@ export function formatBRL(value: number, moeda: "BRL" | "USD" = "BRL"): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(value)
+}
+
+/** Saídas de caixa: sinal negativo explícito (ex.: -R$ 30.000). */
+export function formatBRLSaida(value: number, moeda: "BRL" | "USD" = "BRL"): string {
+  if (value === 0) return formatBRL(0, moeda)
+  return formatBRL(-Math.abs(value), moeda)
+}
+
+/** Aplica polaridade de saída a um formatador arbitrário (gráficos com moeda custom). */
+export function formatMoedaSaida(formatar: (v: number) => string, value: number): string {
+  if (value === 0) return formatar(0)
+  return formatar(-Math.abs(value))
 }
 
 export function formatPct(value: number): string {

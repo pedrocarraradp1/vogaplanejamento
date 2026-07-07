@@ -15,18 +15,13 @@ import {
 } from "@/components/charts/chart-tooltip"
 import {
   CORES_FLUXO_CAIXA,
-  type AnoProjecaoOrcada,
   type MesOrcadoVsRealizado,
   type MesRealizadoCalculado,
-  deveMostrarRotuloAno,
 } from "@/lib/fluxo-caixa-utils"
 
 const CHART_HEIGHT = 240
 const PLOT_HEIGHT = 168
 const LEFT_AXIS_WIDTH = 56
-const RIGHT_AXIS_WIDTH = 76
-const P3_CHART_HEIGHT = 196
-const P3_PLOT_HEIGHT = 160
 
 export function GraficoRealizadoMensal({
   dados,
@@ -47,10 +42,6 @@ export function GraficoRealizadoMensal({
   const posZoneHeight = PLOT_HEIGHT * posZoneRatio
   const negZoneHeight = PLOT_HEIGHT * (1 - posZoneRatio)
 
-  const saldoMin = Math.min(0, ...dados.map((d) => d.saldoAcumulado))
-  const saldoMax = Math.max(0, ...dados.map((d) => d.saldoAcumulado))
-  const saldoRange = saldoMax - saldoMin || 1
-
   const posTicks = [1, 0.75, 0.5, 0.25, 0].map((pct) => ({
     value: maxPos * pct,
     y: posZoneHeight * (1 - pct),
@@ -63,19 +54,6 @@ export function GraficoRealizadoMensal({
         }))
       : []
 
-  const saldoTickValues = Array.from(
-    new Set(
-      [saldoMax, saldoMin, saldoMin < 0 && saldoMax > 0 ? 0 : null].filter(
-        (v): v is number => v !== null,
-      ),
-    ),
-  ).sort((a, b) => b - a)
-
-  const saldoTicks = saldoTickValues.map((value) => ({
-    value,
-    y: ((saldoMax - value) / saldoRange) * PLOT_HEIGHT,
-  }))
-
   const gridTicks = [
     ...posTicks.filter((t) => t.value > 0),
     { value: 0, y: posZoneHeight },
@@ -84,12 +62,6 @@ export function GraficoRealizadoMensal({
 
   const hovered = hoveredIdx !== null ? dados[hoveredIdx] : null
   const detalhes = hovered ? getDetalhes(hovered) : undefined
-
-  const saldoLinePoints = dados.map((d, i) => {
-    const xPct = ((i + 0.5) / dados.length) * 100
-    const yInPlot = ((saldoMax - d.saldoAcumulado) / saldoRange) * PLOT_HEIGHT
-    return `${xPct},${yInPlot}`
-  }).join(" ")
 
   return (
     <div
@@ -161,29 +133,6 @@ export function GraficoRealizadoMensal({
               }}
             />
           ))}
-
-          {/* Linha saldo acumulado */}
-          <svg
-            style={{
-              position: "absolute",
-              left: 0,
-              top: 0,
-              width: "100%",
-              height: PLOT_HEIGHT,
-              pointerEvents: "none",
-              overflow: "visible",
-            }}
-            viewBox={`0 0 100 ${PLOT_HEIGHT}`}
-            preserveAspectRatio="none"
-          >
-            <polyline
-              fill="none"
-              stroke={CORES_FLUXO_CAIXA.saldoAcumulado}
-              strokeWidth={2}
-              vectorEffect="non-scaling-stroke"
-              points={saldoLinePoints}
-            />
-          </svg>
 
           {/* Barras mensais */}
           <div
@@ -259,49 +208,6 @@ export function GraficoRealizadoMensal({
             })}
           </div>
         </div>
-
-        {/* Eixo secundário (direita) — saldo acumulado */}
-        <div
-          style={{
-            width: RIGHT_AXIS_WIDTH,
-            flexShrink: 0,
-            position: "relative",
-            pointerEvents: "none",
-          }}
-        >
-          <span
-            style={{
-              position: "absolute",
-              right: 0,
-              top: -2,
-              fontSize: 8,
-              fontWeight: 600,
-              color: CORES_FLUXO_CAIXA.saldoAcumulado,
-              whiteSpace: "nowrap",
-              textAlign: "right",
-              width: "100%",
-            }}
-          >
-            Saldo acumulado
-          </span>
-          {saldoTicks.map((tick) => (
-            <span
-              key={`saldo-${tick.value}`}
-              style={{
-                position: "absolute",
-                left: 4,
-                top: tick.y,
-                transform: "translateY(-50%)",
-                fontSize: 9,
-                color: CORES_FLUXO_CAIXA.saldoAcumulado,
-                fontVariantNumeric: "tabular-nums",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {formatBRL(tick.value)}
-            </span>
-          ))}
-        </div>
       </div>
 
       {/* Rótulos dos meses */}
@@ -311,7 +217,6 @@ export function GraficoRealizadoMensal({
           marginTop: 6,
           height: 20,
           paddingLeft: LEFT_AXIS_WIDTH,
-          paddingRight: RIGHT_AXIS_WIDTH,
         }}
       >
         {dados.map((d) => (
@@ -451,185 +356,6 @@ export function GraficoOrcadoVsRealizado({
                 hovered.diferenca >= 0 ? CORES_FLUXO_CAIXA.diffPositiva : CORES_FLUXO_CAIXA.diffNegativa,
             },
           ]}
-        />
-      ) : null}
-    </div>
-  )
-}
-
-export function GraficoProjecaoAnual({
-  dados,
-  formatBRL,
-  anoInicio,
-  anoFim,
-  stepAnos,
-}: {
-  dados: AnoProjecaoOrcada[]
-  formatBRL: (v: number) => string
-  anoInicio: number
-  anoFim: number
-  stepAnos: number
-}) {
-  const { containerRef, hoveredIdx, tooltipPos, updateTooltip, handleLeave } = useTooltipHover()
-  const hovered = hoveredIdx !== null ? dados[hoveredIdx] : null
-
-  const maxAbs = Math.max(1, ...dados.map((r) => Math.max(r.entradasTotal, r.saidasTotal)))
-  const posZoneHeight = P3_PLOT_HEIGHT / 2
-  const negZoneHeight = P3_PLOT_HEIGHT / 2
-
-  const detalhesP3 = hovered
-    ? (
-        [
-          { id: "rent", label: "Rentabilidade", v: hovered.categorias.rentabilidade, fill: CORES_FLUXO_CAIXA.rentabilidade },
-          { id: "ap", label: "Aportes", v: hovered.categorias.aportes, fill: CORES_FLUXO_CAIXA.aportes },
-          { id: "pass", label: "Passivos", v: hovered.categorias.passivos, fill: CORES_FLUXO_CAIXA.passivos },
-          { id: "obj", label: "Objetivos", v: hovered.categorias.objetivos, fill: CORES_FLUXO_CAIXA.objetivos },
-          { id: "out", label: "Outros", v: hovered.categorias.outros, fill: CORES_FLUXO_CAIXA.outros },
-        ] as const
-      )
-        .filter((d) => d.v > 0)
-        .map((d) => ({ id: d.id, label: d.label, valor: formatBRL(d.v), fill: d.fill }))
-    : undefined
-
-  return (
-    <div
-      ref={containerRef}
-      className="w-full min-w-0 relative"
-      style={{ height: P3_CHART_HEIGHT }}
-      onMouseLeave={handleLeave}
-    >
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: P3_PLOT_HEIGHT }}>
-        {dados.map((row, i) => {
-          const mostrarAno = deveMostrarRotuloAno(row.ano, anoInicio, anoFim, stepAnos)
-          const ent = row.entradasTotal
-          const sai = row.saidasTotal
-          const temDados = ent > 0 || sai > 0
-
-          const entradas = [
-            { id: "rent", valor: row.categorias.rentabilidade, fill: CORES_FLUXO_CAIXA.rentabilidade },
-            { id: "ap", valor: row.categorias.aportes, fill: CORES_FLUXO_CAIXA.aportes },
-          ].filter((s) => s.valor > 0)
-
-          const saidas = [
-            { id: "pass", valor: row.categorias.passivos, fill: CORES_FLUXO_CAIXA.passivos },
-            { id: "obj", valor: row.categorias.objetivos, fill: CORES_FLUXO_CAIXA.objetivos },
-            { id: "out", valor: row.categorias.outros, fill: CORES_FLUXO_CAIXA.outros },
-          ].filter((s) => s.valor > 0)
-
-          return (
-            <div
-              key={row.ano}
-              className="ano-coluna"
-              style={{
-                flex: 1,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                minWidth: 0,
-                height: "100%",
-                justifyContent: "center",
-                cursor: "default",
-              }}
-              onMouseEnter={(e) => updateTooltip(i, e.clientX, e.clientY)}
-              onMouseMove={(e) => updateTooltip(i, e.clientX, e.clientY)}
-            >
-              <div
-                style={{
-                  flex: 1,
-                  width: "100%",
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "center",
-                  pointerEvents: "none",
-                }}
-              >
-                {temDados ? (
-                  <>
-                    <div style={{ height: posZoneHeight, position: "relative" }}>
-                      {(() => {
-                        let offset = 0
-                        return entradas.map((s, idx) => {
-                          const h = (s.valor / maxAbs) * posZoneHeight
-                          const top = posZoneHeight - offset - h
-                          offset += h
-                          return (
-                            <div
-                              key={s.id}
-                              style={{
-                                position: "absolute",
-                                left: 0,
-                                right: 0,
-                                top,
-                                height: h,
-                                background: s.fill,
-                                borderRadius: idx === entradas.length - 1 ? "3px 3px 0 0" : 0,
-                              }}
-                            />
-                          )
-                        })
-                      })()}
-                    </div>
-                    <div style={{ height: 1, background: "rgba(0,0,0,0.15)", width: "100%" }} />
-                    <div style={{ height: negZoneHeight, position: "relative" }}>
-                      {(() => {
-                        let offset = 0
-                        return saidas.map((s, idx) => {
-                          const h = (s.valor / maxAbs) * negZoneHeight
-                          const top = offset
-                          offset += h
-                          return (
-                            <div
-                              key={s.id}
-                              style={{
-                                position: "absolute",
-                                left: 0,
-                                right: 0,
-                                top,
-                                height: h,
-                                background: s.fill,
-                                borderRadius: idx === saidas.length - 1 ? "0 0 3px 3px" : 0,
-                              }}
-                            />
-                          )
-                        })
-                      })()}
-                    </div>
-                  </>
-                ) : (
-                  <div
-                    style={{
-                      width: "100%",
-                      height: 4,
-                      background: "var(--border, #D9D9D9)",
-                      borderRadius: 2,
-                      margin: "auto 0",
-                    }}
-                  />
-                )}
-              </div>
-              <span
-                style={{
-                  marginTop: 8,
-                  fontSize: 10,
-                  color: "#6B7280",
-                  visibility: mostrarAno ? "visible" : "hidden",
-                  height: 14,
-                  pointerEvents: "none",
-                }}
-              >
-                {mostrarAno ? row.ano : "\u00A0"}
-              </span>
-            </div>
-          )
-        })}
-      </div>
-
-      {hovered && tooltipPos ? (
-        <TooltipFlutuante
-          pos={tooltipPos}
-          titulo={formatBRL(hovered.fluxoLiquido)}
-          subtitulo={`Saldo líquido em ${hovered.ano}`}
-          detalhes={detalhesP3}
         />
       ) : null}
     </div>

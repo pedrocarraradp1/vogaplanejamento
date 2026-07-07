@@ -41,6 +41,21 @@ export interface BuildDadosFluxoOptions {
   retiradaPorAno?: number[]
 }
 
+/** Filtra pontos do Fluxo Anual pelo intervalo de anos-calendário (De/até). */
+export function filtrarDadosFluxoPorPeriodo(
+  data: DadoFluxoGrafico[],
+  anoBase: number,
+  periodoInicioAno: number,
+  periodoFimAno: number,
+): DadoFluxoGrafico[] {
+  const ini = Math.min(periodoInicioAno, periodoFimAno)
+  const fim = Math.max(periodoInicioAno, periodoFimAno)
+  return data.filter((d) => {
+    const ano = anoBase + d.t
+    return ano >= ini && ano <= fim
+  })
+}
+
 /**
  * Séries: Rendimento, Aporte (entradas) | Objetivos, Passivos, Retirada (saídas) | metaRenda (linha).
  */
@@ -62,7 +77,6 @@ export function buildDadosFluxoGrafico(
   } = options
 
   const inf = inflacaoPct / 100
-  const prazoAcumulacao = Math.max(0, idadeApos - idadeAtual)
   const metaAnual = rendaMensalMeta * 12
 
   return projecao.map((p, i) => {
@@ -71,7 +85,7 @@ export function buildDadosFluxoGrafico(
     const patrimonioNominal = Number(p.saldoNominal) || 0
     const patrimonioReal = patrimonioNominal / def
 
-    const isAposentado = i >= prazoAcumulacao
+    const isAposentado = p.isAposentado
 
     const scaleFluxoNominal = (v: number) =>
       displayMode === "nominal" ? v : v / def
@@ -87,9 +101,8 @@ export function buildDadosFluxoGrafico(
     const passivos = -Math.round(scaleFluxoNominal(passivosPos))
 
     const retiradaMotor = isAposentado ? Number(retiradaPorAno?.[i]) || 0 : 0
-    const retiradaAno = retiradaMotor
-    const metaRenda = isAposentado ? retiradaAno : metaAnual
-    const retirada = -Math.round(retiradaAno)
+    const metaRenda = isAposentado ? retiradaMotor : metaAnual
+    const retirada = isAposentado ? -Math.round(Math.abs(retiradaMotor)) : 0
 
     const entradasTotal = rendimento + aporte
     const saidasTotal = Math.abs(objetivos) + Math.abs(passivos) + Math.abs(retirada)
