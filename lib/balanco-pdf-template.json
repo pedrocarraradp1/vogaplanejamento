@@ -1,0 +1,24 @@
+{
+  "pageWidthPt": 960,
+  "pageHeightPt": 540,
+  "slides": [
+    {
+      "leftPt": 0,
+      "topPt": 42.905,
+      "widthPt": 960,
+      "heightPt": 434.095
+    },
+    {
+      "leftPt": 0,
+      "topPt": 34.308,
+      "widthPt": 960,
+      "heightPt": 291.692
+    },
+    {
+      "leftPt": 0,
+      "topPt": 30.476,
+      "widthPt": 960,
+      "heightPt": 409.524
+    }
+  ]
+}
