@@ -226,16 +226,24 @@ export function calcularPassivosPorAnoSeries(
 
 export type DisplayModeProjecao = "nominal" | "real"
 
-/** Retirada anual na aposentadoria conforme o modo de exibição/simulação. */
+/**
+ * Retirada anual na aposentadoria — SEMPRE em poder de compra constante: o valor
+ * mensal desejado cresce nominalmente com a inflação. A simulação de saldo é
+ * única (uma só trajetória nominal); o modo "real" é apenas essa mesma série
+ * deflacionada (`saldoReal = saldoNominal / (1+inf)^t`), com o mesmo formato de
+ * curva. O parâmetro `displayMode` é mantido só por compatibilidade de assinatura
+ * e não altera mais a trajetória — evita o bug em que o modo real eliminava a
+ * fase de saque e o patrimônio parecia crescer indefinidamente.
+ */
 export function retiradaAnualAposentadoria(
   retiradaEfetivaMensal: number,
   t: number,
   inflacaoAnual: number,
-  displayMode: DisplayModeProjecao = "nominal",
+  _displayMode: DisplayModeProjecao = "nominal",
 ): number {
   const base = Math.max(0, retiradaEfetivaMensal) * 12
   if (base === 0) return 0
-  return displayMode === "real" ? base : base * Math.pow(1 + inflacaoAnual, Math.max(0, t))
+  return base * Math.pow(1 + inflacaoAnual, Math.max(0, t))
 }
 
 /**
@@ -248,12 +256,11 @@ export function retiradaAnualAposentadoria(
  *   saldo = saldo_prev*(1+r) + fvMensal(aporteM*(1+inf)^t, r) - objetivos_t - dividas_t
  *   + novaEntrada*(1+inf)^t  se idade == idadeEntrada
  *
- * Aposentadoria t>0 (nominal):
+ * Aposentadoria t>0 (simulação única):
  *   saldo = saldo_prev*(1+r) - retiradaM*12*(1+inf)^t
- * Aposentadoria t>0 (real):
- *   saldo = saldo_prev*(1+r) - retiradaM*12  (poder de compra fixo)
+ *   (retirada com poder de compra constante — cresce com a inflação)
  *
- * Valor Real:
+ * Valor Real (apenas exibição, mesma série deflacionada):
  *   saldoReal = saldoNominal / (1+inf)^t
  */
 export function calcularProjecao(
