@@ -263,30 +263,6 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
     [rendaMensalDesejada, taxaReal, horizonte],
   )
 
-  const idadeIndependencia = useMemo(() => {
-    for (const p of projecao) {
-      if ((Number(p.saldoReal) || 0) >= patrimonioNecessario) return p.idade
-    }
-    return null
-  }, [projecao, patrimonioNecessario])
-
-  const dadosIndependencia = useMemo<PontoIndependencia[]>(
-    () =>
-      projecao.map((p) => {
-        const patrimonio = Math.max(0, Number(p.saldoReal) || 0)
-        return {
-          idade: p.idade,
-          ano: anoBase + p.t,
-          patrimonio,
-          rendaSustentavel: Math.max(0, pmtDeAnuidade(patrimonio, taxaReal, horizonte) / 12),
-        }
-      }),
-    [projecao, taxaReal, horizonte, anoBase],
-  )
-
-  const anosAteIndependencia =
-    idadeIndependencia != null ? Math.max(0, idadeIndependencia - idadeAtualCalculada) : null
-
   // ── Bloco 2: simulação de aporte necessário (inputs editáveis) ─────────────
   const [b2, setB2] = useState<{
     idadeAtual?: number
@@ -319,6 +295,49 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
   }, [b2Renda, b2Rent, b2Horizonte, b2IdadeApos, b2IdadeAtual, b2Patrimonio])
 
   const diffAporte = b2Resultado.aporteNecessario - aporteMensal
+
+  // ── Toggle do gráfico do Bloco 1: "Ritmo atual" vs "Aporte necessário" ─────
+  const [ritmoB1, setRitmoB1] = useState<"atual" | "necessario">("atual")
+
+  // Projeção alternativa usando o aporte necessário (real, cresce com a inflação
+  // via fallback aporteM*(1+inf)^t da engine — por isso zeramos aportePorAnoNominal).
+  const projecaoNecessario = useMemo(
+    () =>
+      calcularProjecao(
+        { ...premissasCompletas, aporteM: b2Resultado.aporteNecessario, aportePorAnoNominal: undefined },
+        objetivosEngine,
+        state.passivos,
+        displayMode,
+      ),
+    [premissasCompletas, b2Resultado.aporteNecessario, objetivosEngine, state.passivos, displayMode],
+  )
+
+  const projecaoB1 = ritmoB1 === "necessario" ? projecaoNecessario : projecao
+  const aporteB1Ativo = ritmoB1 === "necessario" ? b2Resultado.aporteNecessario : aporteMensal
+
+  const idadeIndependencia = useMemo(() => {
+    for (const p of projecaoB1) {
+      if ((Number(p.saldoReal) || 0) >= patrimonioNecessario) return p.idade
+    }
+    return null
+  }, [projecaoB1, patrimonioNecessario])
+
+  const dadosIndependencia = useMemo<PontoIndependencia[]>(
+    () =>
+      projecaoB1.map((p) => {
+        const patrimonio = Math.max(0, Number(p.saldoReal) || 0)
+        return {
+          idade: p.idade,
+          ano: anoBase + p.t,
+          patrimonio,
+          rendaSustentavel: Math.max(0, pmtDeAnuidade(patrimonio, taxaReal, horizonte) / 12),
+        }
+      }),
+    [projecaoB1, taxaReal, horizonte, anoBase],
+  )
+
+  const anosAteIndependencia =
+    idadeIndependencia != null ? Math.max(0, idadeIndependencia - idadeAtualCalculada) : null
 
   // ── Bloco 3: retirada mensal sustentável (inputs editáveis) ────────────────
   const [b3, setB3] = useState<{ patrimonio?: number; horizonte?: number; rentPct?: number }>({})
@@ -714,21 +733,20 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
             <div className="bg-[rgba(34,199,135,0.08)] border border-[#22C787]/30 rounded-xl p-4">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="field-label">Renda Mensal na Aposentadoria</p>
+                  <p className="field-label">Renda Mensal Sustentável</p>
                   {(() => {
                     const anos = Math.max(0, (Number(premissas.idadeApos) || 0) - idadeAtualCalculada)
-                    const patrimonioNominalApos = Number(kpis.patrimonioApos) || 0
                     const patrimonioRealApos = Number(kpis.patrimonioAposReal) || 0
-                    const rendaNominalApos = Math.max(0, patrimonioNominalApos * taxaNominalMensal)
-                    const rendaHojeEq = rendaNominalApos / Math.pow(1 + inflacaoAnual, anos)
-                    const rendaRealApos = Math.max(0, patrimonioRealApos * taxaRealMensal)
+                    // Mesmo método dos Blocos 1/2/3: anuidade sobre o horizonte, sem taxa fixa.
+                    const rendaSustRealApos = Math.max(0, pmtDeAnuidade(patrimonioRealApos, taxaReal, horizonte) / 12)
+                    const rendaSustNominalApos = rendaSustRealApos * Math.pow(1 + inflacaoAnual, anos)
 
                     if (displayMode === "nominal") {
                       return (
                         <>
-                          <p className="text-2xl font-bold text-[#22C787] mt-1">{formatarMoedaCompleta(rendaNominalApos)}</p>
+                          <p className="text-2xl font-bold text-[#22C787] mt-1">{formatarMoedaCompleta(rendaSustNominalApos)}</p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            ({formatarMoedaCompleta(rendaHojeEq)} hoje)
+                            ({formatarMoedaCompleta(rendaSustRealApos)} hoje · anuidade por {horizonte} anos)
                           </p>
                         </>
                       )
@@ -736,9 +754,9 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
 
                     return (
                       <>
-                        <p className="text-2xl font-bold text-[#22C787] mt-1">{formatarMoedaCompleta(rendaRealApos)}</p>
+                        <p className="text-2xl font-bold text-[#22C787] mt-1">{formatarMoedaCompleta(rendaSustRealApos)}</p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Taxa real (Fisher): {(taxaReal * 100).toFixed(1).replace(".", ",")}% a.a.
+                          Anuidade por {horizonte} anos · taxa real {(taxaReal * 100).toFixed(1).replace(".", ",")}% a.a.
                         </p>
                       </>
                     )
@@ -910,13 +928,39 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
             <div style={{ background: PAINEL_BG, borderRadius: 12, padding: "14px 16px" }}>
               <p className="text-xs text-muted-foreground mb-1">Renda mensal desejada</p>
               <p className="text-xl font-bold text-foreground">
-                {formatarMoedaCompleta(rendaMensalDesejada)}
+                {formatarMoedaCompleta(rendaMensalDesejada)}<span className="text-sm font-medium text-muted-foreground">/mês</span>
               </p>
-              <p className="text-xs text-muted-foreground mt-1">Em poder de compra de hoje</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                = {formatarMoedaCompleta(rendaMensalDesejada * 12)}/ano · poder de compra de hoje
+              </p>
             </div>
           </div>
 
           <div style={{ background: PAINEL_BG, borderRadius: 12, padding: "16px" }}>
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+              <div className="inline-flex rounded-lg bg-white p-1 border border-border">
+                {(["atual", "necessario"] as const).map((modo) => (
+                  <button
+                    key={modo}
+                    onClick={() => setRitmoB1(modo)}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                      ritmoB1 === modo
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {modo === "atual" ? "Ritmo atual" : "Aporte necessário"}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Simulando com:{" "}
+                <span className="font-semibold text-foreground">
+                  {ritmoB1 === "atual" ? "Aporte atual" : "Aporte necessário"} de{" "}
+                  {formatarMoedaCompleta(aporteB1Ativo)}/mês
+                </span>
+              </p>
+            </div>
             <IndependenciaChart
               data={dadosIndependencia}
               necessario={patrimonioNecessario}
@@ -964,12 +1008,15 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
               />
             </div>
             <div className="space-y-2">
-              <Label className="field-label">Renda mensal desejada (R$)</Label>
+              <Label className="field-label">Renda mensal desejada (R$/mês)</Label>
               <Input
                 value={formatCurrency(b2Renda)}
                 onChange={(e) => setB2((s) => ({ ...s, renda: parseCurrency(e.target.value) }))}
                 className="form-card text-foreground focus:border-primary"
               />
+              <p className="text-xs text-muted-foreground">
+                = {formatarMoedaCompleta(b2Renda * 12)}/ano
+              </p>
             </div>
             <div className="space-y-2">
               <Label className="field-label">Horizonte de aposentadoria (anos)</Label>
