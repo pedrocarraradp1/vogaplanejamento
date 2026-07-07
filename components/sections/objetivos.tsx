@@ -30,6 +30,7 @@ import {
   AlertTriangle,
 } from "lucide-react"
 import { usePlano, type Objetivo } from "@/lib/plano-context"
+import { GraficoCapitalPorAno } from "@/components/charts/objetivos-charts"
 
 interface ObjetivosProps {
   onNavigate: (section: string) => void
@@ -138,6 +139,12 @@ function contarParcelas(o: Objetivo, prazoTotal: number): number {
   let count = 0
   for (let t = prazoAnos; t < fim; t += freq) count++
   return count
+}
+
+/** Valor exibido em cards e listas: total para únicos, valor por ocorrência para recorrentes. */
+function valorExibicaoObjetivo(o: Objetivo, totalEstimado: number, parcelas: number): number {
+  if (!o.recorrente) return Math.max(0, Number(o.valor) || 0)
+  return parcelas > 0 ? totalEstimado / parcelas : 0
 }
 
 function anoAtual() {
@@ -433,7 +440,6 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
 
   const [periodoInicio, setPeriodoInicio] = useState(anoCorrente)
   const [periodoFim, setPeriodoFim] = useState(() => anoCorrente + prazoTotal)
-  const [hoveredAno, setHoveredAno] = useState<number | null>(null)
 
   const anosVisiveis = useMemo(() => {
     const inicio = Math.min(periodoInicio, periodoFim)
@@ -451,11 +457,6 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
     return max
   }, [anosVisiveis, capitalMap])
 
-  const totalPeriodo = useMemo(
-    () => anosVisiveis.reduce((s, y) => s + (capitalMap.get(y) ?? 0), 0),
-    [anosVisiveis, capitalMap],
-  )
-
   const rotuloStep = Math.max(1, Math.ceil(anosVisiveis.length / 12))
 
   const aplicarPresetPeriodo = (anos: number | "todos") => {
@@ -464,7 +465,6 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
       anos === "todos" ? anoPlanoFim : Math.min(inicio + anos - 1, anoPlanoFim)
     setPeriodoInicio(inicio)
     setPeriodoFim(fim)
-    setHoveredAno(null)
   }
 
   const handlePeriodoInicioChange = (raw: string) => {
@@ -472,7 +472,6 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
     if (Number.isNaN(v)) return
     const inicio = Math.max(anoCorrente, Math.min(v, periodoFim))
     setPeriodoInicio(inicio)
-    setHoveredAno(null)
   }
 
   const handlePeriodoFimChange = (raw: string) => {
@@ -480,7 +479,6 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
     if (Number.isNaN(v)) return
     const fim = Math.min(anoPlanoFim, Math.max(v, periodoInicio))
     setPeriodoFim(fim)
-    setHoveredAno(null)
   }
 
   const formatCurrencyAlways = (value: number) =>
@@ -490,42 +488,6 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(value)
-
-  const destaqueValor =
-    hoveredAno !== null ? (capitalMap.get(hoveredAno) ?? 0) : totalPeriodo
-
-  const destaqueSubtitulo =
-    hoveredAno !== null
-      ? (capitalMap.get(hoveredAno) ?? 0) > 0
-        ? `Ano de ${hoveredAno}`
-        : `Ano de ${hoveredAno} · sem objetivo neste ano`
-      : `Total necessário entre ${Math.min(periodoInicio, periodoFim)} e ${Math.max(periodoInicio, periodoFim)}`
-
-  const contribuicoesHover = useMemo(() => {
-    if (hoveredAno === null) return []
-    const porObj = capitalPorObjetivoMap.get(hoveredAno)
-    if (!porObj) return []
-    return objetivos
-      .map((o) => ({
-        id: o.id,
-        nome: (o.descricao || "Objetivo").trim(),
-        valor: porObj.get(o.id) ?? 0,
-        cor: coresPorObjetivoId.get(o.id) ?? PALETA_OBJETIVOS[0],
-      }))
-      .filter((item) => item.valor > 0)
-  }, [hoveredAno, capitalPorObjetivoMap, objetivos, coresPorObjetivoId])
-
-  const segmentosPorAno = (ano: number) => {
-    const porObj = capitalPorObjetivoMap.get(ano)
-    if (!porObj) return []
-    return objetivos
-      .map((o) => ({
-        id: o.id,
-        valor: porObj.get(o.id) ?? 0,
-        cor: coresPorObjetivoId.get(o.id) ?? PALETA_OBJETIVOS[0],
-      }))
-      .filter((s) => s.valor > 0)
-  }
 
   const alertasConcentracao = useMemo(() => {
     const avisos: { anos: number[]; nomes: string[] }[] = []
@@ -568,8 +530,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
   const renderCardRows = (objetivo: Objetivo) => {
     const total = totalEstimadoObjetivo(objetivo)
     const parcelas = contarParcelas(objetivo, prazoTotal)
-    const valorPorOcorrencia =
-      objetivo.recorrente && parcelas > 0 ? total / parcelas : objetivo.valor
+    const valorExibicao = valorExibicaoObjetivo(objetivo, total, parcelas)
 
     return (
       <>
@@ -577,9 +538,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
         <CardRow label="Recorrência" value={formatRecorrencia(objetivo)} />
         <CardRow
           label={objetivo.recorrente ? "Valor por ocorrência" : "Valor total"}
-          value={
-            formatCurrency(objetivo.recorrente ? valorPorOcorrencia : objetivo.valor) || "—"
-          }
+          value={formatCurrency(valorExibicao) || "—"}
         />
       </>
     )
@@ -734,196 +693,16 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                   })}
                 </div>
 
-                {/* Destaque dinâmico acima do gráfico */}
-                <div
-                  style={{
-                    textAlign: "center",
-                    marginBottom: 12,
-                    minHeight: hoveredAno !== null && contribuicoesHover.length > 0 ? 120 : 52,
-                  }}
-                >
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: 22,
-                      fontWeight: 700,
-                      color: "#1A1A1A",
-                      fontVariantNumeric: "tabular-nums",
-                    }}
-                  >
-                    {formatCurrencyAlways(destaqueValor)}
-                  </p>
-                  <p style={{ margin: "4px 0 0", fontSize: 12, color: "#6B7280" }}>
-                    {destaqueSubtitulo}
-                  </p>
-                  {hoveredAno !== null && contribuicoesHover.length > 0 ? (
-                    <div
-                      style={{
-                        marginTop: 12,
-                        textAlign: "left",
-                        maxWidth: 360,
-                        marginLeft: "auto",
-                        marginRight: "auto",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 6,
-                      }}
-                    >
-                      {contribuicoesHover.map((item) => (
-                        <div
-                          key={item.id}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            gap: 10,
-                            fontSize: 12,
-                          }}
-                        >
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 8,
-                              minWidth: 0,
-                              flex: 1,
-                            }}
-                          >
-                            <span
-                              style={{
-                                width: 10,
-                                height: 10,
-                                borderRadius: 2,
-                                background: item.cor.fill,
-                                flexShrink: 0,
-                              }}
-                            />
-                            <span
-                              style={{
-                                color: "#374151",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {item.nome}
-                            </span>
-                          </div>
-                          <span
-                            style={{
-                              fontWeight: 600,
-                              color: item.cor.text,
-                              flexShrink: 0,
-                              fontVariantNumeric: "tabular-nums",
-                            }}
-                          >
-                            {formatCurrencyAlways(item.valor)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "flex-end",
-                    gap: 4,
-                    height: 140,
-                  }}
-                  onMouseLeave={() => setHoveredAno(null)}
-                >
-                  {anosVisiveis.map((ano) => {
-                    const valor = capitalMap.get(ano) ?? 0
-                    const segmentos = segmentosPorAno(ano)
-                    const anoInicioVisivel = anosVisiveis[0]
-                    const anoFimVisivel = anosVisiveis[anosVisiveis.length - 1]
-                    const mostrarAno =
-                      ano === anoFimVisivel || (ano - anoInicioVisivel) % rotuloStep === 0
-                    const barHeight =
-                      valor > 0 && maxCapitalPeriodo > 0
-                        ? Math.max(20, Math.round((valor / maxCapitalPeriodo) * 100))
-                        : 4
-
-                    return (
-                      <div
-                        key={ano}
-                        style={{
-                          flex: 1,
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          minWidth: 0,
-                          height: "100%",
-                          justifyContent: "flex-end",
-                          cursor: "default",
-                        }}
-                        onMouseEnter={() => setHoveredAno(ano)}
-                      >
-                        {valor > 0 ? (
-                          <div
-                            style={{
-                              width: "100%",
-                              height: barHeight,
-                              display: "flex",
-                              flexDirection: "column",
-                              justifyContent: "flex-end",
-                              opacity: hoveredAno === ano ? 1 : hoveredAno !== null ? 0.65 : 1,
-                              transition: "opacity 0.15s ease",
-                            }}
-                          >
-                            {(() => {
-                              const heights = segmentos.map((seg) =>
-                                Math.max(2, Math.round((seg.valor / valor) * barHeight)),
-                              )
-                              const used = heights.slice(0, -1).reduce((s, h) => s + h, 0)
-                              if (heights.length > 0) {
-                                heights[heights.length - 1] = Math.max(2, barHeight - used)
-                              }
-                              return segmentos.map((seg, idx) => {
-                                const isTop = idx === segmentos.length - 1
-                                return (
-                                  <div
-                                    key={seg.id}
-                                    style={{
-                                      width: "100%",
-                                      height: heights[idx],
-                                      background: seg.cor.fill,
-                                      borderRadius: isTop ? "3px 3px 0 0" : 0,
-                                    }}
-                                  />
-                                )
-                              })
-                            })()}
-                          </div>
-                        ) : (
-                          <div
-                            style={{
-                              width: "100%",
-                              height: 4,
-                              borderRadius: 2,
-                              background: "var(--border, #D9D9D9)",
-                              opacity: hoveredAno === ano ? 1 : hoveredAno !== null ? 0.65 : 1,
-                            }}
-                          />
-                        )}
-                        <span
-                          style={{
-                            marginTop: 8,
-                            fontSize: 10,
-                            color: "#6B7280",
-                            visibility: mostrarAno ? "visible" : "hidden",
-                            height: 14,
-                            lineHeight: "14px",
-                          }}
-                        >
-                          {mostrarAno ? ano : "\u00A0"}
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
+                <GraficoCapitalPorAno
+                  anosVisiveis={anosVisiveis}
+                  capitalMap={capitalMap}
+                  capitalPorObjetivoMap={capitalPorObjetivoMap}
+                  objetivos={objetivos}
+                  coresPorObjetivoId={coresPorObjetivoId}
+                  maxCapitalPeriodo={maxCapitalPeriodo}
+                  rotuloStep={rotuloStep}
+                  formatCurrency={formatCurrencyAlways}
+                />
               </div>
 
               {/* 2. Alerta de concentração */}
@@ -1191,7 +970,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                                     fontVariantNumeric: "tabular-nums",
                                   }}
                                 >
-                                  {formatCurrency(o.recorrente ? item.total : o.valor)}
+                                  {formatCurrency(valorExibicaoObjetivo(o, item.total, item.parcelas))}
                                 </span>
                               </div>
                             )

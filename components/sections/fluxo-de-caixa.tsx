@@ -16,15 +16,14 @@ import {
   calcularOrcadoVsRealizado,
   calcularProjecaoAnualOrcada,
   rotuloStepAnos,
-  deveMostrarRotuloAno,
   formatBRL,
   formatPct,
 } from "@/lib/fluxo-caixa-utils"
 import {
   GraficoRealizadoMensal,
   GraficoOrcadoVsRealizado,
+  GraficoProjecaoAnual,
   LegendaFluxo,
-  DestaqueHover,
 } from "@/components/charts/fluxo-caixa-charts"
 
 interface FluxoDeCaixaProps {
@@ -85,8 +84,6 @@ export function FluxoDeCaixa({ onNavigate }: FluxoDeCaixaProps) {
   const moeda = state.moeda ?? "BRL"
 
   const [hoveredMesP1, setHoveredMesP1] = useState<number | null>(null)
-  const [hoveredMesP2, setHoveredMesP2] = useState<number | null>(null)
-  const [hoveredAnoP3, setHoveredAnoP3] = useState<number | null>(null)
   const [displayModeP3, setDisplayModeP3] = useState<"real" | "nominal">("real")
 
   const anoCorrente = new Date().getFullYear()
@@ -159,14 +156,6 @@ export function FluxoDeCaixa({ onNavigate }: FluxoDeCaixaProps) {
     ],
   )
 
-  const maxAbsAnoP3 = useMemo(() => {
-    let max = 0
-    for (const row of projecaoAnual) {
-      max = Math.max(max, row.entradasTotal, row.saidasTotal)
-    }
-    return max
-  }, [projecaoAnual])
-
   const stepP3 = rotuloStepAnos(anosVisiveisP3.length)
 
   const totaisAno = useMemo(() => {
@@ -203,27 +192,7 @@ export function FluxoDeCaixa({ onNavigate }: FluxoDeCaixaProps) {
     const fim = anos === "todos" ? anoPlanoFim : Math.min(inicio + anos - 1, anoPlanoFim)
     setPeriodoInicio(inicio)
     setPeriodoFim(fim)
-    setHoveredAnoP3(null)
   }
-
-  const p2Hover = hoveredMesP2 !== null ? dadosOrcadoVsReal[hoveredMesP2] : null
-  const p3Hover = hoveredAnoP3 !== null ? projecaoAnual.find((r) => r.ano === hoveredAnoP3) : null
-
-  const detalhesP3 = p3Hover
-    ? (
-        [
-          { id: "rent", label: "Rentabilidade", v: p3Hover.categorias.rentabilidade, fill: CORES_FLUXO_CAIXA.rentabilidade },
-          { id: "ap", label: "Aportes", v: p3Hover.categorias.aportes, fill: CORES_FLUXO_CAIXA.aportes },
-          { id: "pass", label: "Passivos", v: p3Hover.categorias.passivos, fill: CORES_FLUXO_CAIXA.passivos },
-          { id: "obj", label: "Objetivos", v: p3Hover.categorias.objetivos, fill: CORES_FLUXO_CAIXA.objetivos },
-          { id: "out", label: "Outros", v: p3Hover.categorias.outros, fill: CORES_FLUXO_CAIXA.outros },
-        ] as const
-      )
-        .filter((d) => d.v > 0)
-        .map((d) => ({ id: d.id, label: d.label, valor: fmt(d.v), fill: d.fill }))
-    : undefined
-
-  const totalPeriodoP3 = projecaoAnual.reduce((s, r) => s + r.fluxoLiquido, 0)
 
   return (
     <div className="space-y-6">
@@ -329,8 +298,6 @@ export function FluxoDeCaixa({ onNavigate }: FluxoDeCaixaProps) {
               dados={dadosRealizado}
               formatBRL={fmt}
               onHoverMes={setHoveredMesP1}
-              valorPadrao={fmt(totaisAno.fluxo)}
-              subtituloPadrao={`Fluxo líquido do ano ${anoCorrente}`}
               getDetalhes={(d) => [
                 {
                   id: "r",
@@ -371,39 +338,7 @@ export function FluxoDeCaixa({ onNavigate }: FluxoDeCaixaProps) {
                 { id: "real", label: "Realizado", fill: CORES_FLUXO_CAIXA.realizado },
               ]}
             />
-            <DestaqueHover
-              valor={fmt(p2Hover ? p2Hover.realizadoAcumulado : dadosOrcadoVsReal[11]?.realizadoAcumulado ?? 0)}
-              subtitulo={
-                p2Hover
-                  ? `${p2Hover.labelCompleto}`
-                  : "Saldo acumulado realizado até dezembro"
-              }
-              detalhes={
-                p2Hover
-                  ? [
-                      { id: "o", label: "Orçado", valor: fmt(p2Hover.orcadoAcumulado), fill: CORES_FLUXO_CAIXA.orcado },
-                      {
-                        id: "r",
-                        label: "Realizado",
-                        valor: fmt(p2Hover.realizadoAcumulado),
-                        fill: CORES_FLUXO_CAIXA.realizado,
-                      },
-                      {
-                        id: "d",
-                        label: "Diferença",
-                        valor: fmt(p2Hover.diferenca),
-                        fill: p2Hover.diferenca >= 0 ? CORES_FLUXO_CAIXA.diffPositiva : CORES_FLUXO_CAIXA.diffNegativa,
-                        valorColor: p2Hover.diferenca >= 0 ? CORES_FLUXO_CAIXA.diffPositiva : CORES_FLUXO_CAIXA.diffNegativa,
-                      },
-                    ]
-                  : undefined
-              }
-            />
-            <GraficoOrcadoVsRealizado
-              dados={dadosOrcadoVsReal}
-              formatBRL={fmt}
-              onHoverMes={setHoveredMesP2}
-            />
+            <GraficoOrcadoVsRealizado dados={dadosOrcadoVsReal} formatBRL={fmt} />
           </div>
         </CardContent>
       </Card>
@@ -462,7 +397,6 @@ export function FluxoDeCaixa({ onNavigate }: FluxoDeCaixaProps) {
                   const v = parseInt(e.target.value, 10)
                   if (!Number.isNaN(v)) {
                     setPeriodoInicio(Math.max(anoCorrente, Math.min(v, periodoFim)))
-                    setHoveredAnoP3(null)
                   }
                 }}
                 className="h-8 w-[88px] text-sm bg-white"
@@ -477,7 +411,6 @@ export function FluxoDeCaixa({ onNavigate }: FluxoDeCaixaProps) {
                   const v = parseInt(e.target.value, 10)
                   if (!Number.isNaN(v)) {
                     setPeriodoFim(Math.min(anoPlanoFim, Math.max(v, periodoInicio)))
-                    setHoveredAnoP3(null)
                   }
                 }}
                 className="h-8 w-[88px] text-sm bg-white"
@@ -487,145 +420,13 @@ export function FluxoDeCaixa({ onNavigate }: FluxoDeCaixaProps) {
 
           <div style={{ background: PAINEL_BG, borderRadius: 12, padding: "16px" }}>
             <LegendaFluxo itens={LEGENDA_PAINEL3} />
-            <DestaqueHover
-              valor={fmt(p3Hover ? p3Hover.fluxoLiquido : totalPeriodoP3)}
-              subtitulo={
-                p3Hover
-                  ? `Saldo líquido em ${p3Hover.ano}`
-                  : `Total líquido entre ${Math.min(periodoInicio, periodoFim)} e ${Math.max(periodoInicio, periodoFim)}`
-              }
-              detalhes={detalhesP3}
+            <GraficoProjecaoAnual
+              dados={projecaoAnual}
+              formatBRL={fmt}
+              anoInicio={anosVisiveisP3[0] ?? anoCorrente}
+              anoFim={anosVisiveisP3[anosVisiveisP3.length - 1] ?? anoPlanoFim}
+              stepAnos={stepP3}
             />
-
-            <div
-              style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 160 }}
-              onMouseLeave={() => setHoveredAnoP3(null)}
-            >
-              {projecaoAnual.map((row) => {
-                const anoInicio = anosVisiveisP3[0]
-                const anoFim = anosVisiveisP3[anosVisiveisP3.length - 1]
-                const mostrarAno = deveMostrarRotuloAno(row.ano, anoInicio, anoFim, stepP3)
-                const ent = row.entradasTotal
-                const sai = row.saidasTotal
-                const barHeight =
-                  maxAbsAnoP3 > 0
-                    ? Math.max(20, Math.round((Math.max(ent, sai) / maxAbsAnoP3) * 100))
-                    : 4
-
-                const entradas = [
-                  { id: "rent", valor: row.categorias.rentabilidade, fill: CORES_FLUXO_CAIXA.rentabilidade },
-                  { id: "ap", valor: row.categorias.aportes, fill: CORES_FLUXO_CAIXA.aportes },
-                ].filter((s) => s.valor > 0)
-
-                const saidas = [
-                  { id: "pass", valor: row.categorias.passivos, fill: CORES_FLUXO_CAIXA.passivos },
-                  { id: "obj", valor: row.categorias.objetivos, fill: CORES_FLUXO_CAIXA.objetivos },
-                  { id: "out", valor: row.categorias.outros, fill: CORES_FLUXO_CAIXA.outros },
-                ].filter((s) => s.valor > 0)
-
-                const temDados = ent > 0 || sai > 0
-
-                return (
-                  <div
-                    key={row.ano}
-                    style={{
-                      flex: 1,
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      minWidth: 0,
-                      height: "100%",
-                      justifyContent: "center",
-                    }}
-                    onMouseEnter={() => setHoveredAnoP3(row.ano)}
-                  >
-                    <div
-                      style={{
-                        flex: 1,
-                        width: "100%",
-                        display: "flex",
-                        flexDirection: "column",
-                        justifyContent: "center",
-                        opacity: hoveredAnoP3 === row.ano ? 1 : hoveredAnoP3 !== null ? 0.65 : 1,
-                      }}
-                    >
-                      {temDados ? (
-                        <>
-                          <div
-                            style={{
-                              height: barHeight / 2,
-                              display: "flex",
-                              flexDirection: "column",
-                              justifyContent: "flex-end",
-                            }}
-                          >
-                            {(() => {
-                              const h = entradas.map((s) =>
-                                Math.max(2, Math.round((s.valor / ent) * (barHeight / 2))),
-                              )
-                              const used = h.slice(0, -1).reduce((a, b) => a + b, 0)
-                              if (h.length) h[h.length - 1] = Math.max(2, barHeight / 2 - used)
-                              return entradas.map((s, idx) => (
-                                <div
-                                  key={s.id}
-                                  style={{
-                                    width: "100%",
-                                    height: h[idx],
-                                    background: s.fill,
-                                    borderRadius: idx === entradas.length - 1 ? "3px 3px 0 0" : 0,
-                                  }}
-                                />
-                              ))
-                            })()}
-                          </div>
-                          <div style={{ height: 1, background: "rgba(0,0,0,0.15)", width: "100%" }} />
-                          <div style={{ height: barHeight / 2, display: "flex", flexDirection: "column" }}>
-                            {(() => {
-                              const h = saidas.map((s) =>
-                                Math.max(2, Math.round((s.valor / sai) * (barHeight / 2))),
-                              )
-                              const used = h.slice(0, -1).reduce((a, b) => a + b, 0)
-                              if (h.length) h[h.length - 1] = Math.max(2, barHeight / 2 - used)
-                              return saidas.map((s, idx) => (
-                                <div
-                                  key={s.id}
-                                  style={{
-                                    width: "100%",
-                                    height: h[idx],
-                                    background: s.fill,
-                                  }}
-                                />
-                              ))
-                            })()}
-                          </div>
-                        </>
-                      ) : (
-                        <div
-                          style={{
-                            width: "100%",
-                            height: 4,
-                            background: "var(--border, #D9D9D9)",
-                            borderRadius: 2,
-                            margin: "auto 0",
-                          }}
-                        />
-                      )}
-                    </div>
-                    <span
-                      style={{
-                        marginTop: 8,
-                        fontSize: 10,
-                        color: "#6B7280",
-                        visibility: mostrarAno ? "visible" : "hidden",
-                        height: 14,
-                      }}
-                    >
-                      {mostrarAno ? row.ano : "\u00A0"}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
           </div>
         </CardContent>
       </Card>
