@@ -40,7 +40,7 @@ type LinhaCenarios = {
 
 export function CenariosInvestimento(props: CenariosInvestimentoProps) {
   const { state, setPremissas, getSaldoInicialLiquido } = usePlano()
-  const { premissas, objetivos, dadosPessoais } = state
+  const { premissas, objetivos, dadosPessoais, passivos } = state
   const moeda = state.moeda ?? "BRL"
 
   const [showCenarios, setShowCenarios] = useState(true)
