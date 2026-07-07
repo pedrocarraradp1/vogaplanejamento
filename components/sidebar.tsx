@@ -60,12 +60,15 @@ interface SidebarProps {
 export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
   return (
     <aside
-      className="fixed left-0 z-40 flex flex-col bg-navy overflow-y-auto"
+      className="sidebar-nav-scroll fixed left-0 z-40 flex flex-col bg-navy overflow-y-auto overflow-x-hidden"
       style={{
         top: "var(--header-height)",
         width: "var(--sidebar-width)",
-        minHeight: "calc(100vh - var(--header-height))",
+        height: "calc(100vh - var(--header-height))",
+        maxHeight: "calc(100vh - var(--header-height))",
         paddingTop: 24,
+        paddingBottom: 24,
+        overscrollBehavior: "contain",
       }}
     >
       <nav>

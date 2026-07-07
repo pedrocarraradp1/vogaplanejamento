@@ -39,6 +39,8 @@ import {
   exibeInstituicaoAtivo,
   metaReservaEmergenciaMeses,
   descricaoMetaReservaEmergencia,
+  subtituloGapReservaEmergencia,
+  calcularGapReservaEmergencia,
   nivelReservaEmergencia,
   tooltipReservaEmergencia,
   TOOLTIP_PATRIMONIO_LIQUIDO,
@@ -1217,6 +1219,14 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
   const tooltipReserva = tooltipReservaEmergencia(dadosPessoais.profissao ?? "", quantidadeFilhos)
   const capacidadePoupanca = Math.max(0, rendaMensal - despesaMensal)
   const reservaEmergenciaMeses = despesaMensal > 0 ? ativosLiquidos / despesaMensal : 0
+  const gapReserva = useMemo(
+    () => calcularGapReservaEmergencia(ativosLiquidos, despesaMensal, metaReservaEmergencia),
+    [ativosLiquidos, despesaMensal, metaReservaEmergencia],
+  )
+  const subtituloGapReserva = subtituloGapReservaEmergencia(
+    dadosPessoais.profissao ?? "",
+    quantidadeFilhos,
+  )
   const comprometimentoRendaPct = rendaMensal > 0 ? (somaParcelasMensais / rendaMensal) * 100 : 0
   const indiceLiquidez = totalPassivos > 0 ? ativosLiquidos / totalPassivos : 0
   const taxaPoupancaPct = rendaMensal > 0 ? (capacidadePoupanca / rendaMensal) * 100 : 0
@@ -1589,6 +1599,145 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
           tooltip={tooltipReserva}
         />
       </div>
+      </div>
+
+      {/* Gap de patrimônio · reserva de emergência */}
+      <div className="pdf-section" style={{ marginBottom: 16 }}>
+        <div
+          className="pdf-section-card"
+          style={{ background: "var(--surface)", borderRadius: 8, padding: "20px 24px" }}
+        >
+          <p
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: "#1A1A1A",
+              marginBottom: 4,
+            }}
+          >
+            Gap de patrimônio · reserva de emergência
+          </p>
+          <p style={{ fontSize: 12, color: "#6B7280", marginBottom: 16, lineHeight: 1.45 }}>
+            {subtituloGapReserva}
+          </p>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+              gap: 12,
+              marginBottom: 20,
+            }}
+          >
+            <KpiCard
+              label="Necessidade de liquidez"
+              value={
+                gapReserva.necessidadeLiquidez > 0
+                  ? formatCurrency(gapReserva.necessidadeLiquidez)
+                  : "—"
+              }
+              hint={
+                gapReserva.necessidadeLiquidez > 0
+                  ? `${gapReserva.metaMeses} meses × despesa mensal`
+                  : "Informe a despesa em Dados Pessoais"
+              }
+              tooltip={tooltipReserva}
+            />
+            <KpiCard
+              label="Patrimônio líquido disponível"
+              value={formatCurrency(gapReserva.patrimonioDisponivel)}
+              hint="Ativos líquidos (sem previdência)"
+              tooltip={tooltipReserva}
+            />
+            <KpiCard
+              label={gapReserva.temExcedente ? "Excedente" : "Gap"}
+              value={
+                gapReserva.necessidadeLiquidez > 0
+                  ? formatCurrency(gapReserva.valorGapOuExcedente)
+                  : "—"
+              }
+              valueColor={gapReserva.temExcedente ? "#065f46" : "#991B1B"}
+              hint={
+                gapReserva.necessidadeLiquidez > 0
+                  ? gapReserva.temExcedente
+                    ? "Acima da meta de liquidez"
+                    : "Abaixo da meta de liquidez"
+                  : undefined
+              }
+            />
+          </div>
+
+          <div style={{ marginBottom: 12 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "baseline",
+                marginBottom: 8,
+                gap: 12,
+              }}
+            >
+              <span style={{ fontSize: 12, fontWeight: 500, color: "#1A1A1A" }}>
+                Percentual da meta atingido
+              </span>
+              <span
+                style={{
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: gapReserva.temExcedente ? "#065f46" : "#991B1B",
+                  fontVariantNumeric: "tabular-nums",
+                }}
+              >
+                {gapReserva.necessidadeLiquidez > 0
+                  ? `${gapReserva.percentualMeta.toLocaleString("pt-BR", {
+                      minimumFractionDigits: 1,
+                      maximumFractionDigits: 1,
+                    })}%`
+                  : "—"}
+              </span>
+            </div>
+            <div
+              style={{
+                height: 10,
+                borderRadius: 5,
+                background: "#E5E7EB",
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  height: "100%",
+                  width: `${Math.min(100, gapReserva.percentualMeta)}%`,
+                  borderRadius: 5,
+                  background: gapReserva.temExcedente ? "#10B981" : "#EF4444",
+                  transition: "width 0.3s ease",
+                }}
+              />
+            </div>
+          </div>
+
+          <p style={{ fontSize: 12, color: "#52514e", lineHeight: 1.5, margin: 0 }}>
+            {gapReserva.necessidadeLiquidez <= 0 ? (
+              "Cadastre a despesa mensal em Dados Pessoais para calcular o gap de reserva de emergência."
+            ) : gapReserva.temExcedente ? (
+              <>
+                Meta de <strong>{gapReserva.metaMeses} meses</strong> já atingida, com excedente de{" "}
+                <strong style={{ color: "#065f46" }}>
+                  {formatCurrency(gapReserva.valorGapOuExcedente)}
+                </strong>
+                .
+              </>
+            ) : (
+              <>
+                Faltam{" "}
+                <strong style={{ color: "#991B1B" }}>
+                  {formatCurrency(gapReserva.valorGapOuExcedente)}
+                </strong>{" "}
+                para atingir <strong>{gapReserva.metaMeses} meses</strong> de liquidez.
+              </>
+            )}
+          </p>
+        </div>
       </div>
 
       {/* 3. Gráficos donuts */}

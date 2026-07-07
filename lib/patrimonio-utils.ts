@@ -210,6 +210,48 @@ export function descricaoMetaReservaEmergencia(profissao: string, quantidadeFilh
   return `Meta: ${meta} meses`
 }
 
+/** Subtítulo do painel Gap · reserva de emergência (mesma regra de meta do card). */
+export function subtituloGapReservaEmergencia(profissao: string, quantidadeFilhos: number): string {
+  const meta = metaReservaEmergenciaMeses(profissao, quantidadeFilhos)
+  const motivo = isProfissaoEmpresario(profissao)
+    ? "empresário / renda variável"
+    : quantidadeFilhos > 0
+      ? "com filhos"
+      : "sem filhos"
+  return `Meta de ${meta} meses de liquidez, calculada automaticamente pelo perfil do cliente (${motivo}).`
+}
+
+export interface GapReservaEmergenciaResult {
+  metaMeses: number
+  necessidadeLiquidez: number
+  patrimonioDisponivel: number
+  temExcedente: boolean
+  valorGapOuExcedente: number
+  percentualMeta: number
+}
+
+/** Necessidade = despesa × meta; disponível = ativos líquidos (mesma base do card Reserva). */
+export function calcularGapReservaEmergencia(
+  ativosLiquidos: number,
+  despesaMensal: number,
+  metaMeses: number,
+): GapReservaEmergenciaResult {
+  const necessidadeLiquidez = Math.max(0, despesaMensal) * metaMeses
+  const patrimonioDisponivel = Math.max(0, ativosLiquidos)
+  const temExcedente = patrimonioDisponivel >= necessidadeLiquidez
+  const valorGapOuExcedente = Math.abs(patrimonioDisponivel - necessidadeLiquidez)
+  const percentualMeta =
+    necessidadeLiquidez > 0 ? (patrimonioDisponivel / necessidadeLiquidez) * 100 : 0
+  return {
+    metaMeses,
+    necessidadeLiquidez,
+    patrimonioDisponivel,
+    temExcedente,
+    valorGapOuExcedente,
+    percentualMeta,
+  }
+}
+
 export type NivelSaude = "green" | "yellow" | "red"
 
 export function nivelReservaEmergencia(meses: number, meta: number): NivelSaude {
