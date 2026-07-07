@@ -1310,134 +1310,65 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
     if (exportandoPdf) return
     setExportandoPdf(true)
     try {
-      const [{ default: html2canvas }, jspdfMod] = await Promise.all([
-        import("html2canvas"),
-        // @ts-ignore
-        import("jspdf/dist/jspdf.es.min.js"),
-      ])
-      // @ts-ignore
-      const jsPDF = (jspdfMod as any).jsPDF ?? (jspdfMod as any).default
-
-      const nomCliente = dadosPessoais?.nome || "Cliente"
-      const dataRef = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
+      const { default: html2canvas } = await import("html2canvas")
 
       const toHide = document.querySelectorAll(".no-print, .pdf-hide")
-      toHide.forEach((node) => {
-        ;(node as HTMLElement).style.visibility = "hidden"
+      toHide.forEach((el) => {
+        ;(el as HTMLElement).style.visibility = "hidden"
       })
       await new Promise((r) => setTimeout(r, 200))
 
-      const el = document.getElementById("balanco-patrimonial-content")
-      if (!el) {
-        toHide.forEach((node) => {
-          ;(node as HTMLElement).style.visibility = "visible"
+      const captureSection = async (id: string): Promise<string | null> => {
+        const el = document.getElementById(id)
+        if (!el) return null
+        const canvas = await html2canvas(el, {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: "#ffffff",
+          logging: false,
+          scrollX: 0,
+          scrollY: 0,
+          width: el.scrollWidth,
+          height: el.scrollHeight,
         })
-        return
+        return canvas.toDataURL("image/png", 1.0)
       }
 
-      window.scrollTo(0, 0)
-      await new Promise((r) => setTimeout(r, 300))
+      const [slide1, slide2, slide3] = await Promise.all([
+        captureSection("pdf-slide-1"),
+        captureSection("pdf-slide-2"),
+        captureSection("pdf-slide-3"),
+      ])
 
-      const canvas = await html2canvas(el, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: "#ffffff",
-        logging: false,
-        scrollX: 0,
-        scrollY: 0,
-        windowWidth: el.scrollWidth,
-        windowHeight: el.scrollHeight,
-        width: el.scrollWidth,
-        height: el.scrollHeight,
+      toHide.forEach((el) => {
+        ;(el as HTMLElement).style.visibility = "visible"
       })
 
-      toHide.forEach((node) => {
-        ;(node as HTMLElement).style.visibility = "visible"
+      const nomCliente = dadosPessoais?.nome || "Cliente"
+
+      const response = await fetch("/api/relatorios/balanco", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          slide1,
+          slide2,
+          slide3,
+          nomeCliente: nomCliente,
+        }),
       })
 
-      const pdf = new jsPDF({
-        orientation: "landscape",
-        unit: "mm",
-        format: "a4",
-      })
-
-      const pdfW = 297
-      const pdfH = 210
-      const HEADER_H = 16
-      const FOOTER_H = 9
-      const MARGIN_X = 8
-      const CONTENT_W = pdfW - MARGIN_X * 2
-      const CONTENT_H = pdfH - HEADER_H - FOOTER_H
-
-      const scale = CONTENT_W / canvas.width
-      const totalHeightMM = canvas.height * scale
-      const totalPages = Math.ceil(totalHeightMM / CONTENT_H)
-
-      const addHeader = (pageNum: number) => {
-        pdf.setFillColor(1, 33, 55)
-        pdf.rect(0, 0, pdfW, HEADER_H, "F")
-        pdf.setFillColor(75, 117, 155)
-        pdf.rect(0, HEADER_H, pdfW, 1.5, "F")
-
-        pdf.setTextColor(255, 255, 255)
-        pdf.setFontSize(11)
-        pdf.setFont("helvetica", "bold")
-        pdf.text("BALANÇO PATRIMONIAL", MARGIN_X, 8)
-
-        pdf.setFontSize(7)
-        pdf.setFont("helvetica", "normal")
-        pdf.setTextColor(200, 226, 245)
-        pdf.text(`${nomCliente}  ·  ${dataRef}  ·  Confidencial`, MARGIN_X, 13)
-        pdf.text(`Página ${pageNum} de ${totalPages}`, pdfW - MARGIN_X, 8, { align: "right" })
-        pdf.text("Voga | BTG Pactual", pdfW - MARGIN_X, 13, { align: "right" })
+      if (!response.ok) {
+        const errText = await response.text().catch(() => "")
+        throw new Error(errText || `HTTP ${response.status}`)
       }
 
-      const addFooter = () => {
-        const footerY = pdfH - FOOTER_H
-        pdf.setFillColor(1, 33, 55)
-        pdf.rect(0, footerY, pdfW, FOOTER_H, "F")
-        pdf.setFontSize(6.5)
-        pdf.setTextColor(155, 196, 226)
-        pdf.text("Voga | BTG Pactual | Confidencial", MARGIN_X, footerY + 5.5)
-        pdf.text(`${nomCliente} — Balanço Patrimonial`, pdfW / 2, footerY + 5.5, { align: "center" })
-        pdf.text(dataRef, pdfW - MARGIN_X, footerY + 5.5, { align: "right" })
-      }
-
-      for (let page = 0; page < totalPages; page++) {
-        if (page > 0) pdf.addPage()
-
-        addHeader(page + 1)
-        addFooter()
-
-        const sourceYpx = (page * CONTENT_H) / scale
-        const sliceHpx = Math.min(CONTENT_H / scale, canvas.height - sourceYpx)
-        const sliceHmm = sliceHpx * scale
-
-        const sliceCanvas = document.createElement("canvas")
-        sliceCanvas.width = canvas.width
-        sliceCanvas.height = Math.ceil(sliceHpx)
-        const ctx = sliceCanvas.getContext("2d")!
-        ctx.fillStyle = "#ffffff"
-        ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height)
-        ctx.drawImage(
-          canvas,
-          0,
-          Math.floor(sourceYpx),
-          canvas.width,
-          Math.ceil(sliceHpx),
-          0,
-          0,
-          sliceCanvas.width,
-          sliceCanvas.height
-        )
-
-        const sliceImg = sliceCanvas.toDataURL("image/png", 1.0)
-        pdf.addImage(sliceImg, "PNG", MARGIN_X, HEADER_H + 2, CONTENT_W, sliceHmm)
-      }
-
-      const nomeArq = `Balanco_Patrimonial_${nomCliente.replace(/\s+/g, "_")}_${new Date().getFullYear()}.pdf`
-      pdf.save(nomeArq)
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `Balanco_${nomCliente.replace(/\s+/g, "_")}_${new Date().getFullYear()}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
     } catch (err) {
       console.error("Erro ao exportar PDF:", err)
       window.alert("Não foi possível gerar o PDF. Tente novamente.")
@@ -1616,6 +1547,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
       </div>
       </div>
 
+      <div id="pdf-slide-1">
       {/* 2. KPIs */}
       <div className="pdf-section">
       <div
@@ -1852,7 +1784,9 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
         </div>
       </div>
       </div>
+      </div>
 
+      <div id="pdf-slide-2">
       {/* 5. Indicadores de saúde */}
       <div className="pdf-section">
       <div
@@ -2095,7 +2029,9 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
           </div>
         </div>
       </div>
+      </div>
 
+      <div id="pdf-slide-3">
       {/* 7. Lista de ativos por seção */}
       <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 16 }}>
         {SECOES_ATIVOS.map((secao) => {
@@ -2181,6 +2117,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
             </div>
           )
         })}
+      </div>
       </div>
 
       <Dialog open={addModal != null} onOpenChange={(open) => !open && setAddModal(null)}>
