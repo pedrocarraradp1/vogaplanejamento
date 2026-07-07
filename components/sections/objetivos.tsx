@@ -1,6 +1,6 @@
 ﻿"use client"
 
-import { useMemo, useState, type ComponentType } from "react"
+import { useMemo, useRef, useState, type ComponentType } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -57,6 +57,16 @@ const VOGA_NAVY = "#1B2A4A"
 const VOGA_GOLD = "#C9A84C"
 const VOGA_GOLD_LIGHT = "#FAF0DA"
 const VOGA_GOLD_DARK = "#8A6E35"
+
+const PALETA_OBJETIVOS = [
+  { fill: "#0F6E56", bg: "#E1F5EE", text: "#085041" },
+  { fill: "#993C1D", bg: "#FAECE7", text: "#712B13" },
+  { fill: "#C9A84C", bg: "#FAF0DA", text: "#8A6E35" },
+  { fill: "#185FA5", bg: "#E6F1FB", text: "#0C447C" },
+  { fill: "#534AB7", bg: "#EEEDFE", text: "#3C3489" },
+] as const
+
+type CorObjetivo = (typeof PALETA_OBJETIVOS)[number]
 
 const CATEGORIA_META: Record<
   CategoriaObjetivo,
@@ -147,11 +157,17 @@ function anoFimObjetivo(o: Objetivo, prazoTotal: number) {
   return anoAtual() + Math.min(prazoTotal, Math.max(inicioAnos, fimAnos))
 }
 
-function capitalPorAno(objetivos: Objetivo[], prazoTotal: number): Map<number, number> {
-  const map = new Map<number, number>()
-  const add = (year: number, amount: number) => {
+function capitalPorObjetivoPorAno(
+  objetivos: Objetivo[],
+  prazoTotal: number,
+): Map<number, Map<string, number>> {
+  const byYear = new Map<number, Map<string, number>>()
+
+  const add = (year: number, objId: string, amount: number) => {
     if (amount <= 0) return
-    map.set(year, (map.get(year) ?? 0) + amount)
+    if (!byYear.has(year)) byYear.set(year, new Map())
+    const porObj = byYear.get(year)!
+    porObj.set(objId, (porObj.get(objId) ?? 0) + amount)
   }
 
   for (const o of objetivos) {
@@ -160,7 +176,7 @@ function capitalPorAno(objetivos: Objetivo[], prazoTotal: number): Map<number, n
     if (valor === 0 || prazoAnos > prazoTotal) continue
 
     if (!o.recorrente) {
-      add(anoAtual() + prazoAnos, valor)
+      add(anoAtual() + prazoAnos, o.id, valor)
       continue
     }
 
@@ -173,10 +189,20 @@ function capitalPorAno(objetivos: Objetivo[], prazoTotal: number): Map<number, n
     if (fim <= prazoAnos) continue
 
     for (let t = prazoAnos; t < fim; t += freq) {
-      add(anoAtual() + t, valor)
+      add(anoAtual() + t, o.id, valor)
     }
   }
 
+  return byYear
+}
+
+function capitalPorAno(objetivos: Objetivo[], prazoTotal: number): Map<number, number> {
+  const map = new Map<number, number>()
+  for (const [year, porObj] of capitalPorObjetivoPorAno(objetivos, prazoTotal)) {
+    let total = 0
+    for (const v of porObj.values()) total += v
+    if (total > 0) map.set(year, total)
+  }
   return map
 }
 
@@ -365,6 +391,37 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
     [objetivos, prazoTotal],
   )
 
+  const capitalPorObjetivoMap = useMemo(
+    () => capitalPorObjetivoPorAno(objetivos, prazoTotal),
+    [objetivos, prazoTotal],
+  )
+
+  const corIndexPorIdRef = useRef<Map<string, number>>(new Map())
+
+  const coresPorObjetivoId = useMemo(() => {
+    const indexMap = corIndexPorIdRef.current
+    let maxIndex = Math.max(-1, ...indexMap.values())
+    const idsAtivos = new Set(objetivos.map((o) => o.id))
+
+    for (const id of [...indexMap.keys()]) {
+      if (!idsAtivos.has(id)) indexMap.delete(id)
+    }
+
+    for (const o of objetivos) {
+      if (!indexMap.has(o.id)) {
+        maxIndex += 1
+        indexMap.set(o.id, maxIndex)
+      }
+    }
+
+    const result = new Map<string, CorObjetivo>()
+    for (const o of objetivos) {
+      const idx = indexMap.get(o.id) ?? 0
+      result.set(o.id, PALETA_OBJETIVOS[idx % PALETA_OBJETIVOS.length])
+    }
+    return result
+  }, [objetivos])
+
   const anoCorrente = anoAtual()
   const anoPlanoFim = useMemo(() => {
     const fimObjetivos = objetivosEnriquecidos.reduce(
@@ -393,14 +450,6 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
     }
     return max
   }, [anosVisiveis, capitalMap])
-
-  const anosPicoPeriodo = useMemo(
-    () =>
-      maxCapitalPeriodo > 0
-        ? anosVisiveis.filter((y) => (capitalMap.get(y) ?? 0) === maxCapitalPeriodo)
-        : [],
-    [anosVisiveis, capitalMap, maxCapitalPeriodo],
-  )
 
   const totalPeriodo = useMemo(
     () => anosVisiveis.reduce((s, y) => s + (capitalMap.get(y) ?? 0), 0),
@@ -451,6 +500,32 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
         ? `Ano de ${hoveredAno}`
         : `Ano de ${hoveredAno} · sem objetivo neste ano`
       : `Total necessário entre ${Math.min(periodoInicio, periodoFim)} e ${Math.max(periodoInicio, periodoFim)}`
+
+  const contribuicoesHover = useMemo(() => {
+    if (hoveredAno === null) return []
+    const porObj = capitalPorObjetivoMap.get(hoveredAno)
+    if (!porObj) return []
+    return objetivos
+      .map((o) => ({
+        id: o.id,
+        nome: (o.descricao || "Objetivo").trim(),
+        valor: porObj.get(o.id) ?? 0,
+        cor: coresPorObjetivoId.get(o.id) ?? PALETA_OBJETIVOS[0],
+      }))
+      .filter((item) => item.valor > 0)
+  }, [hoveredAno, capitalPorObjetivoMap, objetivos, coresPorObjetivoId])
+
+  const segmentosPorAno = (ano: number) => {
+    const porObj = capitalPorObjetivoMap.get(ano)
+    if (!porObj) return []
+    return objetivos
+      .map((o) => ({
+        id: o.id,
+        valor: porObj.get(o.id) ?? 0,
+        cor: coresPorObjetivoId.get(o.id) ?? PALETA_OBJETIVOS[0],
+      }))
+      .filter((s) => s.valor > 0)
+  }
 
   const alertasConcentracao = useMemo(() => {
     const avisos: { anos: number[]; nomes: string[] }[] = []
@@ -611,12 +686,60 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                   </div>
                 </div>
 
+                {/* Legenda por objetivo */}
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: "10px 16px",
+                    marginBottom: 14,
+                  }}
+                >
+                  {objetivos.map((o) => {
+                    const cor = coresPorObjetivoId.get(o.id) ?? PALETA_OBJETIVOS[0]
+                    const nome = (o.descricao || "Objetivo").trim()
+                    return (
+                      <div
+                        key={o.id}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          minWidth: 0,
+                          maxWidth: "100%",
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: 10,
+                            height: 10,
+                            borderRadius: 2,
+                            background: cor.fill,
+                            flexShrink: 0,
+                          }}
+                        />
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: "#4B5563",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {nome}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+
                 {/* Destaque dinâmico acima do gráfico */}
                 <div
                   style={{
                     textAlign: "center",
                     marginBottom: 12,
-                    minHeight: 52,
+                    minHeight: hoveredAno !== null && contribuicoesHover.length > 0 ? 120 : 52,
                   }}
                 >
                   <p
@@ -624,9 +747,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                       margin: 0,
                       fontSize: 22,
                       fontWeight: 700,
-                      color: hoveredAno !== null && (capitalMap.get(hoveredAno) ?? 0) > 0
-                        ? VOGA_GOLD_DARK
-                        : "#1A1A1A",
+                      color: "#1A1A1A",
                       fontVariantNumeric: "tabular-nums",
                     }}
                   >
@@ -635,6 +756,73 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                   <p style={{ margin: "4px 0 0", fontSize: 12, color: "#6B7280" }}>
                     {destaqueSubtitulo}
                   </p>
+                  {hoveredAno !== null && contribuicoesHover.length > 0 ? (
+                    <div
+                      style={{
+                        marginTop: 12,
+                        textAlign: "left",
+                        maxWidth: 360,
+                        marginLeft: "auto",
+                        marginRight: "auto",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 6,
+                      }}
+                    >
+                      {contribuicoesHover.map((item) => (
+                        <div
+                          key={item.id}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: 10,
+                            fontSize: 12,
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
+                              minWidth: 0,
+                              flex: 1,
+                            }}
+                          >
+                            <span
+                              style={{
+                                width: 10,
+                                height: 10,
+                                borderRadius: 2,
+                                background: item.cor.fill,
+                                flexShrink: 0,
+                              }}
+                            />
+                            <span
+                              style={{
+                                color: "#374151",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {item.nome}
+                            </span>
+                          </div>
+                          <span
+                            style={{
+                              fontWeight: 600,
+                              color: item.cor.text,
+                              flexShrink: 0,
+                              fontVariantNumeric: "tabular-nums",
+                            }}
+                          >
+                            {formatCurrencyAlways(item.valor)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
 
                 <div
@@ -648,7 +836,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                 >
                   {anosVisiveis.map((ano) => {
                     const valor = capitalMap.get(ano) ?? 0
-                    const isPico = valor > 0 && anosPicoPeriodo.includes(ano)
+                    const segmentos = segmentosPorAno(ano)
                     const anoInicioVisivel = anosVisiveis[0]
                     const anoFimVisivel = anosVisiveis[anosVisiveis.length - 1]
                     const mostrarAno =
@@ -673,21 +861,53 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                         }}
                         onMouseEnter={() => setHoveredAno(ano)}
                       >
-                        <div
-                          style={{
-                            width: "100%",
-                            height: barHeight,
-                            borderRadius: 4,
-                            background:
-                              valor > 0
-                                ? isPico
-                                  ? VOGA_GOLD
-                                  : VOGA_NAVY
-                                : "var(--border, #D9D9D9)",
-                            transition: "height 0.2s ease, background 0.15s ease",
-                            opacity: hoveredAno === ano ? 1 : hoveredAno !== null ? 0.65 : 1,
-                          }}
-                        />
+                        {valor > 0 ? (
+                          <div
+                            style={{
+                              width: "100%",
+                              height: barHeight,
+                              display: "flex",
+                              flexDirection: "column",
+                              justifyContent: "flex-end",
+                              opacity: hoveredAno === ano ? 1 : hoveredAno !== null ? 0.65 : 1,
+                              transition: "opacity 0.15s ease",
+                            }}
+                          >
+                            {(() => {
+                              const heights = segmentos.map((seg) =>
+                                Math.max(2, Math.round((seg.valor / valor) * barHeight)),
+                              )
+                              const used = heights.slice(0, -1).reduce((s, h) => s + h, 0)
+                              if (heights.length > 0) {
+                                heights[heights.length - 1] = Math.max(2, barHeight - used)
+                              }
+                              return segmentos.map((seg, idx) => {
+                                const isTop = idx === segmentos.length - 1
+                                return (
+                                  <div
+                                    key={seg.id}
+                                    style={{
+                                      width: "100%",
+                                      height: heights[idx],
+                                      background: seg.cor.fill,
+                                      borderRadius: isTop ? "3px 3px 0 0" : 0,
+                                    }}
+                                  />
+                                )
+                              })
+                            })()}
+                          </div>
+                        ) : (
+                          <div
+                            style={{
+                              width: "100%",
+                              height: 4,
+                              borderRadius: 2,
+                              background: "var(--border, #D9D9D9)",
+                              opacity: hoveredAno === ano ? 1 : hoveredAno !== null ? 0.65 : 1,
+                            }}
+                          />
+                        )}
                         <span
                           style={{
                             marginTop: 8,
