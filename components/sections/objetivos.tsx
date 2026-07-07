@@ -27,6 +27,7 @@ import {
   GraduationCap,
   Home,
   Gift,
+  AlertTriangle,
 } from "lucide-react"
 import { usePlano, type Objetivo } from "@/lib/plano-context"
 
@@ -52,15 +53,35 @@ const OBJETIVOS_PREDEFINIDOS = [
 
 type CategoriaObjetivo = "aposentadoria" | "viagem" | "educacao" | "imovel" | "outros"
 
+const VOGA_NAVY = "#1B2A4A"
+const VOGA_GOLD = "#C9A84C"
+const VOGA_GOLD_LIGHT = "#FAF0DA"
+const VOGA_GOLD_DARK = "#8A6E35"
+
 const CATEGORIA_META: Record<
   CategoriaObjetivo,
-  { color: string; label: string; Icon: ComponentType<{ size?: number; strokeWidth?: number }> }
+  { label: string; Icon: ComponentType<{ size?: number; strokeWidth?: number; color?: string }> }
 > = {
-  aposentadoria: { color: "#1B2A4A", label: "APOSENTADORIA", Icon: Umbrella },
-  viagem: { color: "#1E5CE6", label: "VIAGEM", Icon: Plane },
-  educacao: { color: "#10B981", label: "EDUCAÇÃO", Icon: GraduationCap },
-  imovel: { color: "#F59E0B", label: "IMÓVEL", Icon: Home },
-  outros: { color: "#E05252", label: "OUTROS", Icon: Gift },
+  aposentadoria: { label: "APOSENTADORIA", Icon: Umbrella },
+  viagem: { label: "VIAGEM", Icon: Plane },
+  educacao: { label: "EDUCAÇÃO", Icon: GraduationCap },
+  imovel: { label: "IMÓVEL", Icon: Home },
+  outros: { label: "OUTROS", Icon: Gift },
+}
+
+type PrazoGrupo = "curto" | "medio" | "longo"
+
+const PRAZO_GRUPOS: { id: PrazoGrupo; titulo: string }[] = [
+  { id: "curto", titulo: "Curto prazo · até 3 anos" },
+  { id: "medio", titulo: "Médio prazo · 3 a 10 anos" },
+  { id: "longo", titulo: "Longo prazo · acima de 10 anos" },
+]
+
+function prazoGrupo(prazoAnos: number): PrazoGrupo {
+  const p = Math.max(0, Number(prazoAnos) || 0)
+  if (p <= 3) return "curto"
+  if (p <= 10) return "medio"
+  return "longo"
 }
 
 function resolveCategoria(descricao: string): CategoriaObjetivo {
@@ -126,6 +147,52 @@ function anoFimObjetivo(o: Objetivo, prazoTotal: number) {
   return anoAtual() + Math.min(prazoTotal, Math.max(inicioAnos, fimAnos))
 }
 
+function capitalPorAno(objetivos: Objetivo[], prazoTotal: number): Map<number, number> {
+  const map = new Map<number, number>()
+  const add = (year: number, amount: number) => {
+    if (amount <= 0) return
+    map.set(year, (map.get(year) ?? 0) + amount)
+  }
+
+  for (const o of objetivos) {
+    const prazoAnos = Math.max(0, Number(o.prazoAnos) || 0)
+    const valor = Math.max(0, Number(o.valor) || 0)
+    if (valor === 0 || prazoAnos > prazoTotal) continue
+
+    if (!o.recorrente) {
+      add(anoAtual() + prazoAnos, valor)
+      continue
+    }
+
+    const freq = Math.max(1, Number(o.frequenciaAnos) || 1)
+    const duracaoTipo = o.duracaoTipo ?? "total"
+    const duracaoAnos = Math.max(0, Number(o.duracaoAnos) || 0)
+    const anoFimExclusive =
+      duracaoTipo === "total" ? prazoTotal + 1 : prazoAnos + duracaoAnos
+    const fim = Math.min(prazoTotal + 1, anoFimExclusive)
+    if (fim <= prazoAnos) continue
+
+    for (let t = prazoAnos; t < fim; t += freq) {
+      add(anoAtual() + t, valor)
+    }
+  }
+
+  return map
+}
+
+function formatRecorrencia(o: Objetivo): string {
+  if (!o.recorrente) return "Única"
+  const freq = Math.max(1, Number(o.frequenciaAnos) || 1)
+  return `A cada ${freq} ${freq === 1 ? "ano" : "anos"}`
+}
+
+function formatDataObjetivo(o: Objetivo, prazoTotal: number): string {
+  const inicio = anoInicioObjetivo(o)
+  if (!o.recorrente) return String(inicio)
+  const fim = anoFimObjetivo(o, prazoTotal)
+  return `${inicio} – ${fim}`
+}
+
 function CardRow({ label, value }: { label: string; value: string }) {
   return (
     <div
@@ -154,8 +221,8 @@ function CardRow({ label, value }: { label: string; value: string }) {
 }
 
 export function Objetivos({ onNavigate }: ObjetivosProps) {
-  const { state, setObjetivos, getIdadeAtual } = usePlano()
-  const { objetivos, premissas, dadosPessoais } = state
+  const { state, setObjetivos } = usePlano()
+  const { objetivos, premissas } = state
   const moeda = state.moeda ?? "BRL"
   const prazoTotal = Math.max(0, Number(premissas.prazo) || 0)
 
@@ -279,98 +346,101 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
     return count * valor
   }
 
-  const idadeAtual = getIdadeAtual()
-
-  const timelineItems = useMemo(() => {
-    return [...objetivos]
-      .map((o) => ({
+  const objetivosEnriquecidos = useMemo(
+    () =>
+      objetivos.map((o) => ({
         objetivo: o,
         categoria: resolveCategoria(o.descricao),
         anoInicio: anoInicioObjetivo(o),
         anoFim: anoFimObjetivo(o, prazoTotal),
         parcelas: contarParcelas(o, prazoTotal),
-      }))
-      .sort((a, b) => a.anoInicio - b.anoInicio || a.anoFim - b.anoFim)
-  }, [objetivos, prazoTotal])
+        grupo: prazoGrupo(o.prazoAnos),
+        total: totalEstimadoObjetivo(o),
+      })),
+    [objetivos, prazoTotal],
+  )
 
-  const anoMin = anoAtual()
-  const anoMax = useMemo(() => {
-    if (timelineItems.length === 0) return anoMin
-    return Math.max(...timelineItems.map((t) => t.anoFim), anoMin)
-  }, [timelineItems, anoMin])
+  const capitalMap = useMemo(
+    () => capitalPorAno(objetivos, prazoTotal),
+    [objetivos, prazoTotal],
+  )
 
-  const yearToPct = (year: number) => {
-    if (anoMax <= anoMin) return 50
-    return 8 + ((year - anoMin) / (anoMax - anoMin)) * 84
-  }
+  const anosGrafico = useMemo(() => {
+    const inicio = anoAtual()
+    const fimObjetivos = objetivosEnriquecidos.reduce(
+      (max, item) => Math.max(max, item.anoFim),
+      inicio,
+    )
+    const fim = Math.max(inicio, fimObjetivos, inicio + prazoTotal)
+    const anos: number[] = []
+    for (let y = inicio; y <= fim; y++) anos.push(y)
+    return anos
+  }, [objetivosEnriquecidos, prazoTotal])
 
-  const renderCardRows = (objetivo: Objetivo, categoria: CategoriaObjetivo) => {
-    const inicio = anoInicioObjetivo(objetivo)
-    const fim = anoFimObjetivo(objetivo, prazoTotal)
-    const parcelas = contarParcelas(objetivo, prazoTotal)
-    const total = totalEstimadoObjetivo(objetivo)
-    const idadeAlvo = idadeAtual + Math.max(0, Number(objetivo.prazoAnos) || 0)
-    const temConjuge = !!(dadosPessoais.conjuge || "").trim()
+  const maxCapitalAno = useMemo(() => {
+    let max = 0
+    for (const y of anosGrafico) {
+      max = Math.max(max, capitalMap.get(y) ?? 0)
+    }
+    return max
+  }, [anosGrafico, capitalMap])
 
-    if (categoria === "aposentadoria") {
-      return (
-        <>
-          <CardRow
-            label="Idade alvo"
-            value={
-              temConjuge
-                ? `Titular ${idadeAlvo} · Cônjuge ${idadeAlvo}`
-                : `${idadeAlvo} anos`
-            }
-          />
-          <CardRow
-            label="Renda mensal desejada"
-            value={formatCurrency(premissas.retiradaMensal || objetivo.valor) || "—"}
-          />
-          <CardRow
-            label="Patrimônio necessário"
-            value={formatCurrency(total || objetivo.valor) || "—"}
-          />
-        </>
-      )
+  const anosPicoCapital = useMemo(
+    () =>
+      maxCapitalAno > 0
+        ? anosGrafico.filter((y) => (capitalMap.get(y) ?? 0) === maxCapitalAno)
+        : [],
+    [anosGrafico, capitalMap, maxCapitalAno],
+  )
+
+  const alertasConcentracao = useMemo(() => {
+    const avisos: { anos: number[]; nomes: string[] }[] = []
+    const porAnoInicio = new Map<number, Objetivo[]>()
+
+    for (const o of objetivos) {
+      const y = anoInicioObjetivo(o)
+      if (!porAnoInicio.has(y)) porAnoInicio.set(y, [])
+      porAnoInicio.get(y)!.push(o)
     }
 
-    if (categoria === "educacao") {
-      if (objetivo.recorrente) {
-        return (
-          <>
-            <CardRow label="Início · fim" value={`${inicio} · ${fim}`} />
-            <CardRow label="Valor anual" value={formatCurrency(objetivo.valor) || "—"} />
-            <CardRow label="Total estimado" value={formatCurrency(total) || "—"} />
-          </>
-        )
+    for (const [ano, lista] of porAnoInicio) {
+      if (lista.length >= 2) {
+        avisos.push({
+          anos: [ano],
+          nomes: lista.map((o) => (o.descricao || "Objetivo").trim()),
+        })
       }
-      return (
-        <>
-          <CardRow label="Data alvo" value={String(inicio)} />
-          <CardRow label="Recorrência" value="Única" />
-          <CardRow label="Valor" value={formatCurrency(objetivo.valor) || "—"} />
-        </>
-      )
     }
 
-    if (categoria === "imovel" || categoria === "viagem" || categoria === "outros") {
-      return (
-        <>
-          <CardRow label="Data alvo" value={String(inicio)} />
-          <CardRow
-            label="Recorrência"
-            value={objetivo.recorrente ? `A cada ${objetivo.frequenciaAnos || 1} ano(s)` : "Única"}
-          />
-          <CardRow label="Valor" value={formatCurrency(objetivo.valor) || "—"} />
-        </>
-      )
+    const anosOrdenados = [...porAnoInicio.keys()].sort((a, b) => a - b)
+    for (let i = 0; i < anosOrdenados.length - 1; i++) {
+      const a = anosOrdenados[i]
+      const b = anosOrdenados[i + 1]
+      if (b - a > 1) continue
+      if (avisos.some((x) => x.anos.length === 1 && x.anos[0] === a)) continue
+      const uniao = [...(porAnoInicio.get(a) ?? []), ...(porAnoInicio.get(b) ?? [])]
+      const unicos = [...new Map(uniao.map((o) => [o.id, o])).values()]
+      if (unicos.length >= 2) {
+        avisos.push({
+          anos: [a, b],
+          nomes: unicos.map((o) => (o.descricao || "Objetivo").trim()),
+        })
+      }
     }
 
+    return avisos
+  }, [objetivos])
+
+  const renderCardRows = (objetivo: Objetivo) => {
+    const total = totalEstimadoObjetivo(objetivo)
     return (
       <>
-        <CardRow label="Data alvo" value={String(inicio)} />
-        <CardRow label="Valor" value={formatCurrency(objetivo.valor) || "—"} />
+        <CardRow label="Data / período" value={formatDataObjetivo(objetivo, prazoTotal)} />
+        <CardRow label="Recorrência" value={formatRecorrencia(objetivo)} />
+        <CardRow
+          label="Valor total"
+          value={formatCurrency(objetivo.recorrente ? total : objetivo.valor) || "—"}
+        />
       </>
     )
   }
@@ -411,6 +481,124 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
             </p>
           ) : (
             <>
+              {/* 1. Gráfico necessidade de capital por ano */}
+              <div
+                style={{
+                  background: "#F5F5F5",
+                  borderRadius: 12,
+                  padding: "20px 16px 16px",
+                }}
+              >
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider m-0 mb-4">
+                  Necessidade de capital por ano
+                </p>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-end",
+                    gap: 6,
+                    minHeight: 160,
+                    paddingTop: 28,
+                  }}
+                >
+                  {anosGrafico.map((ano) => {
+                    const valor = capitalMap.get(ano) ?? 0
+                    const isPico = valor > 0 && anosPicoCapital.includes(ano)
+                    const barHeight =
+                      valor > 0 && maxCapitalAno > 0
+                        ? Math.max(20, Math.round((valor / maxCapitalAno) * 100))
+                        : 4
+
+                    return (
+                      <div
+                        key={ano}
+                        style={{
+                          flex: 1,
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          minWidth: 0,
+                          height: 160,
+                          justifyContent: "flex-end",
+                        }}
+                      >
+                        {valor > 0 ? (
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 600,
+                              color: isPico ? VOGA_GOLD_DARK : "#6B7280",
+                              marginBottom: 6,
+                              textAlign: "center",
+                              lineHeight: 1.2,
+                            }}
+                          >
+                            {formatCurrency(valor)}
+                          </span>
+                        ) : (
+                          <span style={{ height: 18, marginBottom: 6 }} />
+                        )}
+                        <div
+                          style={{
+                            width: "100%",
+                            height: barHeight,
+                            borderRadius: 4,
+                            background: valor > 0 ? (isPico ? VOGA_GOLD : VOGA_NAVY) : "var(--border, #D9D9D9)",
+                            transition: "height 0.2s ease",
+                          }}
+                        />
+                        <span
+                          style={{
+                            marginTop: 8,
+                            fontSize: 11,
+                            color: "#6B7280",
+                          }}
+                        >
+                          {ano}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* 2. Alerta de concentração */}
+              {alertasConcentracao.length > 0 ? (
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 12,
+                    alignItems: "flex-start",
+                    padding: "14px 16px",
+                    borderRadius: 10,
+                    background: "#FEF3C7",
+                    border: "1px solid #F59E0B",
+                  }}
+                >
+                  <AlertTriangle
+                    size={20}
+                    color="#B45309"
+                    style={{ flexShrink: 0, marginTop: 2 }}
+                  />
+                  <div style={{ fontSize: 13, color: "#78350F", lineHeight: 1.45 }}>
+                    <p style={{ margin: "0 0 6px", fontWeight: 600 }}>
+                      Concentração de objetivos no mesmo período
+                    </p>
+                    {alertasConcentracao.map((aviso, idx) => (
+                      <p key={idx} style={{ margin: idx === alertasConcentracao.length - 1 ? 0 : "0 0 4px" }}>
+                        Em{" "}
+                        {aviso.anos.length === 1
+                          ? aviso.anos[0]
+                          : `${aviso.anos[0]} e ${aviso.anos[1]}`}
+                        : {aviso.nomes.join(", ")}. Considere reavaliar prazos ou antecipar
+                        aportes para distribuir melhor a necessidade de capital.
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {/* 3. Grid de cards */}
               <div
                 style={{
                   display: "grid",
@@ -418,11 +606,9 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                   gap: 16,
                 }}
               >
-                {objetivos.map((objetivo) => {
-                  const categoria = resolveCategoria(objetivo.descricao)
+                {objetivosEnriquecidos.map(({ objetivo, categoria, parcelas }) => {
                   const meta = CATEGORIA_META[categoria]
                   const Icon = meta.Icon
-                  const parcelas = contarParcelas(objetivo, prazoTotal)
                   const nomeExibicao = (objetivo.descricao || "Sem descrição").trim()
 
                   return (
@@ -436,7 +622,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                     >
                       <div
                         style={{
-                          background: meta.color,
+                          background: VOGA_NAVY,
                           padding: "12px 14px",
                           borderRadius: "12px 12px 0 0",
                           display: "flex",
@@ -445,7 +631,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                           gap: 8,
                         }}
                       >
-                        <Icon size={18} color="#fff" strokeWidth={2} style={{ flexShrink: 0, marginTop: 2 }} />
+                        <Icon size={18} color={VOGA_GOLD} strokeWidth={2} style={{ flexShrink: 0, marginTop: 2 }} />
                         <div style={{ flex: 1, minWidth: 0, textAlign: "right" }}>
                           <p
                             style={{
@@ -466,8 +652,8 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                                 marginTop: 6,
                                 fontSize: 10,
                                 fontWeight: 600,
-                                color: "#fff",
-                                background: "rgba(255,255,255,0.18)",
+                                color: VOGA_GOLD,
+                                background: VOGA_GOLD_LIGHT,
                                 borderRadius: 999,
                                 padding: "3px 8px",
                                 letterSpacing: "0.02em",
@@ -498,7 +684,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                             {nomeExibicao}
                           </p>
                         </div>
-                        {renderCardRows(objetivo, categoria)}
+                        {renderCardRows(objetivo)}
                         <div
                           style={{
                             display: "flex",
@@ -551,202 +737,101 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                 })}
               </div>
 
+              {/* 4. Lista vertical por prazo */}
               <div
                 style={{
                   background: "#F5F5F5",
                   borderRadius: 12,
-                  padding: "20px 16px 24px",
+                  padding: "20px 16px",
                 }}
               >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    flexWrap: "wrap",
-                    gap: 12,
-                    marginBottom: 20,
-                  }}
-                >
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider m-0">
-                    Linha do tempo dos objetivos
-                  </p>
-                  <div style={{ display: "flex", gap: 16, fontSize: 11, color: "#6B7280" }}>
-                    <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <span
-                        style={{
-                          width: 10,
-                          height: 10,
-                          borderRadius: "50%",
-                          background: "#9CA3AF",
-                          display: "inline-block",
-                        }}
-                      />
-                      Meta única
-                    </span>
-                    <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <span
-                        style={{
-                          width: 22,
-                          height: 6,
-                          borderRadius: 3,
-                          background: "#10B981",
-                          display: "inline-block",
-                        }}
-                      />
-                      Meta recorrente
-                    </span>
-                  </div>
-                </div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider m-0 mb-4">
+                  Objetivos por prazo
+                </p>
+                <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                  {PRAZO_GRUPOS.map((grupo) => {
+                    const itens = objetivosEnriquecidos
+                      .filter((item) => item.grupo === grupo.id)
+                      .sort((a, b) => a.objetivo.prazoAnos - b.objetivo.prazoAnos)
 
-                <div style={{ position: "relative", padding: "8px 12px 72px", minHeight: 120 }}>
-                  <div
-                    style={{
-                      position: "absolute",
-                      left: 24,
-                      right: 24,
-                      top: 44,
-                      height: 1,
-                      background: "rgba(0,0,0,0.12)",
-                    }}
-                  />
-                  <div
-                    style={{
-                      position: "absolute",
-                      left: 24,
-                      top: 38,
-                      fontSize: 11,
-                      color: "#9CA3AF",
-                    }}
-                  >
-                    {anoMin}
-                  </div>
-                  <div
-                    style={{
-                      position: "absolute",
-                      right: 24,
-                      top: 38,
-                      fontSize: 11,
-                      color: "#9CA3AF",
-                    }}
-                  >
-                    {anoMax}
-                  </div>
-
-                  {timelineItems.map((item) => {
-                    const color = CATEGORIA_META[item.categoria].color
-                    const nome = (item.objetivo.descricao || "Objetivo").trim()
-                    const startPct = yearToPct(item.anoInicio)
-
-                    if (!item.objetivo.recorrente) {
-                      return (
-                        <div
-                          key={item.objetivo.id}
-                          style={{
-                            position: "absolute",
-                            left: `${startPct}%`,
-                            top: 36,
-                            transform: "translateX(-50%)",
-                            textAlign: "center",
-                            width: 120,
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: 14,
-                              height: 14,
-                              borderRadius: "50%",
-                              background: color,
-                              margin: "0 auto",
-                              border: "2px solid #fff",
-                              boxShadow: "0 0 0 1px rgba(0,0,0,0.08)",
-                            }}
-                          />
-                          <p style={{ margin: "10px 0 2px", fontSize: 11, color: "#6B7280" }}>
-                            {item.anoInicio}
-                          </p>
-                          <p
-                            style={{
-                              margin: 0,
-                              fontSize: 11,
-                              fontWeight: 600,
-                              color: "#1A1A1A",
-                              lineHeight: 1.3,
-                            }}
-                          >
-                            {nome}
-                          </p>
-                        </div>
-                      )
-                    }
-
-                    const endPct = yearToPct(item.anoFim)
-                    const barLeft = Math.min(startPct, endPct)
-                    const barWidth = Math.max(4, Math.abs(endPct - startPct))
-                    const parcelas = item.parcelas
+                    if (itens.length === 0) return null
 
                     return (
-                      <div
-                        key={item.objetivo.id}
-                        style={{
-                          position: "absolute",
-                          left: `${barLeft}%`,
-                          top: 40,
-                          width: `${barWidth}%`,
-                          minWidth: 28,
-                          transform: "translateY(-50%)",
-                        }}
-                      >
-                        <div style={{ position: "relative", height: 8 }}>
-                          <div
-                            style={{
-                              height: 6,
-                              borderRadius: 3,
-                              background: color,
-                              width: "100%",
-                            }}
-                          />
-                          {Array.from({ length: Math.min(parcelas, 8) }).map((_, i) => {
-                            const markPct = parcelas <= 1 ? 50 : (i / (parcelas - 1)) * 100
-                            return (
-                              <div
-                                key={i}
-                                style={{
-                                  position: "absolute",
-                                  left: `${markPct}%`,
-                                  top: -2,
-                                  width: 1,
-                                  height: 10,
-                                  background: "rgba(255,255,255,0.85)",
-                                  transform: "translateX(-50%)",
-                                }}
-                              />
-                            )
-                          })}
-                        </div>
-                        <div
+                      <div key={grupo.id}>
+                        <p
                           style={{
-                            textAlign: "center",
-                            marginTop: 18,
-                            width: 140,
-                            marginLeft: "50%",
-                            transform: "translateX(-50%)",
+                            margin: "0 0 10px",
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: "#6B7280",
+                            letterSpacing: "0.04em",
                           }}
                         >
-                          <p style={{ margin: "0 0 2px", fontSize: 11, color: "#6B7280" }}>
-                            {item.anoInicio} – {item.anoFim}
-                          </p>
-                          <p
-                            style={{
-                              margin: 0,
-                              fontSize: 11,
-                              fontWeight: 600,
-                              color: "#1A1A1A",
-                              lineHeight: 1.3,
-                            }}
-                          >
-                            {nome} · {parcelas} parcela{parcelas === 1 ? "" : "s"} anuais
-                          </p>
+                          {grupo.titulo}
+                        </p>
+                        <div style={{ display: "flex", flexDirection: "column" }}>
+                          {itens.map((item, idx) => {
+                            const Icon = CATEGORIA_META[item.categoria].Icon
+                            const o = item.objetivo
+                            const subtitulo = `${formatDataObjetivo(o, prazoTotal)} (${formatRecorrencia(o)})`
+
+                            return (
+                              <div
+                                key={o.id}
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 12,
+                                  padding: "12px 4px",
+                                  borderBottom:
+                                    idx < itens.length - 1
+                                      ? "0.5px solid rgba(0,0,0,0.08)"
+                                      : "none",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    width: 36,
+                                    height: 36,
+                                    borderRadius: 8,
+                                    background: VOGA_GOLD_LIGHT,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  <Icon size={16} color={VOGA_GOLD_DARK} strokeWidth={2} />
+                                </div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <p
+                                    style={{
+                                      margin: 0,
+                                      fontSize: 13,
+                                      fontWeight: 600,
+                                      color: "#1A1A1A",
+                                    }}
+                                  >
+                                    {(o.descricao || "Objetivo").trim()}
+                                  </p>
+                                  <p style={{ margin: "2px 0 0", fontSize: 12, color: "#6B7280" }}>
+                                    {subtitulo}
+                                  </p>
+                                </div>
+                                <span
+                                  style={{
+                                    fontSize: 13,
+                                    fontWeight: 600,
+                                    color: "#1A1A1A",
+                                    flexShrink: 0,
+                                    fontVariantNumeric: "tabular-nums",
+                                  }}
+                                >
+                                  {formatCurrency(o.recorrente ? item.total : o.valor)}
+                                </span>
+                              </div>
+                            )
+                          })}
                         </div>
                       </div>
                     )
