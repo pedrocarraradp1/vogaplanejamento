@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
-import { PDFDocument, rgb } from "pdf-lib"
-import template from "@/lib/balanco-pdf-template.json"
+import { PDFDocument } from "pdf-lib"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
+
+const PAGE_WIDTH = 960
 
 function dataUrlToBytes(dataUrl: string): { bytes: Uint8Array; isPng: boolean } {
   const match = dataUrl.match(/^data:image\/(png|jpeg|jpg);base64,(.+)$/i)
@@ -27,31 +28,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Nenhuma seção capturada" }, { status: 400 })
     }
 
-    const { pageWidthPt, pageHeightPt, slides } = template
     const pdfDoc = await PDFDocument.create()
 
-    for (let i = 0; i < captures.length; i++) {
-      const slot = slides[i]
-      if (!slot) break
+    for (const capture of captures) {
+      const image = await embedImage(pdfDoc, capture)
+      const { width: imgW, height: imgH } = image.size()
 
-      const image = await embedImage(pdfDoc, captures[i])
-      const page = pdfDoc.addPage([pageWidthPt, pageHeightPt])
-
-      page.drawRectangle({
-        x: 0,
-        y: 0,
-        width: pageWidthPt,
-        height: pageHeightPt,
-        color: rgb(1, 1, 1),
-      })
-
-      const pdfY = pageHeightPt - slot.topPt - slot.heightPt
+      const pageHeight = PAGE_WIDTH * (imgH / imgW)
+      const page = pdfDoc.addPage([PAGE_WIDTH, pageHeight])
 
       page.drawImage(image, {
-        x: slot.leftPt,
-        y: pdfY,
-        width: slot.widthPt,
-        height: slot.heightPt,
+        x: 0,
+        y: 0,
+        width: PAGE_WIDTH,
+        height: pageHeight,
       })
     }
 
