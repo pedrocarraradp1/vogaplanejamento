@@ -206,17 +206,8 @@ export function FluxoDeCaixa({ onNavigate }: FluxoDeCaixaProps) {
     setHoveredAnoP3(null)
   }
 
-  const p1Hover = hoveredMesP1 !== null ? dadosRealizado[hoveredMesP1] : null
   const p2Hover = hoveredMesP2 !== null ? dadosOrcadoVsReal[hoveredMesP2] : null
   const p3Hover = hoveredAnoP3 !== null ? projecaoAnual.find((r) => r.ano === hoveredAnoP3) : null
-
-  const detalhesP1 = p1Hover
-    ? [
-        { id: "r", label: "Rentabilidade", valor: fmt(p1Hover.rentabilidade), fill: CORES_FLUXO_CAIXA.rentabilidade },
-        { id: "rec", label: "Receita", valor: fmt(p1Hover.receita), fill: CORES_FLUXO_CAIXA.receita },
-        { id: "d", label: "Despesa", valor: fmt(p1Hover.despesa), fill: CORES_FLUXO_CAIXA.despesa },
-      ]
-    : undefined
 
   const detalhesP3 = p3Hover
     ? (
@@ -334,19 +325,32 @@ export function FluxoDeCaixa({ onNavigate }: FluxoDeCaixaProps) {
 
           <div style={{ background: PAINEL_BG, borderRadius: 12, padding: "16px" }}>
             <LegendaFluxo itens={LEGENDA_PAINEL1} />
-            <DestaqueHover
-              valor={fmt(p1Hover ? p1Hover.fluxoLiquido : totaisAno.fluxo)}
-              subtitulo={
-                p1Hover
-                  ? `Fluxo líquido em ${p1Hover.labelCompleto}`
-                  : `Fluxo líquido do ano ${anoCorrente}`
-              }
-              detalhes={detalhesP1}
-            />
             <GraficoRealizadoMensal
               dados={dadosRealizado}
               formatBRL={fmt}
               onHoverMes={setHoveredMesP1}
+              valorPadrao={fmt(totaisAno.fluxo)}
+              subtituloPadrao={`Fluxo líquido do ano ${anoCorrente}`}
+              getDetalhes={(d) => [
+                {
+                  id: "r",
+                  label: "Rentabilidade",
+                  valor: fmt(d.rentabilidade),
+                  fill: CORES_FLUXO_CAIXA.rentabilidade,
+                },
+                {
+                  id: "rec",
+                  label: "Receita",
+                  valor: fmt(d.receita),
+                  fill: CORES_FLUXO_CAIXA.receita,
+                },
+                {
+                  id: "d",
+                  label: "Despesa",
+                  valor: fmt(d.despesa),
+                  fill: CORES_FLUXO_CAIXA.despesa,
+                },
+              ]}
             />
           </div>
         </CardContent>

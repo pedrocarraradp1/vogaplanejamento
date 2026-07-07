@@ -1,99 +1,360 @@
 "use client"
 
+import { useRef, useState } from "react"
 import {
   ComposedChart,
-  Bar,
   Line,
   XAxis,
   YAxis,
   CartesianGrid,
   ResponsiveContainer,
-  ReferenceLine,
 } from "recharts"
 import { CORES_FLUXO_CAIXA, type MesRealizadoCalculado } from "@/lib/fluxo-caixa-utils"
 
 const CHART_HEIGHT = 220
+const PLOT_HEIGHT = 168
+
+type DetalheHover = { id: string; label: string; valor: string; fill: string; valorColor?: string }
+
+function segmentHeights(values: number[], total: number, zoneHeight: number): number[] {
+  if (total <= 0) return values.map(() => 0)
+  const raw = values.map((v) => Math.max(0, (v / total) * zoneHeight))
+  if (raw.length === 0) return raw
+  const used = raw.slice(0, -1).reduce((s, h) => s + h, 0)
+  raw[raw.length - 1] = Math.max(0, zoneHeight - used)
+  return raw
+}
 
 export function GraficoRealizadoMensal({
   dados,
   formatBRL,
   onHoverMes,
+  valorPadrao,
+  subtituloPadrao,
+  getDetalhes,
 }: {
   dados: MesRealizadoCalculado[]
   formatBRL: (v: number) => string
   onHoverMes: (idx: number | null) => void
+  valorPadrao: string
+  subtituloPadrao: string
+  getDetalhes: (d: MesRealizadoCalculado) => DetalheHover[]
 }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null)
+
+  const maxPos = Math.max(1, ...dados.map((d) => d.rentabilidade + d.receita))
+  const maxNeg = Math.max(1, ...dados.map((d) => d.despesa))
+  const posZoneRatio = maxPos / (maxPos + maxNeg)
+  const posZoneHeight = PLOT_HEIGHT * posZoneRatio
+  const negZoneHeight = PLOT_HEIGHT * (1 - posZoneRatio)
+
   const saldoMin = Math.min(0, ...dados.map((d) => d.saldoAcumulado))
   const saldoMax = Math.max(0, ...dados.map((d) => d.saldoAcumulado))
+  const saldoRange = saldoMax - saldoMin || 1
+
+  const updateTooltip = (idx: number | null, clientX: number, clientY: number) => {
+    const el = containerRef.current
+    if (!el || idx === null) {
+      setHoveredIdx(null)
+      setTooltipPos(null)
+      onHoverMes(null)
+      return
+    }
+    const rect = el.getBoundingClientRect()
+    setHoveredIdx(idx)
+    setTooltipPos({ x: clientX - rect.left, y: clientY - rect.top })
+    onHoverMes(idx)
+  }
+
+  const handleLeave = () => {
+    setHoveredIdx(null)
+    setTooltipPos(null)
+    onHoverMes(null)
+  }
+
+  const hovered = hoveredIdx !== null ? dados[hoveredIdx] : null
+  const detalhes = hovered ? getDetalhes(hovered) : undefined
+
+  const saldoLinePoints = dados.map((d, i) => {
+    const xPct = ((i + 0.5) / dados.length) * 100
+    const yInPlot = ((saldoMax - d.saldoAcumulado) / saldoRange) * PLOT_HEIGHT
+    return `${xPct},${yInPlot}`
+  }).join(" ")
 
   return (
-    <div className="w-full min-w-0" style={{ height: CHART_HEIGHT }}>
-      <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
-        <ComposedChart
-          data={dados}
-          margin={{ top: 8, right: 48, left: 8, bottom: 4 }}
-          onMouseMove={(state) => {
-            const idx = state?.activeTooltipIndex
-            onHoverMes(typeof idx === "number" ? idx : null)
+    <div
+      ref={containerRef}
+      className="w-full min-w-0 relative"
+      style={{ height: CHART_HEIGHT }}
+      onMouseLeave={handleLeave}
+    >
+      {/* Eixo secundário — saldo acumulado */}
+      <div
+        style={{
+          position: "absolute",
+          right: 0,
+          top: 0,
+          height: PLOT_HEIGHT,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+          fontSize: 10,
+          color: CORES_FLUXO_CAIXA.saldoAcumulado,
+          paddingLeft: 4,
+          pointerEvents: "none",
+        }}
+      >
+        <span>{formatBRL(saldoMax).replace("R$", "").trim()}</span>
+        <span>{formatBRL(saldoMin).replace("R$", "").trim()}</span>
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "stretch",
+          height: PLOT_HEIGHT,
+          paddingRight: 44,
+          position: "relative",
+        }}
+      >
+        {/* Linha saldo acumulado (SVG) */}
+        <svg
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 0,
+            width: "calc(100% - 44px)",
+            height: PLOT_HEIGHT,
+            pointerEvents: "none",
+            overflow: "visible",
           }}
-          onMouseLeave={() => onHoverMes(null)}
+          viewBox={`0 0 100 ${PLOT_HEIGHT}`}
+          preserveAspectRatio="none"
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
-          <XAxis
-            dataKey="label"
-            tick={{ fill: "#6B7280", fontSize: 11 }}
-            axisLine={{ stroke: "rgba(0,0,0,0.1)" }}
-            tickLine={false}
-          />
-          <YAxis
-            yAxisId="left"
-            tick={{ fill: "#6B7280", fontSize: 10 }}
-            tickLine={false}
-            axisLine={false}
-            tickFormatter={(v) => formatBRL(v).replace("R$", "").trim()}
-          />
-          <YAxis
-            yAxisId="right"
-            orientation="right"
-            domain={[saldoMin, saldoMax]}
-            tick={{ fill: CORES_FLUXO_CAIXA.saldoAcumulado, fontSize: 10 }}
-            tickLine={false}
-            axisLine={false}
-            tickFormatter={(v) => formatBRL(v).replace("R$", "").trim()}
-          />
-          <ReferenceLine yAxisId="left" y={0} stroke="rgba(0,0,0,0.2)" />
-          <Bar
-            yAxisId="left"
-            dataKey="rentabilidade"
-            stackId="fluxo"
-            fill={CORES_FLUXO_CAIXA.rentabilidade}
-            isAnimationActive={false}
-          />
-          <Bar
-            yAxisId="left"
-            dataKey="receita"
-            stackId="fluxo"
-            fill={CORES_FLUXO_CAIXA.receita}
-            isAnimationActive={false}
-          />
-          <Bar
-            yAxisId="left"
-            dataKey="despesaNeg"
-            stackId="fluxo"
-            fill={CORES_FLUXO_CAIXA.despesa}
-            isAnimationActive={false}
-          />
-          <Line
-            yAxisId="right"
-            type="monotone"
-            dataKey="saldoAcumulado"
+          <polyline
+            fill="none"
             stroke={CORES_FLUXO_CAIXA.saldoAcumulado}
             strokeWidth={2}
-            dot={false}
-            isAnimationActive={false}
+            vectorEffect="non-scaling-stroke"
+            points={saldoLinePoints}
           />
-        </ComposedChart>
-      </ResponsiveContainer>
+        </svg>
+
+        {dados.map((d, i) => {
+          const posTotal = d.rentabilidade + d.receita
+          const posBarH = (posTotal / maxPos) * posZoneHeight
+          const negBarH = (d.despesa / maxNeg) * negZoneHeight
+          const [hRent, hRec] = segmentHeights(
+            [d.rentabilidade, d.receita],
+            posTotal,
+            posBarH,
+          )
+
+          return (
+            <div
+              key={d.label}
+              className="mes-coluna"
+              style={{
+                flex: 1,
+                minWidth: 0,
+                height: "100%",
+                position: "relative",
+                cursor: "default",
+              }}
+              onMouseEnter={(e) => updateTooltip(i, e.clientX, e.clientY)}
+              onMouseMove={(e) => updateTooltip(i, e.clientX, e.clientY)}
+            >
+              {/* Zona positiva (acima da baseline) */}
+              <div
+                style={{
+                  position: "absolute",
+                  left: 2,
+                  right: 2,
+                  top: 0,
+                  height: posZoneHeight,
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "flex-end",
+                  pointerEvents: "none",
+                }}
+              >
+                {posTotal > 0 ? (
+                  <div style={{ display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+                    {d.rentabilidade > 0 ? (
+                      <div
+                        style={{
+                          height: hRent,
+                          background: CORES_FLUXO_CAIXA.rentabilidade,
+                          borderRadius: hRec <= 0 ? "3px 3px 0 0" : 0,
+                        }}
+                      />
+                    ) : null}
+                    {d.receita > 0 ? (
+                      <div
+                        style={{
+                          height: hRec,
+                          background: CORES_FLUXO_CAIXA.receita,
+                          borderRadius: "3px 3px 0 0",
+                        }}
+                      />
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Linha de zero */}
+              <div
+                style={{
+                  position: "absolute",
+                  left: 0,
+                  right: 0,
+                  top: posZoneHeight,
+                  height: 1,
+                  background: "rgba(0,0,0,0.2)",
+                  pointerEvents: "none",
+                }}
+              />
+
+              {/* Zona negativa (abaixo da baseline) */}
+              <div
+                style={{
+                  position: "absolute",
+                  left: 2,
+                  right: 2,
+                  top: posZoneHeight + 1,
+                  height: negZoneHeight,
+                  pointerEvents: "none",
+                }}
+              >
+                {d.despesa > 0 ? (
+                  <div
+                    style={{
+                      height: negBarH,
+                      background: CORES_FLUXO_CAIXA.despesa,
+                      borderRadius: "0 0 3px 3px",
+                    }}
+                  />
+                ) : null}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Rótulos dos meses */}
+      <div
+        style={{
+          display: "flex",
+          paddingRight: 44,
+          marginTop: 6,
+          height: 20,
+        }}
+      >
+        {dados.map((d) => (
+          <div
+            key={`lbl-${d.label}`}
+            style={{
+              flex: 1,
+              textAlign: "center",
+              fontSize: 11,
+              color: "#6B7280",
+            }}
+          >
+            {d.label}
+          </div>
+        ))}
+      </div>
+
+      {/* Tooltip flutuante — mesmo nó, só atualiza posição e texto */}
+      {hovered && tooltipPos ? (
+        <div
+          style={{
+            position: "absolute",
+            left: tooltipPos.x,
+            top: tooltipPos.y,
+            transform: "translate(-50%, calc(-100% - 12px))",
+            pointerEvents: "none",
+            zIndex: 20,
+            minWidth: 200,
+            maxWidth: 280,
+            padding: "10px 14px",
+            background: "#fff",
+            borderRadius: 8,
+            boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+            border: "1px solid rgba(0,0,0,0.06)",
+          }}
+        >
+          <p
+            style={{
+              margin: 0,
+              fontSize: 16,
+              fontWeight: 700,
+              color: "#1A1A1A",
+              fontVariantNumeric: "tabular-nums",
+              textAlign: "center",
+            }}
+          >
+            {formatBRL(hovered.fluxoLiquido)}
+          </p>
+          <p style={{ margin: "4px 0 0", fontSize: 11, color: "#6B7280", textAlign: "center" }}>
+            Fluxo líquido em {hovered.labelCompleto}
+          </p>
+          {detalhes && detalhes.length > 0 ? (
+            <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 5 }}>
+              {detalhes.map((item) => (
+                <div
+                  key={item.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 8,
+                    fontSize: 11,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: 2,
+                        background: item.fill,
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span style={{ color: "#374151" }}>{item.label}</span>
+                  </div>
+                  <span
+                    style={{
+                      fontWeight: 600,
+                      color: item.valorColor ?? "#1A1A1A",
+                      fontVariantNumeric: "tabular-nums",
+                    }}
+                  >
+                    {item.valor}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <div
+          style={{
+            position: "absolute",
+            left: "50%",
+            top: 8,
+            transform: "translateX(-50%)",
+            pointerEvents: "none",
+            textAlign: "center",
+          }}
+        >
+          <p style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#1A1A1A" }}>{valorPadrao}</p>
+          <p style={{ margin: "2px 0 0", fontSize: 11, color: "#6B7280" }}>{subtituloPadrao}</p>
+        </div>
+      )}
     </div>
   )
 }
