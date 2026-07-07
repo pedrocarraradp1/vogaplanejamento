@@ -31,7 +31,7 @@ interface ProjecaoProps {
 
 export function Projecao({ onNavigate }: ProjecaoProps) {
   const { state, setPremissas, getPatrimonioLiquido } = usePlano()
-  const { premissas, objetivos, dadosPessoais } = state
+  const { premissas, objetivos, dadosPessoais, ativos, passivos } = state
   const moeda = state.moeda ?? "BRL"
 
   // ── Derivados automáticos ────────────────────────────────────────────────
