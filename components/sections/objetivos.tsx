@@ -365,33 +365,92 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
     [objetivos, prazoTotal],
   )
 
-  const anosGrafico = useMemo(() => {
-    const inicio = anoAtual()
+  const anoCorrente = anoAtual()
+  const anoPlanoFim = useMemo(() => {
     const fimObjetivos = objetivosEnriquecidos.reduce(
       (max, item) => Math.max(max, item.anoFim),
-      inicio,
+      anoCorrente,
     )
-    const fim = Math.max(inicio, fimObjetivos, inicio + prazoTotal)
+    return Math.max(anoCorrente, fimObjetivos, anoCorrente + prazoTotal)
+  }, [objetivosEnriquecidos, prazoTotal, anoCorrente])
+
+  const [periodoInicio, setPeriodoInicio] = useState(anoCorrente)
+  const [periodoFim, setPeriodoFim] = useState(() => anoCorrente + prazoTotal)
+  const [hoveredAno, setHoveredAno] = useState<number | null>(null)
+
+  const anosVisiveis = useMemo(() => {
+    const inicio = Math.min(periodoInicio, periodoFim)
+    const fim = Math.max(periodoInicio, periodoFim)
     const anos: number[] = []
     for (let y = inicio; y <= fim; y++) anos.push(y)
     return anos
-  }, [objetivosEnriquecidos, prazoTotal])
+  }, [periodoInicio, periodoFim])
 
-  const maxCapitalAno = useMemo(() => {
+  const maxCapitalPeriodo = useMemo(() => {
     let max = 0
-    for (const y of anosGrafico) {
+    for (const y of anosVisiveis) {
       max = Math.max(max, capitalMap.get(y) ?? 0)
     }
     return max
-  }, [anosGrafico, capitalMap])
+  }, [anosVisiveis, capitalMap])
 
-  const anosPicoCapital = useMemo(
+  const anosPicoPeriodo = useMemo(
     () =>
-      maxCapitalAno > 0
-        ? anosGrafico.filter((y) => (capitalMap.get(y) ?? 0) === maxCapitalAno)
+      maxCapitalPeriodo > 0
+        ? anosVisiveis.filter((y) => (capitalMap.get(y) ?? 0) === maxCapitalPeriodo)
         : [],
-    [anosGrafico, capitalMap, maxCapitalAno],
+    [anosVisiveis, capitalMap, maxCapitalPeriodo],
   )
+
+  const totalPeriodo = useMemo(
+    () => anosVisiveis.reduce((s, y) => s + (capitalMap.get(y) ?? 0), 0),
+    [anosVisiveis, capitalMap],
+  )
+
+  const rotuloStep = Math.max(1, Math.ceil(anosVisiveis.length / 12))
+
+  const aplicarPresetPeriodo = (anos: number | "todos") => {
+    const inicio = anoCorrente
+    const fim =
+      anos === "todos" ? anoPlanoFim : Math.min(inicio + anos - 1, anoPlanoFim)
+    setPeriodoInicio(inicio)
+    setPeriodoFim(fim)
+    setHoveredAno(null)
+  }
+
+  const handlePeriodoInicioChange = (raw: string) => {
+    const v = parseInt(raw, 10)
+    if (Number.isNaN(v)) return
+    const inicio = Math.max(anoCorrente, Math.min(v, periodoFim))
+    setPeriodoInicio(inicio)
+    setHoveredAno(null)
+  }
+
+  const handlePeriodoFimChange = (raw: string) => {
+    const v = parseInt(raw, 10)
+    if (Number.isNaN(v)) return
+    const fim = Math.min(anoPlanoFim, Math.max(v, periodoInicio))
+    setPeriodoFim(fim)
+    setHoveredAno(null)
+  }
+
+  const formatCurrencyAlways = (value: number) =>
+    new Intl.NumberFormat(moeda === "USD" ? "en-US" : "pt-BR", {
+      style: "currency",
+      currency: moeda === "USD" ? "USD" : "BRL",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value)
+
+  const destaqueValor =
+    hoveredAno !== null ? (capitalMap.get(hoveredAno) ?? 0) : totalPeriodo
+
+  const destaqueSubtitulo =
+    hoveredAno !== null
+      ? (capitalMap.get(hoveredAno) ?? 0) > 0
+        ? `Ano de ${hoveredAno}`
+        : `Ano de ${hoveredAno} · sem objetivo neste ano`
+      : `Total necessário entre ${Math.min(periodoInicio, periodoFim)} e ${Math.max(periodoInicio, periodoFim)}`
 
   const alertasConcentracao = useMemo(() => {
     const avisos: { anos: number[]; nomes: string[] }[] = []
@@ -492,21 +551,105 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider m-0 mb-4">
                   Necessidade de capital por ano
                 </p>
+
+                {/* Seletor de período */}
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                    gap: 10,
+                    marginBottom: 16,
+                  }}
+                >
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {(
+                      [
+                        { label: "5 anos", anos: 5 },
+                        { label: "10 anos", anos: 10 },
+                        { label: "25 anos", anos: 25 },
+                        { label: "Todos", anos: "todos" as const },
+                      ] as const
+                    ).map((preset) => (
+                      <Button
+                        key={preset.label}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs bg-white"
+                        onClick={() => aplicarPresetPeriodo(preset.anos)}
+                      >
+                        {preset.label}
+                      </Button>
+                    ))}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <label style={{ fontSize: 12, color: "#6B7280" }}>De</label>
+                    <Input
+                      type="number"
+                      min={anoCorrente}
+                      max={periodoFim}
+                      value={periodoInicio}
+                      onChange={(e) => handlePeriodoInicioChange(e.target.value)}
+                      className="h-8 w-[88px] text-sm bg-white"
+                    />
+                    <label style={{ fontSize: 12, color: "#6B7280" }}>até</label>
+                    <Input
+                      type="number"
+                      min={periodoInicio}
+                      max={anoPlanoFim}
+                      value={periodoFim}
+                      onChange={(e) => handlePeriodoFimChange(e.target.value)}
+                      className="h-8 w-[88px] text-sm bg-white"
+                    />
+                  </div>
+                </div>
+
+                {/* Destaque dinâmico acima do gráfico */}
+                <div
+                  style={{
+                    textAlign: "center",
+                    marginBottom: 12,
+                    minHeight: 52,
+                  }}
+                >
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: 22,
+                      fontWeight: 700,
+                      color: hoveredAno !== null && (capitalMap.get(hoveredAno) ?? 0) > 0
+                        ? VOGA_GOLD_DARK
+                        : "#1A1A1A",
+                      fontVariantNumeric: "tabular-nums",
+                    }}
+                  >
+                    {formatCurrencyAlways(destaqueValor)}
+                  </p>
+                  <p style={{ margin: "4px 0 0", fontSize: 12, color: "#6B7280" }}>
+                    {destaqueSubtitulo}
+                  </p>
+                </div>
+
                 <div
                   style={{
                     display: "flex",
                     alignItems: "flex-end",
-                    gap: 6,
-                    minHeight: 160,
-                    paddingTop: 28,
+                    gap: 4,
+                    height: 140,
                   }}
+                  onMouseLeave={() => setHoveredAno(null)}
                 >
-                  {anosGrafico.map((ano) => {
+                  {anosVisiveis.map((ano) => {
                     const valor = capitalMap.get(ano) ?? 0
-                    const isPico = valor > 0 && anosPicoCapital.includes(ano)
+                    const isPico = valor > 0 && anosPicoPeriodo.includes(ano)
+                    const anoInicioVisivel = anosVisiveis[0]
+                    const anoFimVisivel = anosVisiveis[anosVisiveis.length - 1]
+                    const mostrarAno =
+                      ano === anoFimVisivel || (ano - anoInicioVisivel) % rotuloStep === 0
                     const barHeight =
-                      valor > 0 && maxCapitalAno > 0
-                        ? Math.max(20, Math.round((valor / maxCapitalAno) * 100))
+                      valor > 0 && maxCapitalPeriodo > 0
+                        ? Math.max(20, Math.round((valor / maxCapitalPeriodo) * 100))
                         : 4
 
                     return (
@@ -518,43 +661,38 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                           flexDirection: "column",
                           alignItems: "center",
                           minWidth: 0,
-                          height: 160,
+                          height: "100%",
                           justifyContent: "flex-end",
+                          cursor: "default",
                         }}
+                        onMouseEnter={() => setHoveredAno(ano)}
                       >
-                        {valor > 0 ? (
-                          <span
-                            style={{
-                              fontSize: 10,
-                              fontWeight: 600,
-                              color: isPico ? VOGA_GOLD_DARK : "#6B7280",
-                              marginBottom: 6,
-                              textAlign: "center",
-                              lineHeight: 1.2,
-                            }}
-                          >
-                            {formatCurrency(valor)}
-                          </span>
-                        ) : (
-                          <span style={{ height: 18, marginBottom: 6 }} />
-                        )}
                         <div
                           style={{
                             width: "100%",
                             height: barHeight,
                             borderRadius: 4,
-                            background: valor > 0 ? (isPico ? VOGA_GOLD : VOGA_NAVY) : "var(--border, #D9D9D9)",
-                            transition: "height 0.2s ease",
+                            background:
+                              valor > 0
+                                ? isPico
+                                  ? VOGA_GOLD
+                                  : VOGA_NAVY
+                                : "var(--border, #D9D9D9)",
+                            transition: "height 0.2s ease, background 0.15s ease",
+                            opacity: hoveredAno === ano ? 1 : hoveredAno !== null ? 0.65 : 1,
                           }}
                         />
                         <span
                           style={{
                             marginTop: 8,
-                            fontSize: 11,
+                            fontSize: 10,
                             color: "#6B7280",
+                            visibility: mostrarAno ? "visible" : "hidden",
+                            height: 14,
+                            lineHeight: "14px",
                           }}
                         >
-                          {ano}
+                          {mostrarAno ? ano : "\u00A0"}
                         </span>
                       </div>
                     )
