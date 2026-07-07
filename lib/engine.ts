@@ -1,7 +1,7 @@
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
 export interface Premissas {
-  saldoInicial: number       // calculado: ativos - passivos
+  saldoInicial: number       // ativos líquidos + previdência (sem passivos)
   aporteM: number            // calculado: renda - despesa
   /** Opcional: aporte mensal nominal por ano (t=0..prazo). Se presente, substitui `aporteM*(1+inf)^t`. */
   aportePorAnoNominal?: number[]

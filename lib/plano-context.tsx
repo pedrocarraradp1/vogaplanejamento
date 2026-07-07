@@ -186,6 +186,8 @@ interface PlanoContextType {
   /** Limpa meta de simulação (volta para "nova simulação") */
   clearSimulacaoMeta: () => void
   getPatrimonioLiquido: () => number
+  /** Ativos Líquidos + Previdência — saldo inicial da simulação (sem passivos). */
+  getSaldoInicialLiquido: () => number
   /** Soma ativos líquidos + previdência (sem passivos). */
   getAtivosFinanceiros: () => number
   /** Apenas ativos líquidos imediatos (sem previdência). */
@@ -417,6 +419,10 @@ export function PlanoProvider({
     return computeTotaisAtivos(state.ativos ?? []).totalAtivosFinanceiros
   }, [state.ativos])
 
+  const getSaldoInicialLiquido = useCallback(() => {
+    return getAtivosFinanceiros()
+  }, [getAtivosFinanceiros])
+
   const getTotalPassivos = useCallback(() => {
     return (state.passivos ?? []).reduce((s, p) => s + getSaldoDevedorPassivo(p), 0)
   }, [state.passivos])
@@ -533,7 +539,7 @@ export function PlanoProvider({
   // ── Cálculos ───────────────────────────────────────────────────────────────
 
   const simulatePreview = useCallback(() => {
-    const saldoInicial = getAtivosFinanceiros() - getTotalPassivos()
+    const saldoInicial = getSaldoInicialLiquido()
     const aporteM    = Math.max(0, state.dadosPessoais.renda - state.dadosPessoais.despesa)
     const idadeAtual = (() => {
       const nasc = state.dadosPessoais.nascimento
@@ -552,10 +558,10 @@ export function PlanoProvider({
       state.passivos
     )
     setState(prev => ({ ...prev, projecao }))
-  }, [state.premissas, state.objetivos, state.passivos, state.dadosPessoais, getAtivosFinanceiros, getTotalPassivos])
+  }, [state.premissas, state.objetivos, state.passivos, state.dadosPessoais, getSaldoInicialLiquido])
 
   const calcular = useCallback(() => {
-    const saldoInicial = getAtivosFinanceiros() - getTotalPassivos()
+    const saldoInicial = getSaldoInicialLiquido()
     const aporteM    = Math.max(0, state.dadosPessoais.renda - state.dadosPessoais.despesa)
     const idadeAtual = (() => {
       const nasc = state.dadosPessoais.nascimento
@@ -607,12 +613,12 @@ export function PlanoProvider({
       state.protecao.anosCob,
       state.protecao.eduFilhos,
       state.protecao.dividasPend,
-      saldoInicial,
+      getPatrimonioLiquido(),
       state.premissas.rendimento
     )
 
     setState(prev => ({ ...prev, projecao, kpis, inventario, protecaoResult }))
-  }, [state, getAtivosFinanceiros, getTotalPassivos])
+  }, [state, getSaldoInicialLiquido, getPatrimonioLiquido])
 
   const salvarPlano = useCallback(async (): Promise<{ error: string | null }> => {
     try {
@@ -650,7 +656,7 @@ export function PlanoProvider({
       setDadosPessoais, setAtivos, setPassivos, setPatrimonio, setObjetivos,
       setPremissas, setSucessao, setProtecao,
       loadState, clearSimulacaoMeta,
-      getPatrimonioLiquido, getAtivosFinanceiros, getAtivosLiquidosImediatos,
+      getPatrimonioLiquido, getSaldoInicialLiquido, getAtivosFinanceiros, getAtivosLiquidosImediatos,
       getPatrimonioTotalConsolidado, getAporteMensal, getIdadeAtual,
       simulatePreview, calcular, salvarPlano,
     }}>

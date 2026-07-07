@@ -492,13 +492,19 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
 
   const renderCardRows = (objetivo: Objetivo) => {
     const total = totalEstimadoObjetivo(objetivo)
+    const parcelas = contarParcelas(objetivo, prazoTotal)
+    const valorPorOcorrencia =
+      objetivo.recorrente && parcelas > 0 ? total / parcelas : objetivo.valor
+
     return (
       <>
         <CardRow label="Data / período" value={formatDataObjetivo(objetivo, prazoTotal)} />
         <CardRow label="Recorrência" value={formatRecorrencia(objetivo)} />
         <CardRow
-          label="Valor total"
-          value={formatCurrency(objetivo.recorrente ? total : objetivo.valor) || "—"}
+          label={objetivo.recorrente ? "Valor por ocorrência" : "Valor total"}
+          value={
+            formatCurrency(objetivo.recorrente ? valorPorOcorrencia : objetivo.valor) || "—"
+          }
         />
       </>
     )

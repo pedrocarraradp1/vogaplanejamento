@@ -32,7 +32,7 @@ interface DashboardProps {
 }
 
 export function Dashboard({ onNavigate }: DashboardProps) {
-  const { state, getPatrimonioLiquido, getPatrimonioTotalConsolidado, getAporteMensal, getIdadeAtual } = usePlano()
+  const { state, getSaldoInicialLiquido, getPatrimonioLiquido, getPatrimonioTotalConsolidado, getAporteMensal, getIdadeAtual } = usePlano()
   const { dadosPessoais, objetivos, premissas, sucessao, protecao } = state
   const moeda = state.moeda ?? "BRL"
 
@@ -41,7 +41,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const pieVogaTipo = usePieVogaProps()
   const pieVogaDescricao = usePieVogaProps()
 
-  const saldoInicial = getPatrimonioLiquido()
+  const saldoInicial = getSaldoInicialLiquido()
   const patrimonioTotalConsolidado = getPatrimonioTotalConsolidado()
   const aporteM      = getAporteMensal()
   const idadeAtual   = getIdadeAtual()
@@ -123,8 +123,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   )
 
   const protecaoResult = useMemo(() =>
-    calcularProtecao(protecao.custoVida, protecao.anosCob, protecao.eduFilhos, protecao.dividasPend, saldoInicial, premissas.rendimento)
-  , [protecao, saldoInicial, premissas.rendimento])
+    calcularProtecao(protecao.custoVida, protecao.anosCob, protecao.eduFilhos, protecao.dividasPend, getPatrimonioLiquido(), premissas.rendimento)
+  , [protecao, getPatrimonioLiquido, premissas.rendimento])
 
   const deflatorPorT = (t: number) => {
     const inf = (Number(premissas.inflacao) || 0) / 100

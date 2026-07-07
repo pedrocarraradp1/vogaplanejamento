@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { usePlano } from "@/lib/plano-context"
 import { calcularProjecao, type ProjecaoAno } from "@/lib/engine"
-import { computeTotaisAtivos, getSaldoDevedorPassivo } from "@/lib/patrimonio-utils"
 import {
   ResponsiveContainer,
   LineChart,
@@ -40,8 +39,8 @@ type LinhaCenarios = {
 }
 
 export function CenariosInvestimento(props: CenariosInvestimentoProps) {
-  const { state, setPremissas } = usePlano()
-  const { premissas, objetivos, dadosPessoais, ativos, passivos } = state
+  const { state, setPremissas, getSaldoInicialLiquido } = usePlano()
+  const { premissas, objetivos, dadosPessoais } = state
   const moeda = state.moeda ?? "BRL"
 
   const [showCenarios, setShowCenarios] = useState(true)
@@ -65,11 +64,10 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
   const setDisplayMode = props.onDisplayModeChange ?? setDisplayModeInternal
   const inflacaoGlobal = Number(premissas.inflacao) || 0
 
-  const saldoInicialCalculado = useMemo(() => {
-    const { totalAtivosFinanceiros } = computeTotaisAtivos(ativos ?? [])
-    const totalPassivos = (passivos ?? []).reduce((s, p) => s + getSaldoDevedorPassivo(p), 0)
-    return totalAtivosFinanceiros - totalPassivos
-  }, [ativos, passivos])
+  const saldoInicialCalculado = useMemo(
+    () => getSaldoInicialLiquido(),
+    [getSaldoInicialLiquido],
+  )
 
   const idadeAtualCalculada = useMemo(() => {
     if (!dadosPessoais.nascimento) return 0

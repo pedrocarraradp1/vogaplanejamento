@@ -12,7 +12,6 @@ import {
   ResponsiveContainer, ReferenceLine, Cell, Line,
 } from "recharts"
 import { usePlano } from "@/lib/plano-context"
-import { computeTotaisAtivos, getSaldoDevedorPassivo } from "@/lib/patrimonio-utils"
 import {
   calcularProjecao,
   calcularKPIs,
@@ -30,17 +29,16 @@ interface ProjecaoProps {
 }
 
 export function Projecao({ onNavigate }: ProjecaoProps) {
-  const { state, setPremissas, getPatrimonioLiquido } = usePlano()
-  const { premissas, objetivos, dadosPessoais, ativos, passivos } = state
+  const { state, setPremissas, getSaldoInicialLiquido } = usePlano()
+  const { premissas, objetivos, dadosPessoais } = state
   const moeda = state.moeda ?? "BRL"
 
   // ── Derivados automáticos ────────────────────────────────────────────────
-  // Saldo inicial: ativos líquidos + previdência − passivos
-  const saldoInicialCalculado = useMemo(() => {
-    const { totalAtivosFinanceiros } = computeTotaisAtivos(ativos ?? [])
-    const totalPassivos = (passivos ?? []).reduce((s, p) => s + getSaldoDevedorPassivo(p), 0)
-    return totalAtivosFinanceiros - totalPassivos
-  }, [ativos, passivos])
+  // Saldo inicial: ativos líquidos + previdência (sem passivos)
+  const saldoInicialCalculado = useMemo(
+    () => getSaldoInicialLiquido(),
+    [getSaldoInicialLiquido],
+  )
 
   const idadeAtualCalculada = useMemo(() => {
     if (!dadosPessoais.nascimento) return 0
@@ -291,7 +289,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
               <Label className="field-label">Saldo Inicial Líquido (R$)</Label>
               <Input value={formatCurrency(saldoInicialCalculado)} readOnly
                 className="form-card text-foreground cursor-not-allowed opacity-70" />
-              <p className="text-xs text-muted-foreground">Calculado automaticamente: Ativos Líquidos + Previdência − Passivos</p>
+              <p className="text-xs text-muted-foreground">Calculado automaticamente: Ativos Líquidos + Previdência</p>
             </div>
             <div className="space-y-2">
               <Label className="field-label">Rendimento Anual Bruto (%)</Label>
