@@ -21,6 +21,7 @@ import {
   normalizeAtivoRecord,
   normalizeAtivoTipo,
 } from "@/lib/patrimonio-utils"
+import { criarFluxoDeCaixaInicial, normalizarFluxoDeCaixa, type FluxoDeCaixaState, type FluxoMesRealizado } from "@/lib/fluxo-caixa-utils"
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
@@ -121,15 +122,6 @@ export interface Premissas {
   aportePeriodosReal: number[]
 }
 
-export interface Sucessao {
-  plEditavel: number
-  itcmd: number
-  honorarios: number
-  cartoriais: number
-  herdeiros: number
-  regimeSucessao: string
-}
-
 export interface Protecao {
   custoVida: number
   anosCob: number
@@ -137,12 +129,23 @@ export interface Protecao {
   dividasPend: number
 }
 
+export type { FluxoDeCaixaState, FluxoMesRealizado } from "@/lib/fluxo-caixa-utils"
+
 export interface PatrimonioState {
   ativosLiquidos: number
   previdencia: number
   imobilizado: number
   participacoes: number
   passivos: number
+}
+
+export interface Sucessao {
+  plEditavel: number
+  itcmd: number
+  honorarios: number
+  cartoriais: number
+  herdeiros: number
+  regimeSucessao: string
 }
 
 export interface PlanoState {
@@ -155,6 +158,7 @@ export interface PlanoState {
   premissas: Premissas
   sucessao: Sucessao
   protecao: Protecao
+  fluxoDeCaixa: FluxoDeCaixaState
   projecao: ProjecaoAno[]
   kpis: KPIs | null
   inventario: InventarioResult | null
@@ -181,6 +185,7 @@ interface PlanoContextType {
   setPremissas: (premissas: Partial<Premissas>) => void
   setSucessao: (sucessao: Partial<Sucessao>) => void
   setProtecao: (protecao: Partial<Protecao>) => void
+  setFluxoDeCaixa: (fluxo: Partial<FluxoDeCaixaState>) => void
   /** Substitui o estado atual por um estado salvo (hidratando defaults) */
   loadState: (state: unknown, meta?: Partial<SimulacaoMeta>) => void
   /** Limpa meta de simulação (volta para "nova simulação") */
@@ -275,6 +280,7 @@ const initialState: PlanoState = {
     eduFilhos:   0,
     dividasPend: 0,
   },
+  fluxoDeCaixa: criarFluxoDeCaixaInicial(),
   projecao: calcularProjecao(
     { ...defaultPremissas, saldoInicial: 0, aporteM: 0, idadeAtual: 0 },
     [],
@@ -323,6 +329,7 @@ export function PlanoProvider({
         passivos: 0,
       },
       objetivos: Array.isArray(raw?.objetivos) ? raw.objetivos : [],
+      fluxoDeCaixa: normalizarFluxoDeCaixa(raw?.fluxoDeCaixa),
       projecao: Array.isArray(raw?.projecao) ? raw.projecao : initialState.projecao,
       kpis: raw?.kpis ?? null,
       inventario: raw?.inventario ?? null,
@@ -515,6 +522,13 @@ export function PlanoProvider({
     setState(prev => ({ ...prev, protecao: { ...prev.protecao, ...protecao } }))
   }, [])
 
+  const setFluxoDeCaixa = useCallback((fluxo: Partial<FluxoDeCaixaState>) => {
+    setState((prev) => ({
+      ...prev,
+      fluxoDeCaixa: { ...prev.fluxoDeCaixa, ...fluxo },
+    }))
+  }, [])
+
   const loadState = useCallback((raw: unknown, meta?: Partial<SimulacaoMeta>) => {
     setState(hydrateState(raw))
     if (meta) {
@@ -654,7 +668,7 @@ export function PlanoProvider({
       setMoeda,
       setSimulacaoMeta: setSimulacaoMetaPartial,
       setDadosPessoais, setAtivos, setPassivos, setPatrimonio, setObjetivos,
-      setPremissas, setSucessao, setProtecao,
+      setPremissas, setSucessao, setProtecao, setFluxoDeCaixa,
       loadState, clearSimulacaoMeta,
       getPatrimonioLiquido, getSaldoInicialLiquido, getAtivosFinanceiros, getAtivosLiquidosImediatos,
       getPatrimonioTotalConsolidado, getAporteMensal, getIdadeAtual,
