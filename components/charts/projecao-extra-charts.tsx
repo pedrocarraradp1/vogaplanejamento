@@ -57,6 +57,7 @@ export function FluxoAnualChart({
   formatarMoeda,
   formatarMoedaCompleta,
   hideTitle = false,
+  hideMetaRenda = false,
   className,
   periodoInicioAno,
   periodoFimAno,
@@ -64,6 +65,8 @@ export function FluxoAnualChart({
 }: {
   data: DadoFluxoGrafico[]
   hideTitle?: boolean
+  /** Oculta linha tracejada e tooltip de meta renda (ex.: Painel 3 do Fluxo de Caixa). */
+  hideMetaRenda?: boolean
   className?: string
   /** Ano-calendário inicial do intervalo visível (ex: 2026). */
   periodoInicioAno?: number
@@ -144,9 +147,11 @@ export function FluxoAnualChart({
                     <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, color: "#F5A5A4" }}>
                       Retirada: {formatMoedaSaida(formatarMoedaCompleta, p.retirada)}
                     </p>
-                    <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, color: "#7FE0B8" }}>
-                      Meta renda (ref.): {formatarMoedaCompleta(p.metaRenda)}
-                    </p>
+                    {!hideMetaRenda ? (
+                      <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, color: "#7FE0B8" }}>
+                        Meta renda (ref.): {formatarMoedaCompleta(p.metaRenda)}
+                      </p>
+                    ) : null}
                     <p className="mt-1 font-medium" style={{ ...CHART_TOOLTIP_ITEM_STYLE, color: corLiq, marginTop: 6 }}>
                       Fluxo líquido: {formatarMoedaCompleta(p.fluxoLiquido)}
                     </p>
@@ -186,16 +191,18 @@ export function FluxoAnualChart({
               legendType="rect"
               isAnimationActive={false}
             />
-            <Line
-              type="monotone"
-              dataKey="metaRenda"
-              name="metaRenda"
-              stroke={CORES_FLUXO.metaRenda}
-              strokeWidth={2}
-              strokeDasharray="6 4"
-              dot={false}
-              isAnimationActive={false}
-            />
+            {!hideMetaRenda ? (
+              <Line
+                type="monotone"
+                dataKey="metaRenda"
+                name="metaRenda"
+                stroke={CORES_FLUXO.metaRenda}
+                strokeWidth={2}
+                strokeDasharray="6 4"
+                dot={false}
+                isAnimationActive={false}
+              />
+            ) : null}
             {primeiroAno && (
               <ReferenceDot
                 x={primeiroAno.idade}

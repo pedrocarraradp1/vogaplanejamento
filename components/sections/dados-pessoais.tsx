@@ -1,21 +1,104 @@
 ﻿"use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowRight } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  ArrowRight,
+  Briefcase,
+  Home,
+  Handshake,
+  CircleDollarSign,
+  Pencil,
+  Trash2,
+  Plus,
+  type LucideIcon,
+} from "lucide-react"
 import { usePlano } from "@/lib/plano-context"
+import type { FonteRenda, TipoFonteRenda, PrazoFonteRenda } from "@/lib/plano-context"
+import {
+  criarFonteRenda,
+  getFontesRenda,
+  labelPrazoFonte,
+  receitaMensalAtual,
+  TIPOS_FONTE_RENDA,
+} from "@/lib/renda-utils"
 
 interface DadosPessoaisProps {
   onNavigate: (section: string) => void
 }
 
+const ICONES_FONTE: Record<TipoFonteRenda, LucideIcon> = {
+  salario: Briefcase,
+  aluguel: Home,
+  venda_participacao: Handshake,
+  outros: CircleDollarSign,
+}
+
+const MESES = [
+  { v: 1, l: "Janeiro" },
+  { v: 2, l: "Fevereiro" },
+  { v: 3, l: "Março" },
+  { v: 4, l: "Abril" },
+  { v: 5, l: "Maio" },
+  { v: 6, l: "Junho" },
+  { v: 7, l: "Julho" },
+  { v: 8, l: "Agosto" },
+  { v: 9, l: "Setembro" },
+  { v: 10, l: "Outubro" },
+  { v: 11, l: "Novembro" },
+  { v: 12, l: "Dezembro" },
+]
+
 export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
-  const { state, setDadosPessoais } = usePlano()
+  const { state, setDadosPessoais, setFontesRenda } = usePlano()
   const { dadosPessoais } = state
   const moeda = state.moeda ?? "BRL"
+
+  const fontesRenda = useMemo(() => getFontesRenda(dadosPessoais), [dadosPessoais])
+  const receitaTotal = useMemo(() => receitaMensalAtual(fontesRenda), [fontesRenda])
+
+  const [modalFonteOpen, setModalFonteOpen] = useState(false)
+  const [editingFonte, setEditingFonte] = useState<FonteRenda | null>(null)
+  const [formFonte, setFormFonte] = useState<FonteRenda>(() => criarFonteRenda())
+
+  const abrirNovaFonte = () => {
+    setEditingFonte(null)
+    setFormFonte(criarFonteRenda())
+    setModalFonteOpen(true)
+  }
+
+  const abrirEditarFonte = (fonte: FonteRenda) => {
+    setEditingFonte(fonte)
+    setFormFonte({ ...fonte, prazo: { ...fonte.prazo } })
+    setModalFonteOpen(true)
+  }
+
+  const salvarFonte = () => {
+    const next = editingFonte
+      ? fontesRenda.map((f) => (f.id === editingFonte.id ? formFonte : f))
+      : [...fontesRenda, formFonte]
+    setFontesRenda(next)
+    setModalFonteOpen(false)
+  }
+
+  const removerFonte = (id: string) => {
+    setFontesRenda(fontesRenda.filter((f) => f.id !== id))
+  }
+
+  const setPrazoFonte = (prazo: PrazoFonteRenda) => {
+    setFormFonte((f) => ({ ...f, prazo }))
+  }
 
   const PROFISSOES_PRINCIPAIS = useMemo(
     () => [
@@ -37,10 +120,10 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
   const isCasado = dadosPessoais.estadoCivil === "casado"
 
   const capacidadePoupanca = useMemo(() => {
-    const poupanca = dadosPessoais.renda - dadosPessoais.despesa
-    const percentual = dadosPessoais.renda > 0 ? (poupanca / dadosPessoais.renda) * 100 : 0
+    const poupanca = receitaTotal - dadosPessoais.despesa
+    const percentual = receitaTotal > 0 ? (poupanca / receitaTotal) * 100 : 0
     return { valor: poupanca, percentual }
-  }, [dadosPessoais.renda, dadosPessoais.despesa])
+  }, [receitaTotal, dadosPessoais.despesa])
 
   const formatCurrency = (value: number) => {
     if (value === 0) return ""
@@ -392,55 +475,110 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
         </div>
       )}
 
-      {/* Card 2 - Fluxo de Caixa Mensal */}
+      {/* Receitas e Despesas */}
       <div className="space-y-4">
-        <span className="field-label">
-          Fluxo de Caixa Mensal
-        </span>
+        <span className="field-label">Receitas</span>
         <div style={cardStyle}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Renda Mensal */}
-            <div className="space-y-2">
-              <Label 
-                htmlFor="rendaMensal" 
-                className="field-label"
-              >
-                Renda Mensal (R$)
-              </Label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
-                  R$
-                </span>
-                <Input
-                  id="rendaMensal"
-                  value={formatCurrency(dadosPessoais.renda)}
-                  onChange={(e) => setDadosPessoais({ renda: parseCurrency(e.target.value) })}
-                  placeholder="0,00"
-                  className="form-input pl-10 placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30 tabular-nums"
-                />
-              </div>
-            </div>
+          {fontesRenda.length === 0 ? (
+            <p className="text-sm text-muted-foreground mb-3">Nenhuma fonte de renda cadastrada.</p>
+          ) : (
+            <ul className="space-y-2 mb-3">
+              {fontesRenda.map((fonte) => {
+                const Icon = ICONES_FONTE[fonte.tipo]
+                const tipoLabel = TIPOS_FONTE_RENDA[fonte.tipo].label
+                return (
+                  <li
+                    key={fonte.id}
+                    className="flex items-center gap-3 rounded-lg border border-border/50 bg-background px-3 py-2.5"
+                  >
+                    <div
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary"
+                    >
+                      <Icon className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {(fonte.descricao || tipoLabel).trim()}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{tipoLabel}</p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                      {labelPrazoFonte(fonte.prazo)}
+                    </span>
+                    <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">
+                      {moeda === "USD" ? "US$" : "R$"}{" "}
+                      {fonte.valorMensal.toLocaleString(moeda === "USD" ? "en-US" : "pt-BR", {
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 0,
+                      })}
+                    </span>
+                    <div className="flex shrink-0 gap-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => abrirEditarFonte(fonte)}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        onClick={() => removerFonte(fonte.id)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
 
-            {/* Despesa Mensal */}
-            <div className="space-y-2">
-              <Label 
-                htmlFor="despesaMensal" 
-                className="field-label"
-              >
-                Despesa Mensal (R$)
-              </Label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
-                  R$
-                </span>
-                <Input
-                  id="despesaMensal"
-                  value={formatCurrency(dadosPessoais.despesa)}
-                  onChange={(e) => setDadosPessoais({ despesa: parseCurrency(e.target.value) })}
-                  placeholder="0,00"
-                  className="form-input pl-10 placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30 tabular-nums"
-                />
-              </div>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full border-dashed"
+            onClick={abrirNovaFonte}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Adicionar fonte de renda
+          </Button>
+
+          <div
+            className="flex items-center justify-between mt-4 pt-3 border-t border-border/50"
+          >
+            <span className="text-sm font-medium text-foreground">Receita mensal total</span>
+            <span className="text-base font-bold tabular-nums text-primary">
+              {moeda === "USD" ? "US$" : "R$"}{" "}
+              {receitaTotal.toLocaleString(moeda === "USD" ? "en-US" : "pt-BR", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </span>
+          </div>
+        </div>
+
+        <span className="field-label">Despesas</span>
+        <div style={cardStyle}>
+          <div className="space-y-2 max-w-md">
+            <Label htmlFor="despesaMensal" className="field-label">
+              Despesa mensal (R$)
+            </Label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
+                R$
+              </span>
+              <Input
+                id="despesaMensal"
+                value={formatCurrency(dadosPessoais.despesa)}
+                onChange={(e) => setDadosPessoais({ despesa: parseCurrency(e.target.value) })}
+                placeholder="0,00"
+                className="form-input pl-10 placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30 tabular-nums"
+              />
             </div>
           </div>
 
@@ -449,7 +587,9 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
               Capacidade de poupança mensal:{" "}
               <span className="font-semibold">
                 {moeda === "USD" ? "US$" : "R$"}{" "}
-                {capacidadePoupanca.valor.toLocaleString(moeda === "USD" ? "en-US" : "pt-BR", { minimumFractionDigits: 2 })}
+                {capacidadePoupanca.valor.toLocaleString(moeda === "USD" ? "en-US" : "pt-BR", {
+                  minimumFractionDigits: 2,
+                })}
               </span>{" "}
               <span className="text-white/80">
                 ({capacidadePoupanca.percentual.toFixed(0)}% da renda)
@@ -458,6 +598,206 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
           </div>
         </div>
       </div>
+
+      <Dialog open={modalFonteOpen} onOpenChange={setModalFonteOpen}>
+        <DialogContent className="form-card rounded-2xl max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">
+              {editingFonte ? "Editar fonte de renda" : "Nova fonte de renda"}
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Informe tipo, valor e vigência da receita
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label className="field-label">Tipo</Label>
+              <Select
+                value={formFonte.tipo}
+                onValueChange={(v) => {
+                  const tipo = v as TipoFonteRenda
+                  setFormFonte((f) => ({
+                    ...f,
+                    tipo,
+                    descricao: f.descricao === TIPOS_FONTE_RENDA[f.tipo].descricaoPadrao
+                      ? TIPOS_FONTE_RENDA[tipo].descricaoPadrao
+                      : f.descricao,
+                  }))
+                }}
+              >
+                <SelectTrigger className="form-input">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(TIPOS_FONTE_RENDA) as TipoFonteRenda[]).map((k) => (
+                    <SelectItem key={k} value={k}>
+                      {TIPOS_FONTE_RENDA[k].label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="field-label">Descrição</Label>
+              <Input
+                value={formFonte.descricao}
+                onChange={(e) => setFormFonte((f) => ({ ...f, descricao: e.target.value }))}
+                className="form-input"
+                placeholder={TIPOS_FONTE_RENDA[formFonte.tipo].descricaoPadrao}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="field-label">Valor mensal (R$)</Label>
+              <Input
+                value={formatCurrency(formFonte.valorMensal)}
+                onChange={(e) =>
+                  setFormFonte((f) => ({ ...f, valorMensal: parseCurrency(e.target.value) }))
+                }
+                className="form-input tabular-nums"
+                placeholder="0,00"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="field-label">Prazo</Label>
+              <div className="grid grid-cols-1 gap-2">
+                {(
+                  [
+                    { id: "continua", label: "Contínua", desc: "Sem data de término" },
+                    { id: "ate_data", label: "Até uma data", desc: "Encerra em ano/mês" },
+                    { id: "evento_unico", label: "Evento único", desc: "Entra uma vez só" },
+                  ] as const
+                ).map((opt) => {
+                  const selected = formFonte.prazo.tipo === opt.id
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => {
+                        const ano = new Date().getFullYear()
+                        if (opt.id === "continua") setPrazoFonte({ tipo: "continua" })
+                        else if (opt.id === "ate_data")
+                          setPrazoFonte({ tipo: "ate_data", anoFim: ano + 5, mesFim: 12 })
+                        else setPrazoFonte({ tipo: "evento_unico", ano, mes: 1 })
+                      }}
+                      className={`rounded-lg border px-3 py-2 text-left transition-colors ${
+                        selected
+                          ? "border-primary bg-primary/5"
+                          : "border-border/60 hover:border-primary/40"
+                      }`}
+                    >
+                      <p className="text-sm font-medium text-foreground">{opt.label}</p>
+                      <p className="text-xs text-muted-foreground">{opt.desc}</p>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {formFonte.prazo.tipo === "ate_data" ? (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label className="field-label">Mês fim</Label>
+                  <Select
+                    value={String(formFonte.prazo.mesFim)}
+                    onValueChange={(v) =>
+                      setPrazoFonte({
+                        ...formFonte.prazo,
+                        tipo: "ate_data",
+                        mesFim: Number(v),
+                      })
+                    }
+                  >
+                    <SelectTrigger className="form-input">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MESES.map((m) => (
+                        <SelectItem key={m.v} value={String(m.v)}>
+                          {m.l}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="field-label">Ano fim</Label>
+                  <Input
+                    type="number"
+                    min={new Date().getFullYear()}
+                    value={formFonte.prazo.anoFim}
+                    onChange={(e) =>
+                      setPrazoFonte({
+                        ...formFonte.prazo,
+                        tipo: "ate_data",
+                        anoFim: Number(e.target.value) || new Date().getFullYear(),
+                      })
+                    }
+                    className="form-input"
+                  />
+                </div>
+              </div>
+            ) : null}
+
+            {formFonte.prazo.tipo === "evento_unico" ? (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label className="field-label">Mês</Label>
+                  <Select
+                    value={String(formFonte.prazo.mes)}
+                    onValueChange={(v) =>
+                      setPrazoFonte({
+                        ...formFonte.prazo,
+                        tipo: "evento_unico",
+                        mes: Number(v),
+                      })
+                    }
+                  >
+                    <SelectTrigger className="form-input">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MESES.map((m) => (
+                        <SelectItem key={m.v} value={String(m.v)}>
+                          {m.l}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="field-label">Ano</Label>
+                  <Input
+                    type="number"
+                    min={new Date().getFullYear()}
+                    value={formFonte.prazo.ano}
+                    onChange={(e) =>
+                      setPrazoFonte({
+                        ...formFonte.prazo,
+                        tipo: "evento_unico",
+                        ano: Number(e.target.value) || new Date().getFullYear(),
+                      })
+                    }
+                    className="form-input"
+                  />
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="ghost" onClick={() => setModalFonteOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="button" onClick={salvarFonte} disabled={formFonte.valorMensal <= 0}>
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Rodapé */}
       <div className="nav-footer">

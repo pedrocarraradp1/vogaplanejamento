@@ -16,6 +16,7 @@ import {
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts"
 import { Pencil, Plus, Trash2 } from "lucide-react"
 import { usePlano } from "@/lib/plano-context"
+import { getFontesRenda, receitaMensalAtual } from "@/lib/renda-utils"
 import type { Ativo } from "@/lib/plano-context"
 import {
   CATEGORIAS_PASSIVO,
@@ -1208,7 +1209,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
     [passivos],
   )
 
-  const rendaMensal = dadosPessoais.renda || 0
+  const rendaMensal = receitaMensalAtual(getFontesRenda(dadosPessoais))
   const despesaMensal = dadosPessoais.despesa || 0
   const quantidadeFilhos = dadosPessoais.filhos?.length ?? 0
   const metaReservaEmergencia = metaReservaEmergenciaMeses(dadosPessoais.profissao ?? "", quantidadeFilhos)

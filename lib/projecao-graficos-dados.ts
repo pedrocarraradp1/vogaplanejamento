@@ -37,6 +37,8 @@ export interface BuildDadosFluxoOptions {
   inflacaoPct: number
   objetivosPorAno: number[]
   passivosPorAno: number[]
+  /** Aporte anual do motor (`calcularFluxoAnual`), alinhado ao `displayMode`. */
+  aportePorAno?: number[]
   /** Retirada anual nominal do motor (`calcularFluxoAnual`), alinhada ao `displayMode`. */
   retiradaPorAno?: number[]
 }
@@ -73,6 +75,7 @@ export function buildDadosFluxoGrafico(
     inflacaoPct,
     objetivosPorAno,
     passivosPorAno,
+    aportePorAno,
     retiradaPorAno,
   } = options
 
@@ -94,7 +97,12 @@ export function buildDadosFluxoGrafico(
       displayMode === "nominal" ? patrimonioNominal : patrimonioReal
 
     const rendimento = Math.round(Math.max(0, patrimonioBase * taxaLiqAnual))
-    const aporte = !isAposentado ? Math.round(scaleFluxoNominal(aporteMensal * 12)) : 0
+    const aporteAnualBase = aportePorAno
+      ? Number(aportePorAno[i]) || 0
+      : !isAposentado
+        ? aporteMensal * 12
+        : 0
+    const aporte = !isAposentado ? Math.round(scaleFluxoNominal(aporteAnualBase)) : 0
     const objetivosPos = objetivosPorAno[i] ?? 0
     const objetivos = -Math.round(scaleFluxoNominal(objetivosPos))
     const passivosPos = passivosPorAno[i] ?? 0

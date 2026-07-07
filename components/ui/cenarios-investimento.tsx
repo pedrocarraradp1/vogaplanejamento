@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { usePlano } from "@/lib/plano-context"
+import { getFontesRenda, resolveAporteParaPremissas } from "@/lib/renda-utils"
 import { calcularProjecao, type ProjecaoAno } from "@/lib/engine"
 import {
   ResponsiveContainer,
@@ -79,34 +80,29 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
     return Math.max(0, idade)
   }, [dadosPessoais.nascimento])
 
-  const aporteMensal = Math.max(0, (dadosPessoais.renda || 0) - (dadosPessoais.despesa || 0))
-
+  const fontesRenda = useMemo(() => getFontesRenda(dadosPessoais), [dadosPessoais])
   const aporteModo = premissas.aporteModo ?? "fixo"
-  const aportePorAnoNominal = useMemo(() => {
-    if (aporteModo !== "periodos") return undefined
+  const blocosAporte = useMemo(() => {
     const prazo = Math.max(0, Number(premissas.prazo) || 0)
-    const inf = (Number(premissas.inflacao) || 0) / 100
     const blocos = Math.max(1, Math.ceil(prazo / 5))
-    const periodos = premissas.aportePeriodosReal ?? []
-
-    const byYear = Array.from({ length: prazo + 1 }, () => 0)
-    for (let i = 0; i < blocos; i++) {
+    return Array.from({ length: blocos }, (_, i) => {
       const inicio = i * 5
       const fim = Math.min((i + 1) * 5, prazo)
-      const real = Number(periodos[i] ?? aporteMensal) || 0
-      const nominalNoInicio = real * Math.pow(1 + inf, inicio)
-      for (let t = inicio; t < fim; t++) byYear[t] = nominalNoInicio
-    }
-    if (prazo > 0 && byYear[prazo] === 0) byYear[prazo] = byYear[prazo - 1] ?? 0
-    return byYear
-  }, [aporteModo, premissas.prazo, premissas.inflacao, premissas.aportePeriodosReal, aporteMensal])
+      return { i, inicio, fim }
+    })
+  }, [premissas.prazo])
+
+  const { aporteM: aporteMensal, aportePorAnoNominal } = useMemo(
+    () => resolveAporteParaPremissas(fontesRenda, dadosPessoais.despesa, premissas, blocosAporte),
+    [fontesRenda, dadosPessoais.despesa, premissas, blocosAporte],
+  )
 
   const premissasCompletas = useMemo(
     () => ({
       ...premissas,
       saldoInicial: saldoInicialCalculado,
       aporteM: aporteMensal,
-      ...(aportePorAnoNominal ? { aportePorAnoNominal } : {}),
+      aportePorAnoNominal,
       idadeAtual: idadeAtualCalculada,
     }),
     [premissas, saldoInicialCalculado, aporteMensal, aportePorAnoNominal, idadeAtualCalculada],

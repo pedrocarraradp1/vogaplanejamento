@@ -22,8 +22,18 @@ import {
   normalizeAtivoTipo,
 } from "@/lib/patrimonio-utils"
 import { criarFluxoDeCaixaInicial, normalizarFluxoDeCaixa, type FluxoDeCaixaState, type FluxoMesRealizado } from "@/lib/fluxo-caixa-utils"
+import {
+  type FonteRenda,
+  normalizarFontesRenda,
+  receitaMensalAtual,
+  aporteMensalAtual,
+  resolveAporteParaPremissas,
+  getFontesRenda,
+} from "@/lib/renda-utils"
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
+
+export type { FonteRenda, TipoFonteRenda, PrazoFonteRenda } from "@/lib/renda-utils"
 
 export interface DadosPessoais {
   nome: string
@@ -33,8 +43,10 @@ export interface DadosPessoais {
   estadoCivil: string
   regime: string
   filhos: Array<{ nome: string; dataNascimento: string }>
+  /** Soma das fontes vigentes no mês corrente (derivado). */
   renda: number
   despesa: number
+  fontesRenda?: FonteRenda[]
   /** Sexo para cotações (ex.: MAG API): M ou F */
   sexo?: "M" | "F" | ""
   /** Legado / formulários externos (ex.: Masculino, 1, 2) */
@@ -178,6 +190,7 @@ interface PlanoContextType {
   setMoeda: (moeda: PlanoState["moeda"]) => void
   setSimulacaoMeta: (meta: Partial<SimulacaoMeta>) => void
   setDadosPessoais: (dados: Partial<DadosPessoais>) => void
+  setFontesRenda: (fontes: FonteRenda[]) => void
   setAtivos: (ativos: Ativo[]) => void
   setPassivos: (passivos: Passivo[]) => void
   setPatrimonio: (patrimonio: Partial<PatrimonioState>) => void
@@ -257,6 +270,7 @@ const initialState: PlanoState = {
     filhos:      [],
     renda:       0,
     despesa:     0,
+    fontesRenda: [],
     sexo:        "M",
     genero:      "",
     uf:          "SP",
@@ -358,6 +372,9 @@ export function PlanoProvider({
     if (!dp.regime?.trim()) dp.regime = "Comunhão Parcial de Bens"
     if (!dp.uf?.trim()) dp.uf = "SP"
 
+    dp.fontesRenda = normalizarFontesRenda(dp.fontesRenda, dp.renda)
+    dp.renda = receitaMensalAtual(dp.fontesRenda)
+
     if (merged.premissas.aporteModo !== "fixo" && merged.premissas.aporteModo !== "periodos") {
       merged.premissas.aporteModo = "fixo"
     }
@@ -446,8 +463,9 @@ export function PlanoProvider({
   }, [state.ativos, state.passivos])
 
   const getAporteMensal = useCallback(() => {
-    return Math.max(0, state.dadosPessoais.renda - state.dadosPessoais.despesa)
-  }, [state.dadosPessoais.renda, state.dadosPessoais.despesa])
+    const fontes = getFontesRenda(state.dadosPessoais)
+    return aporteMensalAtual(fontes, state.dadosPessoais.despesa)
+  }, [state.dadosPessoais])
 
   const getIdadeAtual = useCallback(() => {
     const nasc = state.dadosPessoais.nascimento
@@ -467,8 +485,22 @@ export function PlanoProvider({
   }, [])
 
   const setDadosPessoais = useCallback((dados: Partial<DadosPessoais>) => {
-    setState(prev => ({ ...prev, dadosPessoais: { ...prev.dadosPessoais, ...dados } }))
+    setState((prev) => {
+      const next = { ...prev.dadosPessoais, ...dados }
+      if (dados.fontesRenda) {
+        next.fontesRenda = dados.fontesRenda
+        next.renda = receitaMensalAtual(next.fontesRenda)
+      }
+      return { ...prev, dadosPessoais: next }
+    })
   }, [])
+
+  const setFontesRenda = useCallback((fontesRenda: FonteRenda[]) => {
+    setDadosPessoais({
+      fontesRenda,
+      renda: receitaMensalAtual(fontesRenda),
+    })
+  }, [setDadosPessoais])
 
   const setAtivos = useCallback((ativos: Ativo[]) => {
     setState(prev => {
@@ -554,53 +586,53 @@ export function PlanoProvider({
 
   const simulatePreview = useCallback(() => {
     const saldoInicial = getSaldoInicialLiquido()
-    const aporteM    = Math.max(0, state.dadosPessoais.renda - state.dadosPessoais.despesa)
-    const idadeAtual = (() => {
-      const nasc = state.dadosPessoais.nascimento
-      if (!nasc) return 0
-      const nascDate = new Date(nasc)
-      const hoje     = new Date()
-      let idade      = hoje.getFullYear() - nascDate.getFullYear()
-      const m        = hoje.getMonth() - nascDate.getMonth()
-      if (m < 0 || (m === 0 && hoje.getDate() < nascDate.getDate())) idade--
-      return Math.max(0, idade)
-    })()
+    const idadeAtual = getIdadeAtual()
+    const fontes = getFontesRenda(state.dadosPessoais)
+    const { aporteM, aportePorAnoNominal } = resolveAporteParaPremissas(
+      fontes,
+      state.dadosPessoais.despesa,
+      state.premissas,
+    )
 
     const projecao = calcularProjecao(
-      { ...state.premissas, saldoInicial, aporteM, idadeAtual },
+      {
+        ...state.premissas,
+        saldoInicial,
+        aporteM,
+        idadeAtual,
+        aportePorAnoNominal,
+      },
       state.objetivos,
-      state.passivos
+      state.passivos,
     )
-    setState(prev => ({ ...prev, projecao }))
-  }, [state.premissas, state.objetivos, state.passivos, state.dadosPessoais, getSaldoInicialLiquido])
+    setState((prev) => ({ ...prev, projecao }))
+  }, [state.premissas, state.objetivos, state.passivos, state.dadosPessoais, getSaldoInicialLiquido, getIdadeAtual])
 
   const calcular = useCallback(() => {
     const saldoInicial = getSaldoInicialLiquido()
-    const aporteM    = Math.max(0, state.dadosPessoais.renda - state.dadosPessoais.despesa)
-    const idadeAtual = (() => {
-      const nasc = state.dadosPessoais.nascimento
-      if (!nasc) return 0
-      const nascDate = new Date(nasc)
-      const hoje     = new Date()
-      let idade      = hoje.getFullYear() - nascDate.getFullYear()
-      const m        = hoje.getMonth() - nascDate.getMonth()
-      if (m < 0 || (m === 0 && hoje.getDate() < nascDate.getDate())) idade--
-      return Math.max(0, idade)
-    })()
-
-    const premissasCompletas = { ...state.premissas, saldoInicial, aporteM, idadeAtual }
-
-    const projecao = calcularProjecao(
-      premissasCompletas,
-      state.objetivos,
-      state.passivos
+    const idadeAtual = getIdadeAtual()
+    const fontes = getFontesRenda(state.dadosPessoais)
+    const { aporteM, aportePorAnoNominal } = resolveAporteParaPremissas(
+      fontes,
+      state.dadosPessoais.despesa,
+      state.premissas,
     )
+
+    const premissasCompletas = {
+      ...state.premissas,
+      saldoInicial,
+      aporteM,
+      idadeAtual,
+      aportePorAnoNominal,
+    }
+
+    const projecao = calcularProjecao(premissasCompletas, state.objetivos, state.passivos)
 
     const kpis = calcularKPIs(
       projecao,
       premissasCompletas,
-      state.dadosPessoais.renda,
-      state.dadosPessoais.despesa
+      receitaMensalAtual(fontes),
+      state.dadosPessoais.despesa,
     )
 
     const totalPassivosInv = state.passivos.reduce((s, p) => s + getSaldoDevedorPassivo(p), 0)
@@ -632,7 +664,7 @@ export function PlanoProvider({
     )
 
     setState(prev => ({ ...prev, projecao, kpis, inventario, protecaoResult }))
-  }, [state, getSaldoInicialLiquido, getPatrimonioLiquido])
+  }, [state, getSaldoInicialLiquido, getPatrimonioLiquido, getIdadeAtual])
 
   const salvarPlano = useCallback(async (): Promise<{ error: string | null }> => {
     try {
@@ -667,7 +699,7 @@ export function PlanoProvider({
       simulacaoMeta,
       setMoeda,
       setSimulacaoMeta: setSimulacaoMetaPartial,
-      setDadosPessoais, setAtivos, setPassivos, setPatrimonio, setObjetivos,
+      setDadosPessoais, setFontesRenda, setAtivos, setPassivos, setPatrimonio, setObjetivos,
       setPremissas, setSucessao, setProtecao, setFluxoDeCaixa,
       loadState, clearSimulacaoMeta,
       getPatrimonioLiquido, getSaldoInicialLiquido, getAtivosFinanceiros, getAtivosLiquidosImediatos,

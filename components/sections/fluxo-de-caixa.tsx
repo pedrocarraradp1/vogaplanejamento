@@ -10,6 +10,7 @@ import { usePlano } from "@/lib/plano-context"
 import type { FluxoMesRealizado } from "@/lib/plano-context"
 import { calcularProjecao, calcularFluxoAnual, calcularPassivosPorAnoSeries } from "@/lib/engine"
 import { buildDadosFluxoGrafico } from "@/lib/projecao-graficos-dados"
+import { getFontesRenda, resolveAporteParaPremissas } from "@/lib/renda-utils"
 import {
   MESES_LABELS,
   MESES_LABELS_COMPLETOS,
@@ -87,17 +88,22 @@ export function FluxoDeCaixa({ onNavigate }: FluxoDeCaixaProps) {
   const saldoInicial = getSaldoInicialLiquido()
   const idadeAtual = getIdadeAtual()
 
-  const aporteMensal = Math.max(0, dadosPessoais.renda - dadosPessoais.despesa)
+  const fontesRenda = useMemo(() => getFontesRenda(dadosPessoais), [dadosPessoais])
+  const { aporteM: aporteMensal, aportePorAnoNominal } = useMemo(
+    () => resolveAporteParaPremissas(fontesRenda, dadosPessoais.despesa, premissas),
+    [fontesRenda, dadosPessoais.despesa, premissas],
+  )
 
   const premissasCompletas = useMemo(
     () => ({
       ...premissas,
       saldoInicial,
       aporteM: aporteMensal,
+      aportePorAnoNominal,
       idadeAtual,
       prazo: Math.max(1, Number(premissas.prazo) || 1),
     }),
-    [premissas, saldoInicial, aporteMensal, idadeAtual],
+    [premissas, saldoInicial, aporteMensal, aportePorAnoNominal, idadeAtual],
   )
 
   const objetivosEngine = useMemo(
@@ -146,6 +152,7 @@ export function FluxoDeCaixa({ onNavigate }: FluxoDeCaixaProps) {
         inflacaoPct: Number(premissas.inflacao) || 0,
         objetivosPorAno: fluxoAnualNominal.map((r) => r.objetivos),
         passivosPorAno: calcularPassivosPorAnoSeries(passivos, premissasCompletas.prazo),
+        aportePorAno: fluxoAnualNominal.map((r) => r.aporte),
         retiradaPorAno: fluxoAnualNominal.map((r) => r.retirada),
       }),
     [
@@ -196,6 +203,7 @@ export function FluxoDeCaixa({ onNavigate }: FluxoDeCaixaProps) {
         inflacaoPct: Number(premissas.inflacao) || 0,
         objetivosPorAno: fluxoAnual.map((r) => r.objetivos),
         passivosPorAno,
+        aportePorAno: fluxoAnual.map((r) => r.aporte),
         retiradaPorAno: fluxoAnual.map((r) => r.retirada),
       }),
     [
@@ -523,6 +531,7 @@ export function FluxoDeCaixa({ onNavigate }: FluxoDeCaixaProps) {
               formatarMoeda={formatarMoeda}
               formatarMoedaCompleta={formatarMoedaCompleta}
               hideTitle
+              hideMetaRenda
             />
           </div>
         </CardContent>

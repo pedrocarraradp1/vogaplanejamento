@@ -12,6 +12,7 @@ import {
   ResponsiveContainer, ReferenceLine, Cell, Line,
 } from "recharts"
 import { usePlano } from "@/lib/plano-context"
+import { getFontesRenda, receitaMensalAtual, resolveAporteParaPremissas } from "@/lib/renda-utils"
 import {
   calcularProjecao,
   calcularKPIs,
@@ -50,7 +51,8 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
     return Math.max(0, idade)
   }, [dadosPessoais.nascimento])
 
-  const aporteMensal = Math.max(0, dadosPessoais.renda - dadosPessoais.despesa)
+  const fontesRenda = useMemo(() => getFontesRenda(dadosPessoais), [dadosPessoais])
+  const rendaMensalAtual = useMemo(() => receitaMensalAtual(fontesRenda), [fontesRenda])
 
   const aporteModo = premissas.aporteModo ?? "fixo"
   const blocosAporte = useMemo(() => {
@@ -64,30 +66,24 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
   }, [premissas.prazo])
 
   // Mantém o array de aportes por bloco alinhado ao prazo (preserva valores existentes)
+  const aporteBase = useMemo(
+    () => resolveAporteParaPremissas(fontesRenda, dadosPessoais.despesa, premissas, blocosAporte).aporteM,
+    [fontesRenda, dadosPessoais.despesa, premissas, blocosAporte],
+  )
+
   useEffect(() => {
     if (aporteModo !== "periodos") return
     const desired = blocosAporte.length
     const cur = premissas.aportePeriodosReal ?? []
     if (cur.length === desired) return
-    const next = Array.from({ length: desired }, (_, i) => (cur[i] ?? aporteMensal))
+    const next = Array.from({ length: desired }, (_, i) => (cur[i] ?? aporteBase))
     setPremissas({ aportePeriodosReal: next })
-  }, [aporteModo, blocosAporte.length, aporteMensal, premissas.aportePeriodosReal, setPremissas])
+  }, [aporteModo, blocosAporte.length, aporteBase, premissas.aportePeriodosReal, setPremissas])
 
-  const aportePorAnoNominal = useMemo(() => {
-    if (aporteModo !== "periodos") return undefined
-    const prazo = Math.max(0, Number(premissas.prazo) || 0)
-    const inf = (Number(premissas.inflacao) || 0) / 100
-    const periodos = premissas.aportePeriodosReal ?? []
-    const byYear = Array.from({ length: prazo + 1 }, () => 0)
-
-    for (const b of blocosAporte) {
-      const real = Number(periodos[b.i] ?? aporteMensal) || 0
-      const nominalNoInicio = real * Math.pow(1 + inf, b.inicio)
-      for (let t = b.inicio; t < b.fim; t++) byYear[t] = nominalNoInicio
-    }
-    if (prazo > 0 && byYear[prazo] === 0) byYear[prazo] = byYear[prazo - 1] ?? 0
-    return byYear
-  }, [aporteModo, premissas.prazo, premissas.inflacao, premissas.aportePeriodosReal, blocosAporte, aporteMensal])
+  const { aporteM: aporteMensal, aportePorAnoNominal } = useMemo(
+    () => resolveAporteParaPremissas(fontesRenda, dadosPessoais.despesa, premissas, blocosAporte),
+    [fontesRenda, dadosPessoais.despesa, premissas, blocosAporte],
+  )
 
   // Premissas completas — junta os campos editáveis com os derivados
   const premissasCompletas = useMemo(() => ({
@@ -95,7 +91,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
     saldoInicial: saldoInicialCalculado,
     aporteM:      aporteMensal,
     prazo:        Math.max(1, Number(premissas.prazo) || 0),
-    ...(aportePorAnoNominal ? { aportePorAnoNominal } : {}),
+    aportePorAnoNominal,
     idadeAtual:   idadeAtualCalculada,
   }), [premissas, saldoInicialCalculado, aporteMensal, aportePorAnoNominal, idadeAtualCalculada])
 
@@ -187,6 +183,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
         inflacaoPct: Number(premissas.inflacao) || 0,
         objetivosPorAno: fluxoAnual.map((r) => r.objetivos),
         passivosPorAno,
+        aportePorAno: fluxoAnual.map((r) => r.aporte),
         retiradaPorAno: fluxoAnual.map((r) => r.retirada),
       }),
     [
@@ -224,8 +221,8 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
   )
 
   const kpis = useMemo(() =>
-    calcularKPIs(projecao, premissasCompletas, dadosPessoais.renda, dadosPessoais.despesa)
-  , [projecao, premissasCompletas, dadosPessoais.renda, dadosPessoais.despesa])
+    calcularKPIs(projecao, premissasCompletas, rendaMensalAtual, dadosPessoais.despesa)
+  , [projecao, premissasCompletas, rendaMensalAtual, dadosPessoais.despesa])
 
   const dadosGrafico = useMemo(() =>
     projecao.map(p => ({
@@ -405,7 +402,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
                 className="form-card text-foreground cursor-not-allowed opacity-70"
               />
               <p className="text-xs text-muted-foreground">
-                Calculado automaticamente: Renda ({formatarMoedaCompleta(dadosPessoais.renda)}) − Despesa ({formatarMoedaCompleta(dadosPessoais.despesa)})
+                Calculado automaticamente: Renda ({formatarMoedaCompleta(rendaMensalAtual)}) − Despesa ({formatarMoedaCompleta(dadosPessoais.despesa)})
               </p>
             </div>
           ) : (

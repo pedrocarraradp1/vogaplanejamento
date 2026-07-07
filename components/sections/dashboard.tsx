@@ -11,6 +11,7 @@ import {
   ResponsiveContainer, ReferenceLine, Cell, PieChart, Pie, Legend, Label, Line,
 } from "recharts"
 import { usePlano } from "@/lib/plano-context"
+import { getFontesRenda, receitaMensalAtual, resolveAporteParaPremissas } from "@/lib/renda-utils"
 import { CenariosInvestimento } from "@/components/ui/cenarios-investimento"
 import { FluxoAnualChart, RendaCarteiraChart } from "@/components/charts/projecao-extra-charts"
 import { buildDadosFluxoGrafico, buildDadosRendaGrafico } from "@/lib/projecao-graficos-dados"
@@ -32,7 +33,7 @@ interface DashboardProps {
 }
 
 export function Dashboard({ onNavigate }: DashboardProps) {
-  const { state, getSaldoInicialLiquido, getPatrimonioLiquido, getPatrimonioTotalConsolidado, getAporteMensal, getIdadeAtual } = usePlano()
+  const { state, getSaldoInicialLiquido, getPatrimonioLiquido, getPatrimonioTotalConsolidado, getIdadeAtual } = usePlano()
   const { dadosPessoais, objetivos, premissas, sucessao, protecao } = state
   const moeda = state.moeda ?? "BRL"
 
@@ -43,7 +44,12 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
   const saldoInicial = getSaldoInicialLiquido()
   const patrimonioTotalConsolidado = getPatrimonioTotalConsolidado()
-  const aporteM      = getAporteMensal()
+  const fontesRenda = useMemo(() => getFontesRenda(dadosPessoais), [dadosPessoais])
+  const rendaAtual = useMemo(() => receitaMensalAtual(fontesRenda), [fontesRenda])
+  const { aporteM, aportePorAnoNominal } = useMemo(
+    () => resolveAporteParaPremissas(fontesRenda, dadosPessoais.despesa, premissas),
+    [fontesRenda, dadosPessoais.despesa, premissas],
+  )
   const idadeAtual   = getIdadeAtual()
   const patrimonioTotalSucessao =
     sucessao.plEditavel === 0 ? patrimonioTotalConsolidado : sucessao.plEditavel
@@ -52,9 +58,10 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     ...premissas,
     saldoInicial,
     aporteM,
+    aportePorAnoNominal,
     idadeAtual,
     prazo: Math.max(1, Number(premissas.prazo) || 0),
-  }), [premissas, saldoInicial, aporteM, idadeAtual])
+  }), [premissas, saldoInicial, aporteM, aportePorAnoNominal, idadeAtual])
 
   const objetivosEngine = useMemo(() =>
     objetivos.map(o => ({
@@ -86,8 +93,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   )
 
   const kpis = useMemo(() =>
-    calcularKPIs(projecao, premissasCompletas, dadosPessoais.renda, dadosPessoais.despesa)
-  , [projecao, premissasCompletas, dadosPessoais.renda, dadosPessoais.despesa])
+    calcularKPIs(projecao, premissasCompletas, rendaAtual, dadosPessoais.despesa)
+  , [projecao, premissasCompletas, rendaAtual, dadosPessoais.despesa])
 
   const totalPassivosInv = useMemo(
     () => state.passivos.reduce((s, p) => s + getSaldoDevedorPassivo(p), 0),
@@ -154,6 +161,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         inflacaoPct: Number(premissas.inflacao) || 0,
         objetivosPorAno: fluxoAnual.map((r) => r.objetivos),
         passivosPorAno,
+        aportePorAno: fluxoAnual.map((r) => r.aporte),
         retiradaPorAno: fluxoAnual.map((r) => r.retirada),
       }),
     [
