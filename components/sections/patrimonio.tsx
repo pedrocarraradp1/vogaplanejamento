@@ -74,9 +74,11 @@ import {
   formatDonutTooltipPct,
 } from "@/lib/chart-tooltip"
 import { usePieVogaProps } from "@/components/charts/use-pie-voga"
+import { isPlanoCompleto, type PlanoSecaoVariant } from "@/lib/plano-secoes"
 
 interface PatrimonioProps {
   onNavigate: (section: string) => void
+  variant?: PlanoSecaoVariant
 }
 
 type DonutSlice = { name: string; value: number; fill: string }
@@ -974,7 +976,8 @@ function PassivoRowActions({
   )
 }
 
-export function Patrimonio({ onNavigate }: PatrimonioProps) {
+export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
+  const resumo = isPlanoCompleto(variant)
   const { state, setAtivos, setPassivos, getIdadeAtual } = usePlano()
   const { ativos, passivos, patrimonio, moeda, dadosPessoais } = state
 
@@ -1470,6 +1473,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
   return (
     <div id="balanco-patrimonial-content" style={{ background: "#ffffff" }}>
       {/* 1. Cabeçalho (somente tela) */}
+      {!resumo ? (
       <div className="pdf-hide">
       <p style={{ fontSize: 11, color: "var(--accent)", marginBottom: 8 }}>Cadastro</p>
       <div
@@ -1558,6 +1562,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
         </div>
       </div>
       </div>
+      ) : null}
 
       <div id="pdf-slide-1">
       {/* 2. KPIs */}
@@ -1603,6 +1608,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
       </div>
 
       {/* Gap de patrimônio · reserva de emergência */}
+      {!resumo ? (
       <div className="pdf-section" style={{ marginBottom: 16 }}>
         <div
           className="pdf-section-card"
@@ -1740,6 +1746,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
           </p>
         </div>
       </div>
+      ) : null}
 
       {/* 3. Gráficos donuts */}
       <div className="pdf-section">
@@ -1777,8 +1784,10 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
         </div>
       </div>
       </div>
+      </div>
 
       {/* 4. Barras + Passivos */}
+      {!resumo ? (
       <div className="pdf-section">
       <div
         className="pdf-grid-2"
@@ -1935,8 +1944,10 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
         </div>
       </div>
       </div>
-      </div>
+      ) : null}
 
+      {!resumo ? (
+      <>
       <div id="pdf-slide-2">
       {/* 5. Indicadores de saúde */}
       <div className="pdf-section">
@@ -2270,6 +2281,8 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
         })}
       </div>
       </div>
+      </>
+      ) : null}
 
       <Dialog open={addModal != null} onOpenChange={(open) => !open && setAddModal(null)}>
         <DialogContent
@@ -2637,6 +2650,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
       </Dialog>
 
       {/* 8. Navegação */}
+      {!resumo ? (
       <div
         className="no-print"
         style={{
@@ -2672,6 +2686,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
           Próximo ›
         </button>
       </div>
+      ) : null}
     </div>
   )
 }

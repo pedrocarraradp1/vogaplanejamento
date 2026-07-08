@@ -45,6 +45,7 @@ import { MonteCarloChart } from "@/components/charts/monte-carlo-chart"
 import { EstrategiaRetiradaAposentadoria } from "@/components/ui/estrategia-retirada-aposentadoria"
 import { ControlesSimulacao } from "@/components/ui/controles-simulacao"
 import { BlocoAporteNecessario } from "@/components/ui/bloco-aporte-necessario"
+import { isPlanoCompleto, type PlanoSecaoVariant } from "@/lib/plano-secoes"
 
 const GOLD = VOGA.brasilia
 const GREEN = VOGA.brasilia
@@ -52,6 +53,7 @@ const RED = VOGA.alerta
 
 interface ProjecaoProps {
   onNavigate: (section: string) => void
+  variant?: PlanoSecaoVariant
 }
 
 function KpiCardComTooltip({
@@ -84,7 +86,8 @@ function KpiCardComTooltip({
   )
 }
 
-export function Projecao({ onNavigate }: ProjecaoProps) {
+export function Projecao({ onNavigate, variant = "full" }: ProjecaoProps) {
+  const resumo = isPlanoCompleto(variant)
   const { state, setPremissas, setDadosPessoais, getSaldoInicialLiquido } = usePlano()
   const { premissas, objetivos, dadosPessoais } = state
   const moeda = state.moeda ?? "BRL"
@@ -749,6 +752,157 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
       onIdadeAposentadoriaChange={(valor) => setPremissas({ idadeApos: valor })}
     />
   )
+
+  const blocosAporteResumo = (
+    <>
+      <BlocoAporteNecessario
+        titulo="Aporte necessário para preservação"
+        subtitulo="Menor aporte mensal que mantém o patrimônio CONSTANTE na aposentadoria (fluxo-zero), sustentando a renda desejada para sempre, sem consumir nem acumular o principal."
+        corDestaque="#1066DA"
+        dados={{
+          invalido: b2PreservacaoResultado.invalido,
+          aporteNecessario: b2PreservacaoResultado.aporteNecessario,
+          alvo: b2PreservacaoResultado.alvo,
+          alvoInvalidoMsg: "idade de aposentadoria deve ser maior que a idade atual",
+        }}
+        aporteAtual={aporteMensal}
+        formatarMoedaCompleta={formatarMoedaCompleta}
+        textoFolga="O ritmo atual de aportes já é suficiente para preservar o patrimônio na aposentadoria (fluxo-zero), sustentando a renda desejada para sempre."
+        textoFalta="O ritmo atual de aportes não sustenta a estratégia de preservação — o patrimônio não permaneceria constante na aposentadoria com a renda desejada."
+        corFolgaTexto="#0C447C"
+      />
+
+      <BlocoAporteNecessario
+        titulo="Aporte necessário para consumo"
+        subtitulo="Menor aporte mensal que sustenta a renda desejada até o fim do horizonte simulado, consumindo o principal ao longo do caminho — o patrimônio esgota (não sobra herança), mas o aporte necessário é MENOR que o de preservação, já que não precisa durar para sempre."
+        corDestaque="#4B759B"
+        dados={{
+          invalido: b2ConsumoResultado.invalido,
+          aporteNecessario: b2ConsumoResultado.aporteNecessario,
+          alvo: b2ConsumoResultado.alvo,
+          alvoInvalidoMsg: "idade de aposentadoria deve ser maior que a idade atual",
+        }}
+        aporteAtual={aporteMensal}
+        formatarMoedaCompleta={formatarMoedaCompleta}
+        textoFolga="O ritmo atual de aportes já é suficiente para sustentar a renda desejada até o fim do horizonte com consumo do principal."
+        textoFalta="O ritmo atual de aportes não sustenta a estratégia de consumo — o patrimônio não chegaria a zero no fim do horizonte simulado com a renda desejada."
+        corFolgaFundo="rgba(75, 117, 155, 0.15)"
+        corFolgaTexto="#4B759B"
+      />
+    </>
+  )
+
+  if (resumo) {
+    return (
+      <div className="space-y-6">
+        <Card className="form-card">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-base font-medium text-foreground">Simulação em tempo real</CardTitle>
+            {ToggleNominalReal}
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={dadosGrafico} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
+                  <XAxis dataKey="idade" stroke="rgba(0,0,0,0.35)"
+                    tick={{ fill: "var(--text-label)", fontSize: 12 }} tickLine={false}
+                    axisLine={{ stroke: "rgba(0,0,0,0.08)" }} interval="preserveStartEnd" />
+                  <YAxis stroke="rgba(0,0,0,0.35)" tick={{ fill: "var(--text-label)", fontSize: 12 }}
+                    tickLine={false} axisLine={false} tickFormatter={formatarMoeda} />
+                  <Tooltip
+                    {...CHART_TOOLTIP_PROPS}
+                    content={({ active, payload, label }) => {
+                      if (!active || !payload?.length) return null
+                      const entry = payload[0]?.payload as {
+                        valor?: number
+                        idade?: number
+                        isAposentado?: boolean
+                        retiradaAplicadaMensal?: number
+                        deltaPatrimonioReal?: number
+                      }
+                      const idade = Number(entry?.idade) || Number(label) || 0
+                      const patrimonio = Number(entry?.valor) || 0
+                      const retiradaAplicada = Number(entry?.retiradaAplicadaMensal) || 0
+                      const deltaReal = Number(entry?.deltaPatrimonioReal) || 0
+                      const sinalDelta = deltaReal > 0 ? "+" : ""
+
+                      return (
+                        <div className="rounded-md border border-border bg-card px-3 py-2 text-xs shadow-md space-y-1">
+                          <p className="font-medium text-foreground">Idade: {idade} anos</p>
+                          <p>
+                            Patrimônio ({displayMode === "nominal" ? "nominal" : "real"}):{" "}
+                            {formatarMoedaCompleta(patrimonio)}
+                          </p>
+                          {entry?.isAposentado ? (
+                            <p>
+                              Retirada aplicada (simulação): {formatarMoedaCompleta(retiradaAplicada)}
+                              /mês
+                            </p>
+                          ) : (
+                            <p className="text-muted-foreground">Ainda em acumulação (sem retirada)</p>
+                          )}
+                          <p>
+                            Variação real vs. ano anterior: {sinalDelta}
+                            {formatarMoedaCompleta(deltaReal)}
+                          </p>
+                        </div>
+                      )
+                    }}
+                  />
+                  <ReferenceLine x={premissasCompletas.idadeApos} stroke="#1066DA" strokeDasharray="5 5"
+                    label={{ value: "Aposentadoria", position: "top", fill: "#1066DA", fontSize: 12 }} />
+                  <Bar dataKey="valor" radius={[2, 2, 0, 0]}>
+                    {dadosGrafico.map((entry: ProjecaoAno & { valor: number }, index: number) => (
+                      <Cell key={`cell-resumo-${index}`}
+                        fill={entry.valor >= 0 ? "rgba(30,92,230,0.35)" : "rgba(240,75,75,0.2)"} />
+                    ))}
+                  </Bar>
+                  {displayMode === "nominal" && (
+                    <Line
+                      type="monotone"
+                      dataKey="poderCompraHoje"
+                      stroke="rgba(0,0,0,0.45)"
+                      strokeWidth={2}
+                      strokeDasharray="6 4"
+                      dot={false}
+                      isAnimationActive={false}
+                    />
+                  )}
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            {displayMode === "nominal" && (
+              <p className="text-xs text-muted-foreground">
+                Valores nominais — a linha tracejada mostra o equivalente em poder de compra de hoje considerando inflação de{" "}
+                <span className="text-foreground font-medium">{Number(premissasCompletas.inflacao) || 0}% a.a.</span>
+                .
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        {dadosRenda && dadosRenda.length > 0 ? (
+          <Card className="form-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-medium text-foreground">
+                Renda gerada vs. renda desejada
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <RendaCarteiraChart
+                data={dadosRenda}
+                formatarMoeda={formatarMoeda}
+                formatarMoedaCompleta={formatarMoedaCompleta}
+              />
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {blocosAporteResumo}
+      </div>
+    )
+  }
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -1425,40 +1579,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
         </CardContent>
       </Card>
 
-      <BlocoAporteNecessario
-        titulo="Aporte necessário para preservação"
-        subtitulo="Menor aporte mensal que mantém o patrimônio CONSTANTE na aposentadoria (fluxo-zero), sustentando a renda desejada para sempre, sem consumir nem acumular o principal."
-        corDestaque="#1066DA"
-        dados={{
-          invalido: b2PreservacaoResultado.invalido,
-          aporteNecessario: b2PreservacaoResultado.aporteNecessario,
-          alvo: b2PreservacaoResultado.alvo,
-          alvoInvalidoMsg: "idade de aposentadoria deve ser maior que a idade atual",
-        }}
-        aporteAtual={aporteMensal}
-        formatarMoedaCompleta={formatarMoedaCompleta}
-        textoFolga="O ritmo atual de aportes já é suficiente para preservar o patrimônio na aposentadoria (fluxo-zero), sustentando a renda desejada para sempre."
-        textoFalta="O ritmo atual de aportes não sustenta a estratégia de preservação — o patrimônio não permaneceria constante na aposentadoria com a renda desejada."
-        corFolgaTexto="#0C447C"
-      />
-
-      <BlocoAporteNecessario
-        titulo="Aporte necessário para consumo"
-        subtitulo="Menor aporte mensal que sustenta a renda desejada até o fim do horizonte simulado, consumindo o principal ao longo do caminho — o patrimônio esgota (não sobra herança), mas o aporte necessário é MENOR que o de preservação, já que não precisa durar para sempre."
-        corDestaque="#4B759B"
-        dados={{
-          invalido: b2ConsumoResultado.invalido,
-          aporteNecessario: b2ConsumoResultado.aporteNecessario,
-          alvo: b2ConsumoResultado.alvo,
-          alvoInvalidoMsg: "idade de aposentadoria deve ser maior que a idade atual",
-        }}
-        aporteAtual={aporteMensal}
-        formatarMoedaCompleta={formatarMoedaCompleta}
-        textoFolga="O ritmo atual de aportes já é suficiente para sustentar a renda desejada até o fim do horizonte com consumo do principal."
-        textoFalta="O ritmo atual de aportes não sustenta a estratégia de consumo — o patrimônio não chegaria a zero no fim do horizonte simulado com a renda desejada."
-        corFolgaFundo="rgba(75, 117, 155, 0.15)"
-        corFolgaTexto="#4B759B"
-      />
+      {blocosAporteResumo}
 
       <Card className="form-card">
         <CardHeader className="pb-4">

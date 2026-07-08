@@ -34,6 +34,8 @@ export interface CenariosInvestimentoProps {
   editable?: boolean
   /** Se false, não renderiza a seção de retirada (para usar em boxes separados). Default: true */
   showEstrategiaRetirada?: boolean
+  /** `resumo`: só perfis + estratégia de retirada (Plano Financeiro Completo). */
+  layout?: "full" | "resumo"
 }
 
 type LinhaCenarios = {
@@ -51,6 +53,8 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
   const [showCenarios, setShowCenarios] = useState(true)
   const editable = props.editable ?? true
   const showEstrategiaRetirada = props.showEstrategiaRetirada ?? true
+  const layout = props.layout ?? "full"
+  const resumo = layout === "resumo"
 
   const cenarioConservador = premissas.rentabilidadeConservador ?? 7
   const cenarioModerado = premissas.rentabilidadeModerado ?? 10
@@ -352,6 +356,7 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
         <CardTitle className="text-base font-medium text-foreground">Cenários Alternativos de Investimento</CardTitle>
         <div className="flex items-center gap-3">
           {ToggleNominalReal}
+          {!resumo ? (
           <Button
             variant="ghost"
             size="sm"
@@ -360,6 +365,7 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
           >
             {showCenarios ? "Ocultar Cenários" : "Ver Cenários"}
           </Button>
+          ) : null}
         </div>
       </CardHeader>
 
@@ -459,6 +465,8 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
             />
           ) : null}
 
+          {!resumo ? (
+          <>
           <div className="rounded-xl border border-border bg-secondary overflow-hidden">
             <div className="px-5 py-4 border-b border-border">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Comparação de Resultados</p>
@@ -538,6 +546,8 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
               </ResponsiveContainer>
             </div>
           </div>
+          </>
+          ) : null}
         </CardContent>
       )}
     </Card>

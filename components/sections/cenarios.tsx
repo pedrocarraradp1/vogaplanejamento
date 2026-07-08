@@ -4,13 +4,30 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, ArrowRight } from "lucide-react"
 import { CenariosInvestimento } from "@/components/ui/cenarios-investimento"
+import { isPlanoCompleto, type PlanoSecaoVariant } from "@/lib/plano-secoes"
 
 interface CenariosProps {
   onNavigate: (section: string) => void
+  variant?: PlanoSecaoVariant
 }
 
-export function Cenarios({ onNavigate }: CenariosProps) {
+export function Cenarios({ onNavigate, variant = "full" }: CenariosProps) {
+  const resumo = isPlanoCompleto(variant)
   const [displayMode, setDisplayMode] = useState<"nominal" | "real">("real")
+
+  if (resumo) {
+    return (
+      <div className="space-y-6">
+        <CenariosInvestimento
+          displayMode={displayMode}
+          onDisplayModeChange={setDisplayMode}
+          editable={false}
+          layout="resumo"
+          showEstrategiaRetirada
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">

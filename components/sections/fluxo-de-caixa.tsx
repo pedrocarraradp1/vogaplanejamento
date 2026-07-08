@@ -27,9 +27,11 @@ import {
   LegendaFluxo,
 } from "@/components/charts/fluxo-caixa-charts"
 import { GraficoFluxoAnual } from "@/components/charts/grafico-fluxo-anual"
+import { isPlanoCompleto, type PlanoSecaoVariant } from "@/lib/plano-secoes"
 
 interface FluxoDeCaixaProps {
   onNavigate: (section: string) => void
+  variant?: PlanoSecaoVariant
 }
 
 const PAINEL_BG = "#F5F5F5"
@@ -71,7 +73,8 @@ function ToggleDois({
   )
 }
 
-export function FluxoDeCaixa({ onNavigate }: FluxoDeCaixaProps) {
+export function FluxoDeCaixa({ onNavigate, variant = "full" }: FluxoDeCaixaProps) {
+  const resumo = isPlanoCompleto(variant)
   const { state, setFluxoDeCaixa, getSaldoInicialLiquido, getIdadeAtual } = usePlano()
   const { fluxoDeCaixa, premissas, objetivos, passivos, dadosPessoais } = state
   const moeda = state.moeda ?? "BRL"
@@ -291,6 +294,7 @@ export function FluxoDeCaixa({ onNavigate }: FluxoDeCaixaProps) {
 
   return (
     <div className="space-y-6">
+      {!resumo ? (
       <div>
         <p className="text-sm text-muted-foreground mb-1">Planejamento</p>
         <h1 className="page-title text-[24px] text-foreground">
@@ -300,8 +304,10 @@ export function FluxoDeCaixa({ onNavigate }: FluxoDeCaixaProps) {
           Acompanhe o realizado do ano corrente e compare com o orçamento e a projeção patrimonial
         </p>
       </div>
+      ) : null}
 
-      {/* Painel 1 */}
+      {!resumo ? (
+      /* Painel 1 */
       <Card className="form-card">
         <CardHeader className="flex flex-row items-center justify-between gap-4 pb-4">
           <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -417,8 +423,9 @@ export function FluxoDeCaixa({ onNavigate }: FluxoDeCaixaProps) {
           </div>
         </CardContent>
       </Card>
+      ) : null}
 
-      {/* Painel 2 */}
+      {/* Painel 2 — Saldo orçado vs realizado */}
       <Card className="form-card">
         <CardHeader className="pb-4">
           <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -449,6 +456,7 @@ export function FluxoDeCaixa({ onNavigate }: FluxoDeCaixaProps) {
         formatarMoedaCompleta={formatarMoedaCompleta}
       />
 
+      {!resumo ? (
       <div className="nav-footer">
         <Button variant="ghost" className="btn-back" onClick={() => onNavigate("objetivos")}>
           <ArrowLeft className="w-4 h-4 mr-2" />
@@ -459,6 +467,7 @@ export function FluxoDeCaixa({ onNavigate }: FluxoDeCaixaProps) {
           <ArrowRight className="w-4 h-4 ml-2" />
         </Button>
       </div>
+      ) : null}
     </div>
   )
 }
