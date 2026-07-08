@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, ArrowRight, TrendingUp, DollarSign, Clock, Info } from "lucide-react"
+import { ArrowLeft, ArrowRight, TrendingUp, DollarSign, Clock, Info, Check, AlertTriangle } from "lucide-react"
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, Cell, Line,
@@ -19,6 +19,8 @@ import {
   calcularFluxoAnual,
   encontrarRendaDeConsumoMensalReal,
   encontrarRendaDePreservacaoMensalReal,
+  rodarMonteCarlo,
+  VOLATILIDADE_MONTE_CARLO_ANUAL,
   pvAnuidade,
   pmtDeAnuidade,
   horizonteRendaSustentavelAnos,
@@ -26,6 +28,7 @@ import {
   rendaMensalGeradaReal,
   rendaMensalGeradaNominal,
   totalObjetivosEternosAnuais,
+  type ResultadoMonteCarlo,
   type ProjecaoAno,
 } from "@/lib/engine"
 import { VOGA } from "@/lib/voga-tokens"
@@ -35,6 +38,7 @@ import { CenariosInvestimento } from "@/components/ui/cenarios-investimento"
 import { GraficoFluxoAnual } from "@/components/charts/grafico-fluxo-anual"
 import { RendaCarteiraChart } from "@/components/charts/projecao-extra-charts"
 import { IndependenciaChart, type PontoIndependencia } from "@/components/charts/independencia-chart"
+import { MonteCarloChart } from "@/components/charts/monte-carlo-chart"
 import { EstrategiaRetiradaAposentadoria } from "@/components/ui/estrategia-retirada-aposentadoria"
 
 const GOLD = VOGA.brasilia
@@ -509,94 +513,66 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
 
   const patrimonioNecessario = kpis.patrimonioNecessarioLF
 
-  // ── Bloco 2: simulação de aporte necessário (inputs editáveis) ─────────────
-  const [b2, setB2] = useState<{
-    idadeAtual?: number
-    idadeApos?: number
-    renda?: number
-    horizonte?: number
-    patrimonio?: number
-    rentPct?: number
-  }>({})
-  const b2IdadeAtual = b2.idadeAtual ?? idadeAtualCalculada
-  const b2IdadeApos = b2.idadeApos ?? (Number(premissas.idadeApos) || 0)
-  const b2Renda = b2.renda ?? rendaMensalDesejada
-  const b2Horizonte = b2.horizonte ?? horizonte
-  const b2Patrimonio = b2.patrimonio ?? saldoInicialCalculado
-  const b2RentPct = b2.rentPct ?? taxaReal * 100
-  const b2Rent = b2RentPct / 100
+  // ── Bloco 2: aporte necessário (mesmo cálculo, só apresentação) ────────────
+  const b2RentPct = taxaReal * 100
 
   const b2Resultado = useMemo(() => {
-    const alvo = pvAnuidade(b2Renda * 12, b2Rent, Math.max(1, b2Horizonte))
-    const nMeses = Math.max(0, (b2IdadeApos - b2IdadeAtual) * 12)
+    const alvo = pvAnuidade(rendaMensalDesejada * 12, taxaReal, Math.max(1, horizonte))
+    const nMeses = Math.max(0, ((Number(premissas.idadeApos) || 0) - idadeAtualCalculada) * 12)
     if (nMeses <= 0) {
-      return { alvo, aporteNecessario: 0, fvPatrimonio: b2Patrimonio, invalido: true }
+      return { alvo, aporteNecessario: 0, fvPatrimonio: saldoInicialCalculado, invalido: true }
     }
-    const rMensal = Math.pow(1 + b2Rent, 1 / 12) - 1
-    const fvPatrimonio = b2Patrimonio * Math.pow(1 + rMensal, nMeses)
+    const rMensal = Math.pow(1 + taxaReal, 1 / 12) - 1
+    const fvPatrimonio = saldoInicialCalculado * Math.pow(1 + rMensal, nMeses)
     const fatorAnuidade =
       rMensal === 0 ? nMeses : (Math.pow(1 + rMensal, nMeses) - 1) / rMensal
     const aporteNecessario = Math.max(0, (alvo - fvPatrimonio) / fatorAnuidade)
     return { alvo, aporteNecessario, fvPatrimonio, invalido: false }
-  }, [b2Renda, b2Rent, b2Horizonte, b2IdadeApos, b2IdadeAtual, b2Patrimonio])
+  }, [rendaMensalDesejada, taxaReal, horizonte, premissas.idadeApos, idadeAtualCalculada, saldoInicialCalculado])
 
-  const diffAporte = b2Resultado.aporteNecessario - aporteMensal
-
-  // ── Toggle do gráfico do Bloco 1: "Ritmo atual" vs "Aporte necessário" ─────
-  const [ritmoB1, setRitmoB1] = useState<"atual" | "necessario">("atual")
-
-  // Projeção alternativa usando o aporte necessário (real, cresce com a inflação
-  // via fallback aporteM*(1+inf)^t da engine — por isso zeramos aportePorAnoNominal).
-  const projecaoNecessario = useMemo(
-    () =>
-      calcularProjecao(
-        { ...premissasCompletas, aporteM: b2Resultado.aporteNecessario, aportePorAnoNominal: undefined },
-        objetivosEngine,
-        state.passivos,
-        displayMode,
-      ),
-    [premissasCompletas, b2Resultado.aporteNecessario, objetivosEngine, state.passivos, displayMode],
-  )
-
-  const projecaoB1 = ritmoB1 === "necessario" ? projecaoNecessario : projecao
-  const aporteB1Ativo = ritmoB1 === "necessario" ? b2Resultado.aporteNecessario : aporteMensal
+  const gapAporte = aporteMensal - b2Resultado.aporteNecessario
+  const maiorAporteComparativo = Math.max(aporteMensal, b2Resultado.aporteNecessario, 1)
 
   const idadeIndependencia = useMemo(() => {
-    for (const p of projecaoB1) {
+    for (const p of projecao) {
       if ((Number(p.saldoReal) || 0) >= patrimonioNecessario) return p.idade
     }
     return null
-  }, [projecaoB1, patrimonioNecessario])
+  }, [projecao, patrimonioNecessario])
 
   const dadosIndependencia = useMemo<PontoIndependencia[]>(
-    () => {
-      const idadeApos = Number(premissas.idadeApos) || 0
-      return projecaoB1.map((p) => {
-        const patrimonio = Number(p.saldoReal) || 0
-        const horizonteNesseAno = horizonteRendaSustentavelAnos(p.idade, idadeApos, horizonte)
-        return {
-          idade: p.idade,
-          ano: anoBase + p.t,
-          patrimonio,
-          rendaSustentavel: pmtDeAnuidade(patrimonio, taxaReal, horizonteNesseAno) / 12,
-        }
-      })
-    },
-    [projecaoB1, taxaReal, horizonte, anoBase, premissas.idadeApos],
+    () =>
+      projecao.map((p) => ({
+        idade: p.idade,
+        ano: anoBase + p.t,
+        patrimonio: Number(p.saldoReal) || 0,
+      })),
+    [projecao, anoBase],
   )
 
   const anosAteIndependencia =
     idadeIndependencia != null ? Math.max(0, idadeIndependencia - idadeAtualCalculada) : null
 
-  // ── Bloco 3: retirada mensal sustentável (inputs editáveis) ────────────────
-  const [b3, setB3] = useState<{ patrimonio?: number; horizonte?: number; rentPct?: number }>({})
-  const b3Patrimonio = b3.patrimonio ?? patrimonioNecessario
-  const b3Horizonte = b3.horizonte ?? horizonte
-  const b3RentPct = b3.rentPct ?? taxaReal * 100
-  const b3Rent = b3RentPct / 100
-  const retiradaSustentavel = pmtDeAnuidade(b3Patrimonio, b3Rent, Math.max(1, b3Horizonte)) / 12
-
   const PAINEL_BG = "#F5F5F5"
+  const [monteCarloLoading, setMonteCarloLoading] = useState(false)
+  const [monteCarloResultado, setMonteCarloResultado] = useState<ResultadoMonteCarlo | null>(null)
+
+  const rodarMonteCarloSobDemanda = async () => {
+    setMonteCarloLoading(true)
+    await new Promise((resolve) => window.setTimeout(resolve, 0))
+    try {
+      const resultado = rodarMonteCarlo(
+        premissasCompletas,
+        objetivosEngine,
+        state.passivos,
+        1000,
+        VOLATILIDADE_MONTE_CARLO_ANUAL,
+      )
+      setMonteCarloResultado(resultado)
+    } finally {
+      setMonteCarloLoading(false)
+    }
+  }
 
   const ToggleNominalReal = (
     <div className="flex items-center gap-3">
@@ -970,8 +946,12 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
               <div className="flex items-start justify-between">
                 <div>
                   <p className="field-label">Patrimônio na Aposentadoria</p>
-                  <p className="text-2xl font-bold text-primary mt-1">{formatarMoeda(kpis.patrimonioApos)}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{formatarMoeda(kpis.patrimonioAposReal)} em valor real</p>
+                  <p className="text-2xl font-bold mt-1" style={{ color: "var(--voga-brasilia)" }}>
+                    {formatarMoeda(kpis.patrimonioAposReal)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {formatarMoeda(kpis.patrimonioApos)} nominal
+                  </p>
                 </div>
                 <TrendingUp className="w-5 h-5 text-primary" />
               </div>
@@ -1266,30 +1246,6 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
           </div>
 
           <div style={{ background: PAINEL_BG, borderRadius: 12, padding: "16px" }}>
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-              <div className="inline-flex rounded-lg bg-white p-1 border border-border">
-                {(["atual", "necessario"] as const).map((modo) => (
-                  <button
-                    key={modo}
-                    onClick={() => setRitmoB1(modo)}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
-                      ritmoB1 === modo
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {modo === "atual" ? "Ritmo atual" : "Aporte necessário"}
-                  </button>
-                ))}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Simulando com:{" "}
-                <span className="font-semibold text-foreground">
-                  {ritmoB1 === "atual" ? "Aporte atual" : "Aporte necessário"} de{" "}
-                  {formatarMoedaCompleta(aporteB1Ativo)}/mês
-                </span>
-              </p>
-            </div>
             <IndependenciaChart
               data={dadosIndependencia}
               necessario={patrimonioNecessario}
@@ -1298,164 +1254,198 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
               formatarMoedaCompleta={formatarMoedaCompleta}
             />
             <p className="text-xs text-muted-foreground mt-2">
-              Barras: patrimônio acumulado ano a ano (poder de compra de hoje). Linha dourada:
-              patrimônio necessário. Linha verde: renda mensal já sustentável a cada ano.
+              Barras: patrimônio acumulado ano a ano (mesma projeção da Simulação em tempo real,
+              poder de compra de hoje). Linha dourada: patrimônio necessário.
             </p>
           </div>
         </CardContent>
       </Card>
 
-      {/* Bloco 2 — Simulação de aporte necessário */}
+      {/* Bloco 2 — Aporte necessário */}
       <Card className="form-card">
         <CardHeader className="pb-4">
           <CardTitle className="text-base font-medium text-foreground">
-            Simulação de aporte necessário
+            Aporte necessário
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            Aporte mensal para atingir o patrimônio necessário até a aposentadoria (composição
-            mensal). Campos pré-preenchidos pelas premissas e editáveis para simulação.
+            Para atingir a renda mensal desejada na aposentadoria, com base nas premissas já definidas acima
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label className="field-label">Idade atual</Label>
-              <Input
-                type="number"
-                value={b2IdadeAtual || ""}
-                onChange={(e) => setB2((s) => ({ ...s, idadeAtual: parseInt(e.target.value) || 0 }))}
-                className="form-card text-foreground focus:border-primary"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="field-label">Idade de aposentadoria</Label>
-              <Input
-                type="number"
-                value={b2IdadeApos || ""}
-                onChange={(e) => setB2((s) => ({ ...s, idadeApos: parseInt(e.target.value) || 0 }))}
-                className="form-card text-foreground focus:border-primary"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="field-label">Renda mensal desejada (R$/mês)</Label>
-              <Input
-                value={formatCurrency(b2Renda)}
-                onChange={(e) => setB2((s) => ({ ...s, renda: parseCurrency(e.target.value) }))}
-                className="form-card text-foreground focus:border-primary"
-              />
-              <p className="text-xs text-muted-foreground">
-                = {formatarMoedaCompleta(b2Renda * 12)}/ano
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div style={{ background: PAINEL_BG, borderRadius: 12, padding: "16px" }}>
+              <p className="text-xs text-muted-foreground mb-1">Aporte necessário</p>
+              <p className="text-[30px] leading-none font-bold" style={{ color: "#1066DA" }}>
+                {b2Resultado.invalido ? "—" : formatarMoedaCompleta(b2Resultado.aporteNecessario)}
               </p>
             </div>
-            <div className="space-y-2">
-              <Label className="field-label">Horizonte de aposentadoria (anos)</Label>
-              <Input
-                type="number"
-                value={b2Horizonte || ""}
-                onChange={(e) => setB2((s) => ({ ...s, horizonte: parseInt(e.target.value) || 0 }))}
-                className="form-card text-foreground focus:border-primary"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="field-label">Patrimônio atual (R$)</Label>
-              <Input
-                value={formatCurrency(b2Patrimonio)}
-                onChange={(e) => setB2((s) => ({ ...s, patrimonio: parseCurrency(e.target.value) }))}
-                className="form-card text-foreground focus:border-primary"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="field-label">Rentabilidade real esperada (% a.a.)</Label>
-              <Input
-                type="number"
-                step={0.1}
-                value={Number(b2RentPct.toFixed(2))}
-                onChange={(e) => setB2((s) => ({ ...s, rentPct: parseFloat(e.target.value) || 0 }))}
-                className="form-card text-foreground focus:border-primary"
-              />
+            <div style={{ background: PAINEL_BG, borderRadius: 12, padding: "16px" }}>
+              <p className="text-xs text-muted-foreground mb-1">Aporte atual</p>
+              <p className="text-[30px] leading-none font-bold text-foreground">
+                {formatarMoedaCompleta(aporteMensal)}
+              </p>
             </div>
           </div>
 
           <div style={{ background: PAINEL_BG, borderRadius: 12, padding: "16px" }}>
-            <p className="text-xs text-muted-foreground mb-1">Aporte mensal necessário</p>
-            <p className="text-2xl font-bold" style={{ color: diffAporte > 0 ? RED : GREEN }}>
-              {b2Resultado.invalido ? "—" : formatarMoedaCompleta(b2Resultado.aporteNecessario)}
-            </p>
-            {!b2Resultado.invalido && (
-              <p className="text-sm mt-2" style={{ color: diffAporte > 0 ? RED : GREEN }}>
-                {diffAporte > 0 ? (
-                  <>
-                    Faltam <strong>{formatarMoedaCompleta(diffAporte)}</strong>/mês em relação ao
-                    aporte atual ({formatarMoedaCompleta(aporteMensal)}).
-                  </>
-                ) : (
-                  <>
-                    Sobram <strong>{formatarMoedaCompleta(Math.abs(diffAporte))}</strong>/mês — o
-                    aporte atual ({formatarMoedaCompleta(aporteMensal)}) já supera o necessário.
-                  </>
-                )}
-              </p>
-            )}
-            <p className="text-xs text-muted-foreground mt-2">
+            <p className="text-xs text-muted-foreground mb-4">Comparativo mensal</p>
+            <div className="space-y-4">
+              <div>
+                <div className="flex items-center justify-between gap-3 mb-2">
+                  <span className="text-sm font-medium text-foreground">Necessário</span>
+                  <span className="text-sm tabular-nums text-foreground">
+                    {b2Resultado.invalido ? "—" : formatarMoedaCompleta(b2Resultado.aporteNecessario)}
+                  </span>
+                </div>
+                <div className="h-3 rounded-full bg-white/80 overflow-hidden">
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${(b2Resultado.aporteNecessario / maiorAporteComparativo) * 100}%`,
+                      background: "#1066DA",
+                    }}
+                  />
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center justify-between gap-3 mb-2">
+                  <span className="text-sm font-medium text-foreground">Atual</span>
+                  <span className="text-sm tabular-nums text-foreground">
+                    {formatarMoedaCompleta(aporteMensal)}
+                  </span>
+                </div>
+                <div className="h-3 rounded-full bg-white/80 overflow-hidden">
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${(aporteMensal / maiorAporteComparativo) * 100}%`,
+                      background: "#01121E",
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground mt-4">
               Alvo: {formatarMoedaCompleta(b2Resultado.alvo)}
               {b2Resultado.invalido ? " · idade de aposentadoria deve ser maior que a idade atual" : ""}
             </p>
           </div>
+
+          <div
+            style={{
+              borderRadius: 12,
+              padding: "16px",
+              background: gapAporte >= 0 ? "#D0E0F0" : "#FBEAEA",
+              color: gapAporte >= 0 ? "#0C447C" : "var(--voga-alerta-texto)",
+            }}
+          >
+            <div className="flex items-start gap-4">
+              <div
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+                style={{
+                  background: gapAporte >= 0 ? "#1066DA" : "var(--voga-alerta)",
+                  color: "#FFFFFF",
+                }}
+              >
+                {gapAporte >= 0 ? <Check className="h-5 w-5" /> : <AlertTriangle className="h-5 w-5" />}
+              </div>
+              <div className="min-w-0">
+                <p className="text-[26px] leading-tight font-bold">
+                  {gapAporte >= 0
+                    ? `+${formatarMoedaCompleta(gapAporte)}/mês de folga`
+                    : `Faltam ${formatarMoedaCompleta(Math.abs(gapAporte))}/mês`}
+                </p>
+                <p className="text-sm mt-2 opacity-90">
+                  {gapAporte >= 0
+                    ? "O aporte atual já supera o necessário — dá pra manter o ritmo ou redirecionar o excedente pra outro objetivo."
+                    : "O aporte atual não é suficiente para atingir a renda desejada na idade de aposentadoria planejada."}
+                </p>
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
-      {/* Bloco 3 — Retirada mensal sustentável */}
       <Card className="form-card">
         <CardHeader className="pb-4">
           <CardTitle className="text-base font-medium text-foreground">
-            Retirada mensal sustentável
+            Simulação Monte Carlo
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            Renda mensal que o patrimônio sustenta ao longo do horizonte, pela anuidade — sem taxa
-            de retirada fixa.
+            Roda 1.000 cenários com retornos variando aleatoriamente, em vez de uma única trajetória fixa,
+            pra estimar a probabilidade do plano dar certo.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label className="field-label">Patrimônio na aposentadoria (R$)</Label>
-              <Input
-                value={formatCurrency(b3Patrimonio)}
-                onChange={(e) => setB3((s) => ({ ...s, patrimonio: parseCurrency(e.target.value) }))}
-                className="form-card text-foreground focus:border-primary"
-              />
+          {!monteCarloResultado && !monteCarloLoading ? (
+            <div style={{ background: PAINEL_BG, borderRadius: 12, padding: "20px" }}>
+              <Button onClick={rodarMonteCarloSobDemanda} className="btn-next">
+                Rodar simulação Monte Carlo
+              </Button>
             </div>
-            <div className="space-y-2">
-              <Label className="field-label">Horizonte de aposentadoria (anos)</Label>
-              <Input
-                type="number"
-                value={b3Horizonte || ""}
-                onChange={(e) => setB3((s) => ({ ...s, horizonte: parseInt(e.target.value) || 0 }))}
-                className="form-card text-foreground focus:border-primary"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="field-label">Rentabilidade real esperada (% a.a.)</Label>
-              <Input
-                type="number"
-                step={0.1}
-                value={Number(b3RentPct.toFixed(2))}
-                onChange={(e) => setB3((s) => ({ ...s, rentPct: parseFloat(e.target.value) || 0 }))}
-                className="form-card text-foreground focus:border-primary"
-              />
-            </div>
-          </div>
+          ) : null}
 
-          <div style={{ background: PAINEL_BG, borderRadius: 12, padding: "16px" }}>
-            <p className="text-xs text-muted-foreground mb-1">Retirada mensal sustentável</p>
-            <p className="text-2xl font-bold" style={{ color: GREEN }}>
-              {formatarMoedaCompleta(retiradaSustentavel)}
-            </p>
-            <p className="text-xs text-muted-foreground mt-2">
-              {formatarMoedaCompleta(b3Patrimonio)} distribuídos ao longo de {b3Horizonte} anos a{" "}
-              {b3RentPct.toFixed(1).replace(".", ",")}% a.a. real.
-            </p>
-          </div>
+          {monteCarloLoading ? (
+            <div style={{ background: PAINEL_BG, borderRadius: 12, padding: "20px" }}>
+              <p className="text-sm font-medium text-foreground">Processando cenários...</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Simulando 1.000 trajetórias com volatilidade anual de {(VOLATILIDADE_MONTE_CARLO_ANUAL * 100).toFixed(0)}%.
+              </p>
+            </div>
+          ) : null}
+
+          {monteCarloResultado ? (
+            <>
+              <div className="flex justify-end">
+                <Button variant="outline" onClick={rodarMonteCarloSobDemanda}>
+                  Rodar novamente
+                </Button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div
+                  style={{ background: "#D0E0F0", borderRadius: 12, padding: "16px", color: "#0C447C" }}
+                >
+                  <p className="text-xs uppercase tracking-wide opacity-80">Probabilidade de sucesso</p>
+                  <p className="text-[32px] leading-none font-bold mt-2">
+                    {monteCarloResultado.probabilidadeSucesso.toFixed(1).replace(".", ",")}%
+                  </p>
+                  <p className="text-sm mt-2 opacity-90">
+                    Percentual de cenários em que o patrimônio não esgota antes do fim do horizonte.
+                  </p>
+                </div>
+                <div style={{ background: PAINEL_BG, borderRadius: 12, padding: "16px" }}>
+                  <p className="text-xs text-muted-foreground mb-1">Patrimônio final · mediana</p>
+                  <p className="text-[30px] leading-none font-bold text-foreground">
+                    {formatarMoedaCompleta(monteCarloResultado.patrimonioFinalMediana)}
+                  </p>
+                  <div className="grid grid-cols-2 gap-4 mt-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Pior 10%</p>
+                      <p className="text-lg font-semibold" style={{ color: "var(--voga-alerta)" }}>
+                        {formatarMoedaCompleta(monteCarloResultado.patrimonioFinalP10)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Melhor 10%</p>
+                      <p className="text-lg font-semibold" style={{ color: "#1066DA" }}>
+                        {formatarMoedaCompleta(monteCarloResultado.patrimonioFinalP90)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ background: PAINEL_BG, borderRadius: 12, padding: "16px" }}>
+                <MonteCarloChart
+                  data={monteCarloResultado.trajetorias}
+                  idadeApos={Number(premissas.idadeApos) || 0}
+                  formatarMoeda={formatarMoeda}
+                  formatarMoedaCompleta={formatarMoedaCompleta}
+                />
+              </div>
+            </>
+          ) : null}
         </CardContent>
       </Card>
 

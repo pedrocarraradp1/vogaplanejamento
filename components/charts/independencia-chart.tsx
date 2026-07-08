@@ -3,7 +3,6 @@
 import {
   ComposedChart,
   Bar,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -16,16 +15,14 @@ import { VOGA } from "@/lib/voga-tokens"
 const CHART_HEIGHT = 300
 const NAVY = VOGA.noite
 const GOLD = VOGA.brasilia
-const GREEN = VOGA.brasilia
 
 export interface PontoIndependencia {
   idade: number
   ano: number
   patrimonio: number
-  rendaSustentavel: number
 }
 
-const MARGIN = { top: 20, right: 12, left: 12, bottom: 8 }
+const MARGIN = { top: 20, right: 16, left: 12, bottom: 8 }
 const AXIS_WIDTH = 56
 const PLOT_BOTTOM = 28
 
@@ -67,24 +64,13 @@ export function IndependenciaChart({
               interval="preserveStartEnd"
             />
             <YAxis
-              yAxisId="left"
               width={AXIS_WIDTH}
               tick={{ fill: "var(--text-label)", fontSize: 10 }}
               tickLine={false}
               axisLine={false}
               tickFormatter={formatarMoeda}
             />
-            <YAxis
-              yAxisId="right"
-              orientation="right"
-              width={AXIS_WIDTH}
-              tick={{ fill: GREEN, fontSize: 10 }}
-              tickLine={false}
-              axisLine={false}
-              tickFormatter={formatarMoeda}
-            />
             <ReferenceLine
-              yAxisId="left"
               y={necessario}
               stroke={GOLD}
               strokeDasharray="6 4"
@@ -97,26 +83,16 @@ export function IndependenciaChart({
                 fontWeight: 600,
               }}
             />
-            <Bar yAxisId="left" dataKey="patrimonio" fill={NAVY} radius={[3, 3, 0, 0]} isAnimationActive={false} />
-            <Line
-              yAxisId="right"
-              type="monotone"
-              dataKey="rendaSustentavel"
-              stroke={GREEN}
-              strokeWidth={2}
-              dot={false}
-              isAnimationActive={false}
-            />
+            <Bar dataKey="patrimonio" fill={NAVY} radius={[3, 3, 0, 0]} isAnimationActive={false} />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
 
-      {/* Overlay de hover — coluna inteira por ano */}
       <div
         style={{
           position: "absolute",
           left: MARGIN.left + AXIS_WIDTH,
-          right: MARGIN.right + AXIS_WIDTH,
+          right: MARGIN.right,
           top: plotTop,
           height: plotHeight,
           display: "flex",
@@ -146,13 +122,6 @@ export function IndependenciaChart({
               label: "Patrimônio acumulado",
               valor: formatarMoedaCompleta(hovered.patrimonio),
               fill: NAVY,
-            },
-            {
-              id: "renda",
-              label: "Renda mensal sustentável",
-              valor: formatarMoedaCompleta(hovered.rendaSustentavel),
-              fill: GREEN,
-              valorColor: GREEN,
             },
             {
               id: "nec",

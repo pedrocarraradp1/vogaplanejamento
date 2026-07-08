@@ -489,6 +489,127 @@ export function calcularProjecao(
   return resultado
 }
 
+export interface MonteCarloTrajetoriaAno {
+  idade: number
+  p10: number
+  p25: number
+  p50: number
+  p75: number
+  p90: number
+}
+
+export interface ResultadoMonteCarlo {
+  probabilidadeSucesso: number
+  patrimonioFinalMediana: number
+  patrimonioFinalP10: number
+  patrimonioFinalP90: number
+  trajetorias: MonteCarloTrajetoriaAno[]
+}
+
+export const VOLATILIDADE_MONTE_CARLO_ANUAL = 0.15
+
+function amostraNormal(media: number, desvioPadrao: number): number {
+  const u1 = Math.max(Number.EPSILON, Math.random())
+  const u2 = Math.max(Number.EPSILON, Math.random())
+  const z0 = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2)
+  return media + z0 * desvioPadrao
+}
+
+function percentilOrdenado(valoresOrdenados: number[], p: number): number {
+  if (valoresOrdenados.length === 0) return 0
+  const pos = ((p / 100) * (valoresOrdenados.length - 1))
+  const base = Math.floor(pos)
+  const resto = pos - base
+  const atual = valoresOrdenados[base] ?? valoresOrdenados[valoresOrdenados.length - 1]
+  const prox = valoresOrdenados[Math.min(base + 1, valoresOrdenados.length - 1)] ?? atual
+  return atual + (prox - atual) * resto
+}
+
+/**
+ * Monte Carlo da mesma simulação patrimonial:
+ * reaproveita aportes, objetivos, passivos, entrada extra e retirada anual;
+ * a única diferença é que a taxa anual deixa de ser fixa e passa a ser sorteada.
+ */
+export function rodarMonteCarlo(
+  premissas: Premissas,
+  objetivos: Objetivo[],
+  passivos: Passivo[] = [],
+  numSimulacoes = 1000,
+  volatilidadeAnual = VOLATILIDADE_MONTE_CARLO_ANUAL,
+): ResultadoMonteCarlo {
+  const inf = premissas.inflacao / 100
+  const retornoEsperado = premissas.rendimento / 100
+  const {
+    saldoInicial, aporteM, idadeAtual, prazo,
+    idadeApos, retiradaMensal, rendaAposentadoria, novaEntrada, idadeEntrada,
+  } = premissas
+  const retiradaEfetiva = Math.max(0, retiradaMensal - (rendaAposentadoria || 0))
+  const totalAnos = Math.max(0, prazo)
+  const resultadosPorAno: number[][] = Array.from({ length: totalAnos + 1 }, () => [])
+  const finais: number[] = []
+  let sucessoCount = 0
+
+  for (let sim = 0; sim < numSimulacoes; sim++) {
+    let saldo = saldoInicial
+    let sucesso = true
+
+    for (let t = 0; t <= totalAnos; t++) {
+      const retornoAno = amostraNormal(retornoEsperado, volatilidadeAnual)
+      const idade = idadeAtual + t
+      const fatorInf = Math.pow(1 + inf, t)
+      const isAposentado = idade >= idadeApos
+      const objetivosAno = saqueObjetivosAno(t, objetivos, inf, totalAnos)
+      const dividasAno = passivos.reduce((s, p) => s + pagamentoDividaAno(p, t), 0)
+      const aporteNominalAno =
+        (premissas.aportePorAnoNominal?.[t] ?? null) !== null
+          ? Number(premissas.aportePorAnoNominal?.[t]) || 0
+          : aporteM * fatorInf
+      const entradaAno =
+        novaEntrada > 0 && idadeEntrada > 0 && idade === idadeEntrada
+          ? novaEntrada * fatorInf
+          : 0
+
+      if (t === 0) {
+        saldo = saldoInicial + fvMensal(aporteNominalAno, retornoAno) - objetivosAno - dividasAno + entradaAno
+      } else if (isAposentado) {
+        const retiradaAno = retiradaAnualAposentadoria(retiradaEfetiva, t, inf, "nominal")
+        saldo = saldo * (1 + retornoAno) - retiradaAno - objetivosAno - dividasAno + entradaAno
+      } else {
+        saldo = saldo * (1 + retornoAno) + fvMensal(aporteNominalAno, retornoAno) - objetivosAno - dividasAno + entradaAno
+      }
+
+      const saldoReal = saldo / fatorInf
+      resultadosPorAno[t].push(Math.round(saldoReal))
+      if (saldoReal < 0) sucesso = false
+    }
+
+    const saldoFinal = resultadosPorAno[totalAnos][resultadosPorAno[totalAnos].length - 1] ?? 0
+    finais.push(saldoFinal)
+    if (sucesso) sucessoCount++
+  }
+
+  const finaisOrdenados = [...finais].sort((a, b) => a - b)
+  const trajetorias = resultadosPorAno.map((valores, t) => {
+    const ordenado = [...valores].sort((a, b) => a - b)
+    return {
+      idade: idadeAtual + t,
+      p10: percentilOrdenado(ordenado, 10),
+      p25: percentilOrdenado(ordenado, 25),
+      p50: percentilOrdenado(ordenado, 50),
+      p75: percentilOrdenado(ordenado, 75),
+      p90: percentilOrdenado(ordenado, 90),
+    }
+  })
+
+  return {
+    probabilidadeSucesso: (sucessoCount / Math.max(1, numSimulacoes)) * 100,
+    patrimonioFinalMediana: percentilOrdenado(finaisOrdenados, 50),
+    patrimonioFinalP10: percentilOrdenado(finaisOrdenados, 10),
+    patrimonioFinalP90: percentilOrdenado(finaisOrdenados, 90),
+    trajetorias,
+  }
+}
+
 /** Rendas de referência para as 3 estratégias de retirada (perpetuidade e anuidade). */
 export function calcularRendasReferenciaEstrategia(
   patrimonioRealInicio: number,
