@@ -221,7 +221,7 @@ export function Sucessorio({ onNavigate }: SucessorioProps) {
   }, [buscarPremioMAG])
 
   const handleProximo = () => {
-    onNavigate("dashboard")
+    onNavigate("diagnostico-financeiro")
   }
 
   return (

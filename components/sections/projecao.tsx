@@ -1,6 +1,6 @@
 ﻿"use client"
 
-import { useEffect, useState, useMemo } from "react"
+import { useEffect, useState, useMemo, type ReactNode } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -18,6 +18,7 @@ import {
   calcularKPIs,
   calcularFluxoAnual,
   encontrarAporteNecessario,
+  encontrarIdadeLiberdadeFinanceira,
   encontrarRendaDeConsumoMensalReal,
   encontrarRendaDePreservacaoMensalReal,
   rodarMonteCarlo,
@@ -35,12 +36,14 @@ import {
 import { VOGA } from "@/lib/voga-tokens"
 import { buildDadosFluxoGrafico, buildDadosRendaGrafico } from "@/lib/projecao-graficos-dados"
 import { CHART_TOOLTIP_PROPS } from "@/lib/chart-tooltip"
+import { TooltipFlutuante, useTooltipHover } from "@/components/charts/chart-tooltip"
 import { CenariosInvestimento } from "@/components/ui/cenarios-investimento"
 import { GraficoFluxoAnual } from "@/components/charts/grafico-fluxo-anual"
 import { RendaCarteiraChart } from "@/components/charts/projecao-extra-charts"
 import { IndependenciaChart, type PontoIndependencia } from "@/components/charts/independencia-chart"
 import { MonteCarloChart } from "@/components/charts/monte-carlo-chart"
 import { EstrategiaRetiradaAposentadoria } from "@/components/ui/estrategia-retirada-aposentadoria"
+import { ControlesSimulacao } from "@/components/ui/controles-simulacao"
 
 const GOLD = VOGA.brasilia
 const GREEN = VOGA.brasilia
@@ -50,8 +53,38 @@ interface ProjecaoProps {
   onNavigate: (section: string) => void
 }
 
+function KpiCardComTooltip({
+  children,
+  tooltip,
+  titulo,
+}: {
+  children: ReactNode
+  tooltip: string
+  titulo: string
+}) {
+  const { containerRef, hoveredIdx, tooltipPos, updateTooltip, handleLeave } = useTooltipHover()
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative"
+      onMouseEnter={(e) => updateTooltip(0, e.clientX, e.clientY)}
+      onMouseMove={(e) => updateTooltip(0, e.clientX, e.clientY)}
+      onMouseLeave={handleLeave}
+    >
+      {children}
+      <div className="pointer-events-none absolute right-4 top-4">
+        <Info className="h-4 w-4 text-muted-foreground/70" />
+      </div>
+      {hoveredIdx !== null && tooltipPos ? (
+        <TooltipFlutuante pos={tooltipPos} titulo={titulo} subtitulo={tooltip} />
+      ) : null}
+    </div>
+  )
+}
+
 export function Projecao({ onNavigate }: ProjecaoProps) {
-  const { state, setPremissas, getSaldoInicialLiquido } = usePlano()
+  const { state, setPremissas, setDadosPessoais, getSaldoInicialLiquido } = usePlano()
   const { premissas, objetivos, dadosPessoais } = state
   const moeda = state.moeda ?? "BRL"
 
@@ -107,7 +140,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
   )
 
   // Premissas completas — junta os campos editáveis com os derivados
-  const premissasCompletas = useMemo(() => ({
+  const premissasCompletasLive = useMemo(() => ({
     ...premissas,
     saldoInicial: saldoInicialCalculado,
     aporteM:      aporteMensal,
@@ -115,6 +148,28 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
     aportePorAnoNominal,
     idadeAtual:   idadeAtualCalculada,
   }), [premissas, saldoInicialCalculado, aporteMensal, aportePorAnoNominal, idadeAtualCalculada])
+
+  const [simulacaoInputs, setSimulacaoInputs] = useState(() => ({
+    premissasCompletas: premissasCompletasLive,
+    rendaMensalAtual,
+    despesaMensal: Number(dadosPessoais.despesa) || 0,
+  }))
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setSimulacaoInputs({
+        premissasCompletas: premissasCompletasLive,
+        rendaMensalAtual,
+        despesaMensal: Number(dadosPessoais.despesa) || 0,
+      })
+    }, 120)
+
+    return () => window.clearTimeout(timer)
+  }, [premissasCompletasLive, rendaMensalAtual, dadosPessoais.despesa])
+
+  const premissasCompletas = simulacaoInputs.premissasCompletas
+  const rendaMensalAtualSimulacao = simulacaoInputs.rendaMensalAtual
+  const despesaMensalSimulacao = simulacaoInputs.despesaMensal
 
   // Objetivos no formato da engine (usado na simulação e nos cenários)
   const objetivosEngine = useMemo(() =>
@@ -159,8 +214,24 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
 
   const deflatorPorIdade = (idade: number) => {
     const anos = Math.max(0, idade - idadeAtualCalculada)
-    const inf = (Number(premissas.inflacao) || 0) / 100
+    const inf = (Number(premissasCompletas.inflacao) || 0) / 100
     return Math.pow(1 + inf, anos)
+  }
+
+  const rentabilidadeRealAtualPct = useMemo(() => {
+    const nominalLiquida = (Number(premissas.rendimento) || 0) / 100
+    const inflacaoPct = (Number(premissas.inflacao) || 0) / 100
+    return ((1 + nominalLiquida) / (1 + inflacaoPct) - 1) * 100
+  }, [premissas.rendimento, premissas.inflacao])
+
+  const handleRentabilidadeRealChange = (realPct: number) => {
+    const inflacaoPct = (Number(premissas.inflacao) || 0) / 100
+    const aliq = Number(premissas.aliquotaImpostoRendimento) || 0
+    const nominalLiquida = (1 + realPct / 100) * (1 + inflacaoPct) - 1
+    const fatorLiquido = Math.max(0.0001, 1 - Math.max(0, Math.min(1, aliq)))
+    setPremissas({
+      rendimentoBruto: (nominalLiquida / fatorLiquido) * 100,
+    })
   }
 
   const taxaNominalAnual = Math.max(0, (Number(premissas.rendimento) || 0) / 100)
@@ -172,7 +243,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
     [premissasCompletas],
   )
   const idadeFimSimulacao =
-    idadeAtualCalculada + Math.max(0, Number(premissas.prazo) || 0)
+    idadeAtualCalculada + Math.max(0, Number(premissasCompletas.prazo) || 0)
 
   const projecao = useMemo(
     () => calcularProjecao(premissasCompletas, objetivosEngine, state.passivos, displayMode),
@@ -227,16 +298,16 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
   )
 
   const kpis = useMemo(() =>
-    calcularKPIs(projecao, premissasCompletas, rendaMensalAtual, dadosPessoais.despesa, objetivosEngine)
-  , [projecao, premissasCompletas, rendaMensalAtual, dadosPessoais.despesa, objetivosEngine])
+    calcularKPIs(projecao, premissasCompletas, rendaMensalAtualSimulacao, despesaMensalSimulacao, objetivosEngine)
+  , [projecao, premissasCompletas, rendaMensalAtualSimulacao, despesaMensalSimulacao, objetivosEngine])
 
   const objetivosEternosMensal = objetivosEternosAnuais / 12
   const necessidadeMensalTotal = (Number(premissas.retiradaMensal) || 0) + objetivosEternosMensal
 
   const dadosGrafico = useMemo(() => {
-    const idadeApos = Number(premissas.idadeApos) || 0
-    const retiradaDesejada = Number(premissas.retiradaMensal) || 0
-    const rendaApos = Number(premissas.rendaAposentadoria) || 0
+    const idadeApos = Number(premissasCompletas.idadeApos) || 0
+    const retiradaDesejada = Number(premissasCompletas.retiradaMensal) || 0
+    const rendaApos = Number(premissasCompletas.rendaAposentadoria) || 0
     // Mesma fórmula do loop: só o excedente da renda desejada sobre a renda permanente
     // é sacado do patrimônio.
     const retiradaEfetivaMensalHoje = Math.max(0, retiradaDesejada - rendaApos)
@@ -297,11 +368,11 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
     fluxoAnual,
     premissasCompletas.saldoInicial,
     displayMode,
-    premissas.inflacao,
-    premissas.retiradaMensal,
-    premissas.rendaAposentadoria,
+    premissasCompletas.inflacao,
+    premissasCompletas.retiradaMensal,
+    premissasCompletas.rendaAposentadoria,
     horizonteApos,
-    premissas.idadeApos,
+    premissasCompletas.idadeApos,
     taxaReal,
     taxaNominalAnual,
     inflacaoAnual,
@@ -321,7 +392,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
 
   /** Série de objetivos/dívidas REAIS usada pelo KPI e pelos testes — mesma fonte do loop. */
   const seriesFluxoAposentadoriaReal = useMemo(() => {
-    const idadeApos = Number(premissas.idadeApos) || 0
+    const idadeApos = Number(premissasCompletas.idadeApos) || 0
     const idxApos = fluxoAnual.findIndex((r) => r.idade === idadeApos)
     const objetivos: number[] = []
     const dividas: number[] = []
@@ -344,7 +415,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
         dividasAno: Math.round(dividas[i] || 0),
       })),
     }
-  }, [fluxoAnual, premissas.idadeApos, horizonteApos, deflatorPorIdade])
+  }, [fluxoAnual, premissasCompletas.idadeApos, horizonteApos, deflatorPorIdade])
 
   // Gráfico de renda: consumo é o valor fixo do KPI (linha flat), não recalculado por idade.
   const dadosRenda = useMemo(
@@ -370,9 +441,9 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
       taxaNominalAnual,
       inflacaoAnual,
       horizonteApos,
-      premissas.retiradaMensal,
-      premissas.idadeApos,
-      premissas.aliquotaImpostoRendimento,
+      premissasCompletas.retiradaMensal,
+      premissasCompletas.idadeApos,
+      premissasCompletas.aliquotaImpostoRendimento,
       premissasCompletas,
       objetivosEngine,
       state.passivos,
@@ -383,13 +454,13 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
 
   const pontoAposentadoria = useMemo(() => {
     return (
-      dadosGrafico.find((d) => d.idade === (Number(premissas.idadeApos) || 0)) ??
+      dadosGrafico.find((d) => d.idade === (Number(premissasCompletas.idadeApos) || 0)) ??
       dadosGrafico[dadosGrafico.length - 1]
     )
-  }, [dadosGrafico, premissas.idadeApos])
+  }, [dadosGrafico, premissasCompletas.idadeApos])
 
   const rendaGeradaApos = useMemo(() => {
-    const idadeApos = Number(premissas.idadeApos) || 0
+    const idadeApos = Number(premissasCompletas.idadeApos) || 0
     const idxApos = projecao.findIndex((p) => p.idade === idadeApos)
     if (idxApos < 0) return { valor: 0, valorHoje: 0, diagnostic: null as null | object }
 
@@ -437,7 +508,6 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
     }
   }, [
     projecao,
-    premissas.idadeApos,
     premissasCompletas,
     objetivosEngine,
     state.passivos,
@@ -460,7 +530,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
 
   const rendaConsumoApos = useMemo(() => {
     if (!pontoAposentadoria) return { valor: 0, valorHoje: 0 }
-    const anosAteApos = Math.max(0, (Number(premissas.idadeApos) || 0) - idadeAtualCalculada)
+    const anosAteApos = Math.max(0, (Number(premissasCompletas.idadeApos) || 0) - idadeAtualCalculada)
     const deflatorApos = Math.pow(1 + inflacaoAnual, anosAteApos)
     return {
       valor:
@@ -473,7 +543,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
     pontoAposentadoria,
     displayMode,
     rendaConsumoPatrimonioRealApos,
-    premissas.idadeApos,
+    premissasCompletas.idadeApos,
     idadeAtualCalculada,
     inflacaoAnual,
   ])
@@ -481,14 +551,14 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
   // ── Independência financeira (anuidade, sem taxa de retirada fixa) ─────────
   const anoBase = new Date().getFullYear()
   const horizonte = horizonteApos
-  const rendaMensalDesejada = Number(premissas.retiradaMensal) || 0
+  const rendaMensalDesejada = Number(premissasCompletas.retiradaMensal) || 0
 
   const patrimonioNecessario = kpis.patrimonioNecessarioLF
 
-  // ── Bloco 2: aporte necessário (busca na simulação real, série escalada) ───
+  // ── Bloco 2: aporte necessário (preservação / fluxo-zero na retirada) ──────
   const b2Resultado = useMemo(() => {
     const alvo = patrimonioNecessario
-    const idadeApos = Number(premissas.idadeApos) || 0
+    const idadeApos = Number(premissasCompletas.idadeApos) || 0
     if (idadeApos <= idadeAtualCalculada) {
       return {
         alvo,
@@ -503,7 +573,6 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
       premissas: premissasCompletas,
       objetivos: objetivosEngine,
       passivos: state.passivos,
-      patrimonioNecessario: alvo,
     })
     return {
       alvo,
@@ -518,7 +587,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
     premissasCompletas,
     objetivosEngine,
     state.passivos,
-    premissas.idadeApos,
+    premissasCompletas.idadeApos,
     idadeAtualCalculada,
     saldoInicialCalculado,
   ])
@@ -538,7 +607,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
       },
       objetivosEngine,
       state.passivos,
-      "real",
+      displayMode,
     )
   }, [
     ritmoIndependencia,
@@ -547,24 +616,50 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
     premissasCompletas,
     objetivosEngine,
     state.passivos,
+    displayMode,
   ])
 
-  const idadeIndependencia = useMemo(() => {
-    for (const p of projecaoIndependencia) {
-      if ((Number(p.saldoReal) || 0) >= patrimonioNecessario) return p.idade
-    }
-    return null
-  }, [projecaoIndependencia, patrimonioNecessario])
-
-  const dadosIndependencia = useMemo<PontoIndependencia[]>(
+  const idadeIndependencia = useMemo(
     () =>
-      projecaoIndependencia.map((p) => ({
+      encontrarIdadeLiberdadeFinanceira(
+        projecaoIndependencia,
+        premissasCompletas.rendimento,
+        premissasCompletas.inflacao,
+        premissasCompletas.retiradaMensal,
+        objetivosEngine,
+      ),
+    [
+      projecaoIndependencia,
+      premissasCompletas.rendimento,
+      premissasCompletas.inflacao,
+      premissasCompletas.retiradaMensal,
+      objetivosEngine,
+    ],
+  )
+
+  const dadosIndependencia = useMemo<PontoIndependencia[]>(() => {
+    if (ritmoIndependencia === "atual") {
+      return dadosGrafico.map((p) => ({
         idade: p.idade,
         ano: anoBase + p.t,
-        patrimonio: Number(p.saldoReal) || 0,
-      })),
-    [projecaoIndependencia, anoBase],
-  )
+        patrimonio: p.valor,
+      }))
+    }
+    return projecaoIndependencia.map((p) => {
+      const deflator = deflatorPorIdade(p.idade)
+      const saldoNominal = Number(p.saldoNominal) || 0
+      const valor = displayMode === "nominal" ? saldoNominal : saldoNominal / deflator
+      return { idade: p.idade, ano: anoBase + p.t, patrimonio: valor }
+    })
+  }, [
+    ritmoIndependencia,
+    dadosGrafico,
+    projecaoIndependencia,
+    anoBase,
+    displayMode,
+    premissas.inflacao,
+    idadeAtualCalculada,
+  ])
 
   const anosAteIndependencia =
     idadeIndependencia != null ? Math.max(0, idadeIndependencia - idadeAtualCalculada) : null
@@ -613,6 +708,21 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
         INFLAÇÃO: <span className="text-foreground">{Number(premissas.inflacao) || 0}%</span>
       </div>
     </div>
+  )
+
+  const renderControlesTempoReal = () => (
+    <ControlesSimulacao
+      rentabilidadeReal={rentabilidadeRealAtualPct}
+      despesaMensal={Number(dadosPessoais.despesa) || 0}
+      aporteMensal={aporteMensal}
+      retiradaMensal={Number(premissas.retiradaMensal) || 0}
+      idadeAposentadoria={Number(premissas.idadeApos) || 30}
+      formatarMoedaCompleta={formatarMoedaCompleta}
+      onRentabilidadeRealChange={handleRentabilidadeRealChange}
+      onDespesaMensalChange={(valor) => setDadosPessoais({ despesa: valor })}
+      onRetiradaMensalChange={(valor) => setPremissas({ retiradaMensal: valor })}
+      onIdadeAposentadoriaChange={(valor) => setPremissas({ idadeApos: valor })}
+    />
   )
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -956,76 +1066,98 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
           {ToggleNominalReal}
         </CardHeader>
         <CardContent className="space-y-6">
+          {renderControlesTempoReal()}
+
           {/* KPIs */}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-            <div className="bg-[rgba(30,92,230,0.08)] border border-primary/30 rounded-xl p-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="field-label">Patrimônio na Aposentadoria</p>
-                  <p className="text-2xl font-bold mt-1" style={{ color: "var(--voga-brasilia)" }}>
-                    {formatarMoeda(kpis.patrimonioAposReal)}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {formatarMoeda(kpis.patrimonioApos)} nominal
-                  </p>
-                </div>
-                <TrendingUp className="w-5 h-5 text-primary" />
-              </div>
-            </div>
-            <div className="bg-[rgba(16,102,218,0.08)] border border-[#1066DA]/30 rounded-xl p-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="field-label font-semibold text-foreground">Renda mensal gerada</p>
-                  <p className="text-2xl font-bold text-[#1066DA] mt-1">{formatarMoedaCompleta(rendaGeradaApos.valor)}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Perpetuidade {displayMode === "nominal" ? `· (${formatarMoedaCompleta(rendaGeradaApos.valorHoje)} hoje)` : ""}
-                  </p>
-                </div>
-                <DollarSign className="w-5 h-5 text-[#1066DA]" />
-              </div>
-            </div>
-            <div className="bg-[rgba(75,117,155,0.10)] border border-[var(--voga-nuvem)]/30 rounded-xl p-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="field-label font-semibold text-foreground">Renda de consumo do patrimônio</p>
-                  <p className="text-2xl font-bold mt-1" style={{ color: "var(--voga-nuvem)" }}>
-                    {formatarMoedaCompleta(rendaConsumoApos.valor)}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {displayMode === "nominal"
-                      ? `(${formatarMoedaCompleta(rendaConsumoApos.valorHoje)} hoje · anuidade por ${horizonte} anos)`
-                      : `Zera aos ${idadeFimSimulacao} anos`}
-                  </p>
-                  {displayMode === "nominal" && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Zera aos {idadeFimSimulacao} anos
+            <KpiCardComTooltip
+              titulo="Patrimônio na Aposentadoria"
+              tooltip="Patrimônio projetado no ano em que a idade de aposentadoria é atingida, considerando aportes e rentabilidade até lá."
+            >
+              <div className="bg-[rgba(30,92,230,0.08)] border border-primary/30 rounded-xl p-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="field-label">Patrimônio na Aposentadoria</p>
+                    <p className="text-2xl font-bold mt-1" style={{ color: "var(--voga-brasilia)" }}>
+                      {formatarMoeda(kpis.patrimonioAposReal)}
                     </p>
-                  )}
-                </div>
-                <DollarSign className="w-5 h-5" style={{ color: "var(--voga-nuvem)" }} />
-              </div>
-            </div>
-            <div className="bg-secondary border border-border rounded-xl p-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="field-label">Liberdade Financeira</p>
-                  <p className="text-2xl font-bold text-[#1066DA] mt-1">
-                    {kpis.idadeLF ? `${kpis.idadeLF} anos` : "—"}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {kpis.idadeLF ? `Em ${kpis.idadeLF - idadeAtualCalculada} anos` : "Ajuste as premissas"}
-                  </p>
-                  <div className="text-xs text-muted-foreground mt-2 space-y-0.5 border-t border-border/50 pt-2">
-                    <p>Renda desejada: {formatarMoedaCompleta(rendaMensalDesejada)}/mês</p>
-                    <p>Objetivos eternos (equiv.): {formatarMoedaCompleta(objetivosEternosMensal)}/mês</p>
-                    <p className="text-foreground font-medium">
-                      Necessidade total: {formatarMoedaCompleta(necessidadeMensalTotal)}/mês
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {formatarMoeda(kpis.patrimonioApos)} nominal
                     </p>
                   </div>
+                  <TrendingUp className="w-5 h-5 text-primary" />
                 </div>
-                <Clock className="w-5 h-5 text-[#1066DA]" />
               </div>
-            </div>
+            </KpiCardComTooltip>
+            <KpiCardComTooltip
+              titulo="Renda mensal gerada"
+              tooltip="Retirada mensal que o patrimônio sustenta para sempre, sem consumir o principal — é o rendimento real anual dividido por 12."
+            >
+              <div className="bg-[rgba(16,102,218,0.08)] border border-[#1066DA]/30 rounded-xl p-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="field-label font-semibold text-foreground">Renda mensal gerada</p>
+                    <p className="text-2xl font-bold text-[#1066DA] mt-1">{formatarMoedaCompleta(rendaGeradaApos.valor)}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Perpetuidade {displayMode === "nominal" ? `· (${formatarMoedaCompleta(rendaGeradaApos.valorHoje)} hoje)` : ""}
+                    </p>
+                  </div>
+                  <DollarSign className="w-5 h-5 text-[#1066DA]" />
+                </div>
+              </div>
+            </KpiCardComTooltip>
+            <KpiCardComTooltip
+              titulo="Renda de consumo do patrimônio"
+              tooltip="Retirada mensal que esgota exatamente o patrimônio no último ano do horizonte simulado — mais alta que a renda gerada, mas consome o principal ao longo do caminho."
+            >
+              <div className="bg-[rgba(75,117,155,0.10)] border border-[var(--voga-nuvem)]/30 rounded-xl p-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="field-label font-semibold text-foreground">Renda de consumo do patrimônio</p>
+                    <p className="text-2xl font-bold mt-1" style={{ color: "var(--voga-nuvem)" }}>
+                      {formatarMoedaCompleta(rendaConsumoApos.valor)}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {displayMode === "nominal"
+                        ? `(${formatarMoedaCompleta(rendaConsumoApos.valorHoje)} hoje · anuidade por ${horizonte} anos)`
+                        : `Zera aos ${idadeFimSimulacao} anos`}
+                    </p>
+                    {displayMode === "nominal" && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Zera aos {idadeFimSimulacao} anos
+                      </p>
+                    )}
+                  </div>
+                  <DollarSign className="w-5 h-5" style={{ color: "var(--voga-nuvem)" }} />
+                </div>
+              </div>
+            </KpiCardComTooltip>
+            <KpiCardComTooltip
+              titulo="Liberdade Financeira"
+              tooltip="Idade em que o rendimento real do patrimônio já cobre a renda desejada e os objetivos eternos, para sempre — o patrimônio pode ser sacado indefinidamente sem esgotar."
+            >
+              <div className="bg-secondary border border-border rounded-xl p-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="field-label">Liberdade Financeira</p>
+                    <p className="text-2xl font-bold text-[#1066DA] mt-1">
+                      {kpis.idadeLF ? `${kpis.idadeLF} anos` : "—"}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {kpis.idadeLF ? `Em ${kpis.idadeLF - idadeAtualCalculada} anos` : "Ajuste as premissas"}
+                    </p>
+                    <div className="text-xs text-muted-foreground mt-2 space-y-0.5 border-t border-border/50 pt-2">
+                      <p>Renda desejada: {formatarMoedaCompleta(rendaMensalDesejada)}/mês</p>
+                      <p>Objetivos eternos (equiv.): {formatarMoedaCompleta(objetivosEternosMensal)}/mês</p>
+                      <p className="text-foreground font-medium">
+                        Necessidade total: {formatarMoedaCompleta(necessidadeMensalTotal)}/mês
+                      </p>
+                    </div>
+                  </div>
+                  <Clock className="w-5 h-5 text-[#1066DA]" />
+                </div>
+              </div>
+            </KpiCardComTooltip>
           </div>
 
           <div
@@ -1048,6 +1180,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
           </div>
 
           {/* Gráfico */}
+          {renderControlesTempoReal()}
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dadosGrafico} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
@@ -1109,7 +1242,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
                     )
                   }}
                 />
-                <ReferenceLine x={premissas.idadeApos} stroke="#1066DA" strokeDasharray="5 5"
+                <ReferenceLine x={premissasCompletas.idadeApos} stroke="#1066DA" strokeDasharray="5 5"
                   label={{ value: "Aposentadoria", position: "top", fill: "#1066DA", fontSize: 12 }} />
                 <Bar dataKey="valor" radius={[2, 2, 0, 0]}>
                   {dadosGrafico.map((entry: ProjecaoAno & { valor: number }, index: number) => (
@@ -1134,7 +1267,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
           {displayMode === "nominal" && (
             <p className="text-xs text-muted-foreground">
               Valores nominais — a linha tracejada mostra o equivalente em poder de compra de hoje considerando inflação de{" "}
-              <span className="text-foreground font-medium">{Number(premissas.inflacao) || 0}% a.a.</span>
+              <span className="text-foreground font-medium">{Number(premissasCompletas.inflacao) || 0}% a.a.</span>
               .
             </p>
           )}
@@ -1292,8 +1425,8 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
             />
             <p className="text-xs text-muted-foreground mt-2">
               {ritmoIndependencia === "atual"
-                ? "Barras: patrimônio com o aporte atual (mesma projeção da Simulação em tempo real, poder de compra de hoje). Linha dourada: patrimônio necessário."
-                : `Barras: patrimônio simulado com o aporte necessário (${formatarMoedaCompleta(b2Resultado.aporteNecessario)}/mês equivalente hoje). Na aposentadoria, a barra deve encostar na linha do alvo.`}
+                ? "Barras: mesma série da Simulação em tempo real (calcularProjecao com retirada pós-aposentadoria). Linha dourada: patrimônio necessário (anuidade)."
+                : `Barras: simulação com o aporte necessário (${formatarMoedaCompleta(b2Resultado.aporteNecessario)}/mês equivalente hoje). Após a aposentadoria, a curva deve ficar praticamente reta (patrimônio constante).`}
             </p>
           </div>
         </CardContent>
@@ -1306,7 +1439,8 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
             Aporte necessário
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            Para atingir a renda mensal desejada na aposentadoria, com base nas premissas já definidas acima
+            Menor aporte mensal que mantém o patrimônio constante na aposentadoria (preservação /
+            fluxo-zero), sustentando a renda desejada sem consumir nem acumular o principal
           </p>
         </CardHeader>
         <CardContent className="space-y-4">

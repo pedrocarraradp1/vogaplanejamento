@@ -494,21 +494,55 @@ export function seriesAportePorEscala(premissas: Premissas, escala: number): num
   const prazo = Math.max(0, Number(premissas.prazo) || 0)
   const inf = (Number(premissas.inflacao) || 0) / 100
   const k = Math.max(0, escala)
+  const aporteM = Number(premissas.aporteM) || 0
   const base = premissas.aportePorAnoNominal
-  if (base && base.length > 0) {
+  const temSeriePositiva = base?.some((v) => (Number(v) || 0) > 0) ?? false
+
+  if (temSeriePositiva && base && base.length > 0) {
     return Array.from({ length: prazo + 1 }, (_, t) => (Number(base[t]) || 0) * k)
   }
-  const aporteM = Number(premissas.aporteM) || 0
-  return Array.from({ length: prazo + 1 }, (_, t) => aporteM * k * Math.pow(1 + inf, t))
+  if (aporteM > 0) {
+    return Array.from({ length: prazo + 1 }, (_, t) => aporteM * k * Math.pow(1 + inf, t))
+  }
+  return Array.from({ length: prazo + 1 }, (_, t) => k * Math.pow(1 + inf, t))
 }
 
 /** Premissas com aporteM e aportePorAnoNominal escalados pelo mesmo fator. */
 export function premissasComEscalaAporte(premissas: Premissas, escala: number): Premissas {
   const k = Math.max(0, escala)
+  const aporteM = Number(premissas.aporteM) || 0
+  const base = premissas.aportePorAnoNominal
+  const temSeriePositiva = base?.some((v) => (Number(v) || 0) > 0) ?? false
+  const serie = seriesAportePorEscala(premissas, k)
+  const aporteMEquiv = aporteM > 0 || temSeriePositiva ? aporteM * k : k
   return {
     ...premissas,
-    aporteM: (Number(premissas.aporteM) || 0) * k,
-    aportePorAnoNominal: seriesAportePorEscala(premissas, k),
+    aporteM: aporteMEquiv,
+    aportePorAnoNominal: serie,
+  }
+}
+
+/** Drift de preservação: saldo real no fim − saldo real na aposentadoria (≈ 0 = patrimônio constante). */
+export function driftPreservacaoComEscala(
+  premissas: Premissas,
+  objetivos: Objetivo[],
+  passivos: Passivo[],
+  escala: number,
+): { drift: number; patrimonioNaAposentadoria: number; patrimonioNoFimDoHorizonte: number } {
+  const idadeApos = Number(premissas.idadeApos) || 0
+  const proj = calcularProjecao(
+    premissasComEscalaAporte(premissas, escala),
+    objetivos,
+    passivos,
+    "real",
+  )
+  const patrimonioNaAposentadoria =
+    Number(proj.find((p) => p.idade === idadeApos)?.saldoReal) || 0
+  const patrimonioNoFimDoHorizonte = Number(proj[proj.length - 1]?.saldoReal) || 0
+  return {
+    drift: patrimonioNoFimDoHorizonte - patrimonioNaAposentadoria,
+    patrimonioNaAposentadoria,
+    patrimonioNoFimDoHorizonte,
   }
 }
 
@@ -545,22 +579,33 @@ export function saldoRealNaIdadeApos(
 export interface ResultadoAporteNecessario {
   /** Fator sobre a série `aportePorAnoNominal` (1 = ritmo atual das fontes). */
   escala: number
-  /** Equivalente mensal hoje para exibição: escala × aporteM. */
+  /** Equivalente mensal hoje para exibição: escala × aporteM (ou valor absoluto se aporte atual = 0). */
   aporteMensalEquivalente: number
   aportePorAnoNominal: number[]
   patrimonioNaAposentadoria: number
+  patrimonioNoFimDoHorizonte: number
+  /** Saldo fim − saldo na aposentadoria; ≈ 0 = preservação (fluxo-zero na retirada). */
+  drift: number
+}
+
+function aporteMensalEquivalenteDaEscala(premissas: Premissas, escala: number): number {
+  const aporteMBase = Number(premissas.aporteM) || 0
+  const base = premissas.aportePorAnoNominal
+  const temSeriePositiva = (base?.some((v) => (Number(v) || 0) > 0) ?? false)
+  if (aporteMBase > 0 || temSeriePositiva) return aporteMBase * escala
+  return escala
 }
 
 /**
- * Escala (busca binária) sobre a mesma série `aportePorAnoNominal` da simulação
- * principal, para que o patrimônio REAL na idade de aposentadoria ≈ alvo.
+ * Menor escala sobre `aportePorAnoNominal` que, na mesma `calcularProjecao` do gráfico
+ * principal, deixa o patrimônio REAL praticamente constante na fase de retirada
+ * (drift fim − aposentadoria ≈ 0) — mesmo critério de Preservação / fluxo-zero.
  */
 export function encontrarAporteNecessario(
   params: {
     premissas: Premissas
     objetivos: Objetivo[]
     passivos?: Passivo[]
-    patrimonioNecessario: number
     tolerancia?: number
     maxIter?: number
   },
@@ -569,58 +614,57 @@ export function encontrarAporteNecessario(
     premissas,
     objetivos,
     passivos = [],
-    patrimonioNecessario,
-    tolerancia = 1000,
+    tolerancia = 500,
     maxIter = 60,
   } = params
 
   const idadeAtual = Number(premissas.idadeAtual) || 0
   const idadeApos = Number(premissas.idadeApos) || 0
-  const anos = idadeApos - idadeAtual
-  const alvo = Math.max(0, patrimonioNecessario)
-  const aporteMBase = Number(premissas.aporteM) || 0
+  const anosAteApos = idadeApos - idadeAtual
+  const toleranciaDrift = tolerancia * Math.max(1, anosAteApos + 1)
 
-  const build = (escala: number): ResultadoAporteNecessario => ({
-    escala,
-    aporteMensalEquivalente: aporteMBase * escala,
-    aportePorAnoNominal: seriesAportePorEscala(premissas, escala),
-    patrimonioNaAposentadoria: saldoRealNaIdadeAposComEscala(
-      premissas,
-      objetivos,
-      passivos,
+  const build = (escala: number): ResultadoAporteNecessario => {
+    const { drift, patrimonioNaAposentadoria, patrimonioNoFimDoHorizonte } =
+      driftPreservacaoComEscala(premissas, objetivos, passivos, escala)
+    return {
       escala,
-    ),
-  })
+      aporteMensalEquivalente: aporteMensalEquivalenteDaEscala(premissas, escala),
+      aportePorAnoNominal: seriesAportePorEscala(premissas, escala),
+      patrimonioNaAposentadoria,
+      patrimonioNoFimDoHorizonte,
+      drift,
+    }
+  }
 
-  if (anos <= 0 || alvo <= 0) return build(0)
+  if (anosAteApos <= 0) return build(0)
 
-  const saldoNaApos = (escala: number) =>
-    saldoRealNaIdadeAposComEscala(premissas, objetivos, passivos, escala)
+  const driftEm = (escala: number) =>
+    driftPreservacaoComEscala(premissas, objetivos, passivos, escala).drift
 
-  const saldoSemAporte = saldoNaApos(0)
-  if (saldoSemAporte >= alvo - tolerancia) return build(0)
+  const driftSemAporte = driftEm(0)
+  if (Math.abs(driftSemAporte) < toleranciaDrift) return build(0)
+  if (driftSemAporte > 0) return build(0)
 
   let baixo = 0
   let alto = 1
 
-  if (saldoNaApos(alto) < alvo) {
+  if (driftEm(alto) < 0) {
     for (let i = 0; i < 40; i++) {
-      if (saldoNaApos(alto) >= alvo) break
+      if (driftEm(alto) >= 0) break
       alto *= 2
-      if (alto > 10_000) break
+      if (alto > 100_000) break
     }
   }
 
   for (let i = 0; i < maxIter; i++) {
     const mid = (baixo + alto) / 2
-    const diferenca = saldoNaApos(mid) - alvo
-    if (Math.abs(diferenca) < tolerancia) return build(mid)
-    if (diferenca < 0) baixo = mid
+    const drift = driftEm(mid)
+    if (Math.abs(drift) < toleranciaDrift) return build(mid)
+    if (drift < 0) baixo = mid
     else alto = mid
   }
 
-  const escalaFinal = (baixo + alto) / 2
-  return build(escalaFinal)
+  return build((baixo + alto) / 2)
 }
 
 export interface MonteCarloTrajetoriaAno {

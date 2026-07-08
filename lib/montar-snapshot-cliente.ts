@@ -11,7 +11,7 @@ import {
   aporteMensalAtual,
   resolveAporteParaPremissas,
 } from "@/lib/renda-utils"
-import { calcularProjecao, pvAnuidade, totalObjetivosEternosAnuais, horizontePosAposentadoriaAnos, encontrarAporteNecessario } from "@/lib/engine"
+import { calcularProjecao, encontrarAporteNecessario, encontrarIdadeLiberdadeFinanceira } from "@/lib/engine"
 import { calcularRealizadoMensal } from "@/lib/fluxo-caixa-utils"
 
 function idadePorNascimento(nascimento: string): number {
@@ -103,29 +103,13 @@ export function montarSnapshotCliente(state: PlanoState): SnapshotCliente {
       passivos,
     )
 
-    const taxaNominal = Math.max(0, (Number(premissas.rendimento) || 0) / 100)
-    const inflacao = Math.max(0, (Number(premissas.inflacao) || 0) / 100)
-    const taxaReal = (1 + taxaNominal) / (1 + inflacao) - 1
-    const horizonte = horizontePosAposentadoriaAnos({
-      idadeAtual,
-      idadeApos,
-      prazo: Number(premissas.prazo) || 0,
-      horizonteAposentadoria: premissas.horizonteAposentadoria,
-    })
-    const objetivosEternosAnuais = totalObjetivosEternosAnuais(objetivos, taxaReal)
-    const patrimonioNecessario = pvAnuidade(
-      rendaDesejada * 12 + objetivosEternosAnuais,
-      taxaReal,
-      horizonte,
+    const idadeIndep = encontrarIdadeLiberdadeFinanceira(
+      projecao,
+      premissas.rendimento,
+      premissas.inflacao,
+      rendaDesejada,
+      objetivos,
     )
-
-    let idadeIndep: number | null = null
-    for (const p of projecao) {
-      if ((Number(p.saldoReal) || 0) >= patrimonioNecessario) {
-        idadeIndep = p.idade
-        break
-      }
-    }
     const anosParaIndependencia =
       idadeIndep != null ? Math.max(0, idadeIndep - idadeAtual) : Math.max(0, idadeApos - idadeAtual)
 
@@ -133,7 +117,6 @@ export function montarSnapshotCliente(state: PlanoState): SnapshotCliente {
       premissas: { ...premissas, saldoInicial, aporteM, idadeAtual, aportePorAnoNominal },
       objetivos,
       passivos,
-      patrimonioNecessario,
     })
     const aporteMensalNecessario = resultadoAporte.aporteMensalEquivalente
 

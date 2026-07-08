@@ -48,10 +48,7 @@ const navGroups: NavGroup[] = [
   },
   {
     title: "Diagnóstico",
-    items: [
-      { id: "dashboard", label: "Dashboard" },
-      { id: "diagnostico-financeiro", label: "Diagnóstico e Plano de Ação" },
-    ],
+    items: [{ id: "diagnostico-financeiro", label: "Diagnóstico e Plano de Ação" }],
   },
 ]
 

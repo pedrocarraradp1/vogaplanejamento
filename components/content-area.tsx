@@ -13,7 +13,6 @@ import { ProtecaoFinanceira } from "./sections/protecao-financeira"
 import { SimuladorSeguros } from "./sections/simulador-seguros"
 import { PgblVsVgbl } from "./sections/pgbl-vs-vgbl"
 import { EficienciaTributaria } from "./sections/eficiencia-tributaria"
-import { Dashboard } from "./sections/dashboard"
 
 interface ContentAreaProps {
   activeSection: string
@@ -49,8 +48,6 @@ export function ContentArea({ activeSection, onNavigate }: ContentAreaProps) {
         return <PgblVsVgbl onNavigate={onNavigate} />
       case "eficiencia-tributaria":
         return <EficienciaTributaria onNavigate={onNavigate} />
-      case "dashboard":
-        return <Dashboard onNavigate={onNavigate} />
       default:
         return <DadosPessoais onNavigate={onNavigate} />
     }
