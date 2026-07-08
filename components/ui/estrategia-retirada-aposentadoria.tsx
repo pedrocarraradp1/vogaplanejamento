@@ -14,7 +14,9 @@ import {
 } from "recharts"
 import {
   calcularPassivosPorAnoSeries,
+  calcularFluxoAnual,
   calcularRendasReferenciaEstrategia,
+  encontrarRendaDeConsumoMensalReal,
   projecaoEstrategiaRetirada,
   type Objetivo,
   type Passivo,
@@ -25,6 +27,9 @@ import { CHART_TOOLTIP_PROPS } from "@/lib/chart-tooltip"
 import { VOGA } from "@/lib/voga-tokens"
 import { Slider } from "@/components/ui/slider"
 import { Label } from "@/components/ui/label"
+import { totalObjetivosEternosAnuais } from "@/lib/engine"
+
+const CENARIO_VERDE = "#1F6D3E"
 
 type DisplayMode = "nominal" | "real"
 
@@ -164,13 +169,58 @@ export function EstrategiaRetiradaAposentadoria({
     ],
   )
 
+  const rendaConsumoPatrimonioRealApos = useMemo(() => {
+    // Fluxo anual nominal completo (alinhado ao motor). Depois convertemos para real por ano.
+    const fluxo = calcularFluxoAnual(
+      premissasModerado,
+      objetivosEngine,
+      passivos,
+      aliquotaIR,
+      "nominal",
+    )
+    const idxApos = fluxo.findIndex((r) => r.idade === idadeApos)
+    if (idxApos < 0) return 0
+
+    const objetivosFinitosPorAnoReal: number[] = []
+    const passivosPorAnoReal: number[] = []
+    for (let ano = 0; ano < horizonte; ano++) {
+      const row = fluxo[idxApos + ano]
+      const idade = idadeApos + ano
+      const anos = Math.max(0, idade - idadeAtualCalculada)
+      const deflator = Math.pow(1 + Math.max(0, inflacaoGlobal) / 100, anos)
+      objetivosFinitosPorAnoReal.push(((Number(row?.objetivos) || 0) / deflator) || 0)
+      passivosPorAnoReal.push(((Number(row?.dividas) || 0) / deflator) || 0)
+    }
+
+    return encontrarRendaDeConsumoMensalReal({
+      patrimonioRealInicioApos: patrimonioRealInicioApos.patrimonioReal,
+      taxaRealAnual: rendasReferencia.taxaReal,
+      horizonteAnos: horizonte,
+      objetivosEternosAnuaisReal: totalObjetivosEternosAnuais(objetivosEngine, rendasReferencia.taxaReal),
+      objetivosFinitosPorAnoReal,
+      passivosPorAnoReal,
+      tolerancia: 1000,
+    })
+  }, [
+    premissasModerado,
+    objetivosEngine,
+    passivos,
+    aliquotaIR,
+    idadeApos,
+    horizonte,
+    idadeAtualCalculada,
+    inflacaoGlobal,
+    patrimonioRealInicioApos,
+    rendasReferencia.taxaReal,
+  ])
+
   const retiradas = useMemo(
     () => ({
       acumulacao: rendasReferencia.rendaGeradaMensal * (pctAcumulacao / 100),
       preservacao: rendasReferencia.rendaGeradaMensal,
-      consumo: rendasReferencia.rendaSustentavelMensal,
+      consumo: rendaConsumoPatrimonioRealApos,
     }),
-    [rendasReferencia, pctAcumulacao],
+    [rendasReferencia, pctAcumulacao, rendaConsumoPatrimonioRealApos],
   )
 
   const projecoesEstrategia = useMemo(() => {
@@ -254,7 +304,7 @@ export function EstrategiaRetiradaAposentadoria({
       titulo: "Preservação",
       descricao: "Renda gerada (perpetuidade) — patrimônio real estável.",
       icon: ShieldCheck,
-      cor: VOGA.onda,
+      cor: VOGA.noite,
       retirada: retiradas.preservacao,
       serie: series.preservacao,
       destaque: true,
@@ -262,9 +312,9 @@ export function EstrategiaRetiradaAposentadoria({
     {
       key: "consumo",
       titulo: "Consumo",
-      descricao: "Renda sustentável (anuidade) — patrimônio tende a zero no fim do horizonte.",
+      descricao: "Renda de consumo do patrimônio — patrimônio tende a zero no fim do horizonte.",
       icon: TrendingDown,
-      cor: VOGA.nuvem,
+      cor: CENARIO_VERDE,
       retirada: retiradas.consumo,
       serie: series.consumo,
       alertaNoUltimoPonto: true,
@@ -294,7 +344,7 @@ export function EstrategiaRetiradaAposentadoria({
             <div
               key={e.key}
               className={`rounded-xl border bg-card p-5 ${
-                e.destaque ? "border-2 border-[var(--voga-onda)]" : "border-border"
+                e.destaque ? "border-2 border-[var(--cenario-1)]" : "border-border"
               }`}
             >
               <div className="flex items-start gap-3">
@@ -401,7 +451,7 @@ export function EstrategiaRetiradaAposentadoria({
                 type="monotone"
                 dataKey="preservacao"
                 name="preservacao"
-                stroke={VOGA.onda}
+                stroke={VOGA.noite}
                 strokeWidth={2}
                 dot={false}
               />
@@ -409,7 +459,7 @@ export function EstrategiaRetiradaAposentadoria({
                 type="monotone"
                 dataKey="consumo"
                 name="consumo"
-                stroke={VOGA.nuvem}
+                stroke={CENARIO_VERDE}
                 strokeWidth={2}
                 dot={false}
               />

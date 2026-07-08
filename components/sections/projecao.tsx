@@ -17,6 +17,7 @@ import {
   calcularProjecao,
   calcularKPIs,
   calcularFluxoAnual,
+  encontrarRendaDeConsumoMensalReal,
   pvAnuidade,
   pmtDeAnuidade,
   horizonteRendaSustentavelAnos,
@@ -31,6 +32,7 @@ import { CHART_TOOLTIP_PROPS } from "@/lib/chart-tooltip"
 import { CenariosInvestimento } from "@/components/ui/cenarios-investimento"
 import { FluxoAnualChart, RendaCarteiraChart } from "@/components/charts/projecao-extra-charts"
 import { IndependenciaChart, type PontoIndependencia } from "@/components/charts/independencia-chart"
+import { EstrategiaRetiradaAposentadoria } from "@/components/ui/estrategia-retirada-aposentadoria"
 
 const GOLD = VOGA.brasilia
 const GREEN = VOGA.brasilia
@@ -121,7 +123,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
   , [objetivos])
 
   // ── Estado local ─────────────────────────────────────────────────────────
-  const [displayMode, setDisplayMode] = useState<"nominal" | "real">("nominal")
+  const [displayMode, setDisplayMode] = useState<"nominal" | "real">("real")
 
   // ── Formatadores ─────────────────────────────────────────────────────────
   const formatCurrency = (value: number) => {
@@ -205,25 +207,37 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
     ]
   )
 
+  const objetivosEternosAnuais = useMemo(
+    () => totalObjetivosEternosAnuais(objetivosEngine, taxaReal),
+    [objetivosEngine, taxaReal],
+  )
+
   const dadosRenda = useMemo(
     () =>
-      buildDadosRendaGrafico(
-        projecao,
-        taxaReal,
-        Math.max(1, Number(premissas.horizonteAposentadoria) || 35),
-        Number(premissas.retiradaMensal) || 0,
-        Number(premissas.inflacao) || 0,
-        displayMode,
-        Number(premissas.idadeApos) || 0,
-      ),
+      buildDadosRendaGrafico(projecao, {
+        taxaRealAnual: taxaReal,
+        taxaNominalAnual,
+        inflacaoAnual,
+        horizonteAnos: Math.max(1, Number(premissas.horizonteAposentadoria) || 35),
+        metaMensal: Number(premissas.retiradaMensal) || 0,
+        idadeAposentadoria: Number(premissas.idadeApos) || 0,
+        saldoInicial: premissasCompletas.saldoInicial,
+        objetivosEternosAnuais,
+        aliquotaIR: Number(premissas.aliquotaImpostoRendimento) || 0.15,
+        fluxoAnual,
+      }),
     [
       projecao,
       taxaReal,
+      taxaNominalAnual,
+      inflacaoAnual,
       premissas.horizonteAposentadoria,
       premissas.retiradaMensal,
-      premissas.inflacao,
       premissas.idadeApos,
-      displayMode,
+      premissas.aliquotaImpostoRendimento,
+      premissasCompletas.saldoInicial,
+      objetivosEternosAnuais,
+      fluxoAnual,
     ]
   )
 
@@ -231,10 +245,6 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
     calcularKPIs(projecao, premissasCompletas, rendaMensalAtual, dadosPessoais.despesa, objetivosEngine)
   , [projecao, premissasCompletas, rendaMensalAtual, dadosPessoais.despesa, objetivosEngine])
 
-  const objetivosEternosAnuais = useMemo(
-    () => totalObjetivosEternosAnuais(objetivosEngine, taxaReal),
-    [objetivosEngine, taxaReal],
-  )
   const objetivosEternosMensal = objetivosEternosAnuais / 12
   const necessidadeMensalTotal = (Number(premissas.retiradaMensal) || 0) + objetivosEternosMensal
 
@@ -301,6 +311,43 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
     objetivosEternosAnuais,
   ])
 
+  const rendaConsumoPatrimonioRealApos = useMemo(() => {
+    const idadeApos = Number(premissas.idadeApos) || 0
+    const horizonteApos = Math.max(1, Number(premissas.horizonteAposentadoria) || 35)
+    const idxApos = projecao.findIndex((p) => p.idade === idadeApos)
+    if (idxApos < 0) return 0
+    const patrimonioRealInicioApos = Number(projecao[idxApos]?.saldoReal) || 0
+
+    // Fluxos em termos reais (poder de compra de hoje), alinhados ao motor.
+    const objetivosFinitosPorAnoReal: number[] = []
+    const passivosPorAnoReal: number[] = []
+    for (let ano = 0; ano < horizonteApos; ano++) {
+      const row = fluxoAnual[idxApos + ano]
+      const idade = idadeApos + ano
+      const deflator = deflatorPorIdade(idade)
+      objetivosFinitosPorAnoReal.push(((Number(row?.objetivos) || 0) / deflator) || 0)
+      passivosPorAnoReal.push(((Number(row?.dividas) || 0) / deflator) || 0)
+    }
+
+    return encontrarRendaDeConsumoMensalReal({
+      patrimonioRealInicioApos,
+      taxaRealAnual: taxaReal,
+      horizonteAnos: horizonteApos,
+      objetivosEternosAnuaisReal: objetivosEternosAnuais,
+      objetivosFinitosPorAnoReal,
+      passivosPorAnoReal,
+      tolerancia: 1000,
+    })
+  }, [
+    premissas.idadeApos,
+    premissas.horizonteAposentadoria,
+    projecao,
+    fluxoAnual,
+    taxaReal,
+    objetivosEternosAnuais,
+    deflatorPorIdade,
+  ])
+
   const pontoAposentadoria = useMemo(() => {
     return (
       dadosGrafico.find((d) => d.idade === (Number(premissas.idadeApos) || 0)) ??
@@ -317,14 +364,23 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
 
   const rendaConsumoApos = useMemo(() => {
     if (!pontoAposentadoria) return { valor: 0, valorHoje: 0 }
+    const anosAteApos = Math.max(0, (Number(premissas.idadeApos) || 0) - idadeAtualCalculada)
+    const deflatorApos = Math.pow(1 + inflacaoAnual, anosAteApos)
     return {
       valor:
         displayMode === "nominal"
-          ? Number(pontoAposentadoria.rendaSustentavelNominal) || 0
-          : Number(pontoAposentadoria.rendaSustentavelReal) || 0,
-      valorHoje: Number(pontoAposentadoria.rendaSustentavelReal) || 0,
+          ? rendaConsumoPatrimonioRealApos * deflatorApos
+          : rendaConsumoPatrimonioRealApos,
+      valorHoje: rendaConsumoPatrimonioRealApos,
     }
-  }, [pontoAposentadoria, displayMode])
+  }, [
+    pontoAposentadoria,
+    displayMode,
+    rendaConsumoPatrimonioRealApos,
+    premissas.idadeApos,
+    idadeAtualCalculada,
+    inflacaoAnual,
+  ])
 
   // ── Independência financeira (anuidade, sem taxa de retirada fixa) ─────────
   const anoBase = new Date().getFullYear()
@@ -958,7 +1014,6 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
           {dadosRenda && dadosRenda.length > 0 && (
             <RendaCarteiraChart
               data={dadosRenda}
-              displayMode={displayMode}
               formatarMoeda={formatarMoeda}
               formatarMoedaCompleta={formatarMoedaCompleta}
             />
@@ -971,7 +1026,34 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
         displayMode={displayMode}
         onDisplayModeChange={setDisplayMode}
         editable
+        showEstrategiaRetirada={false}
       />
+
+      <Card className="form-card">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base font-medium text-foreground">
+            Estratégia de retirada na aposentadoria
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Acumulação / preservação / consumo — escolhe-se a retirada mensal; a rentabilidade é independente.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <EstrategiaRetiradaAposentadoria
+            premissasCompletas={premissasCompletas}
+            objetivosEngine={objetivosEngine}
+            passivos={state.passivos}
+            rentabilidadeLiquidaPct={rendimentoLiquidoPct}
+            displayMode={displayMode}
+            inflacaoGlobal={Number(premissas.inflacao) || 0}
+            idadeAtualCalculada={idadeAtualCalculada}
+            projecaoModerada={projecao}
+            aliquotaIR={Number(premissas.aliquotaImpostoRendimento) || 0.15}
+            fmtFull={formatarMoedaCompleta}
+            formatarMoeda={formatarMoeda}
+          />
+        </CardContent>
+      </Card>
 
       {/* Card 4 — Modo de Cálculo */}
       <Card className="form-card">

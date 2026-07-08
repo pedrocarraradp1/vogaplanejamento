@@ -28,7 +28,7 @@ import {
 import { formatMoedaSaida } from "@/lib/fluxo-caixa-utils"
 import { CORES_FLUXO_PROJECAO } from "@/lib/voga-tokens"
 
-const CORES_FLUXO = CORES_FLUXO_PROJECAO
+type CoresFluxo = typeof CORES_FLUXO_PROJECAO
 
 const LEGENDA_FLUXO: Record<string, string> = {
   rendimento: "Rendimento",
@@ -56,6 +56,7 @@ export function FluxoAnualChart({
   periodoInicioAno,
   periodoFimAno,
   anoBase,
+  cores = CORES_FLUXO_PROJECAO,
 }: {
   data: DadoFluxoGrafico[]
   hideTitle?: boolean
@@ -68,6 +69,7 @@ export function FluxoAnualChart({
   periodoFimAno?: number
   /** Ano-calendário do t=0 da projeção — normalmente o ano corrente. */
   anoBase?: number
+  cores?: CoresFluxo
 } & ChartFormatters) {
   const dadosVisiveis = useMemo(() => {
     const all = data ?? []
@@ -162,26 +164,26 @@ export function FluxoAnualChart({
               dataKey="rendimento"
               name="rendimento"
               stackId="fluxo"
-              fill={CORES_FLUXO.rendimento}
+              fill={cores.rendimento}
             />
-            <Bar dataKey="aporte" name="aporte" stackId="fluxo" fill={CORES_FLUXO.aporte} />
+            <Bar dataKey="aporte" name="aporte" stackId="fluxo" fill={cores.aporte} />
             <Bar
               dataKey="objetivos"
               name="objetivos"
               stackId="fluxo"
-              fill={CORES_FLUXO.objetivos}
+              fill={cores.objetivos}
             />
             <Bar
               dataKey="passivos"
               name="passivos"
               stackId="fluxo"
-              fill={CORES_FLUXO.passivos}
+              fill={cores.passivos}
             />
             <Bar
               dataKey="retirada"
               name="retirada"
               stackId="fluxo"
-              fill={CORES_FLUXO.retirada}
+              fill={cores.retirada}
               legendType="rect"
               isAnimationActive={false}
             />
@@ -190,7 +192,7 @@ export function FluxoAnualChart({
                 type="monotone"
                 dataKey="metaRenda"
                 name="metaRenda"
-                stroke={CORES_FLUXO.metaRenda}
+                stroke={cores.metaRenda}
                 strokeWidth={2}
                 strokeDasharray="6 4"
                 dot={false}
@@ -220,10 +222,9 @@ export function FluxoAnualChart({
 
 export function RendaCarteiraChart({
   data,
-  displayMode,
   formatarMoeda,
   formatarMoedaCompleta,
-}: { data: DadoRendaGrafico[]; displayMode: "nominal" | "real" } & ChartFormatters) {
+}: { data: DadoRendaGrafico[] } & ChartFormatters) {
   const dados = data ?? []
 
   const areaIndependencia = useMemo(() => {
@@ -239,7 +240,7 @@ export function RendaCarteiraChart({
 
   return (
     <div className="mt-8 w-full min-w-0 space-y-2">
-      <h3 className="text-sm font-medium text-foreground">Renda mensal sustentável</h3>
+      <h3 className="text-sm font-medium text-foreground">Renda gerada vs. renda de consumo</h3>
       <div className="w-full min-w-0" style={{ height: CHART_HEIGHT, minHeight: CHART_HEIGHT }}>
         <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
           <ComposedChart data={dados} margin={{ top: 16, right: 24, left: 8, bottom: 4 }}>
@@ -272,31 +273,18 @@ export function RendaCarteiraChart({
                 if (!active || !payload?.length) return null
                 const p = payload[0]?.payload as DadoRendaGrafico
                 const status = p.acimaMeta ? "Acima da meta" : "Abaixo da meta"
-                const corStatus = p.acimaMeta ? "#1066DA" : "#B33A3A"
+                const corStatus = p.acimaMeta ? "var(--cenario-1)" : "var(--voga-alerta)"
                 return (
                   <div style={{ ...CHART_TOOLTIP_STYLE, fontSize: 12 }}>
                     <p style={{ ...CHART_TOOLTIP_LABEL_STYLE, margin: 0 }}>Idade {p.idade}</p>
-                    {displayMode === "nominal" ? (
-                      <>
-                        <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, marginTop: 6 }}>
-                          Renda nominal: {formatarMoedaCompleta(p.rendaNominal)}
-                        </p>
-                        <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, opacity: 0.85 }}>
-                          Poder de compra (hoje): {formatarMoedaCompleta(p.rendaPoderCompra)}
-                        </p>
-                      </>
-                    ) : (
-                      <>
-                        <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, marginTop: 6 }}>
-                          Renda sustentável: {formatarMoedaCompleta(p.rendaReal)}
-                        </p>
-                        <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, opacity: 0.85 }}>
-                          Renda nominal (ref.): {formatarMoedaCompleta(p.rendaNominal)}
-                        </p>
-                      </>
-                    )}
+                    <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, marginTop: 6 }}>
+                      Renda mensal gerada: {formatarMoedaCompleta(p.rendaGeradaReal)}
+                    </p>
                     <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, opacity: 0.85 }}>
-                      Meta: {formatarMoedaCompleta(p.meta)}
+                      Renda de consumo do patrimônio: {formatarMoedaCompleta(p.rendaConsumoReal)}
+                    </p>
+                    <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, opacity: 0.85 }}>
+                      Renda mensal desejada: {formatarMoedaCompleta(p.meta)}
                     </p>
                     <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, fontWeight: 500, color: corStatus, marginTop: 6 }}>
                       {status}
@@ -306,44 +294,29 @@ export function RendaCarteiraChart({
               }}
             />
             <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
-            {displayMode === "nominal" ? (
-              <>
-                <Line
-                  type="monotone"
-                  dataKey="rendaNominal"
-                  name="Renda nominal"
-                  stroke="var(--accent)"
-                  strokeWidth={2}
-                  dot={false}
-                  isAnimationActive={false}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="rendaPoderCompra"
-                  name="Poder de compra (hoje)"
-                  stroke="#1066DA"
-                  strokeWidth={2}
-                  strokeDasharray="6 4"
-                  dot={false}
-                  isAnimationActive={false}
-                />
-              </>
-            ) : (
-              <Line
-                type="monotone"
-                dataKey="rendaReal"
-                name="Renda sustentável"
-                stroke="var(--accent)"
-                strokeWidth={2}
-                dot={false}
-                isAnimationActive={false}
-              />
-            )}
+            <Line
+              type="monotone"
+              dataKey="rendaGeradaReal"
+              name="Renda mensal gerada"
+              stroke="var(--cenario-1)"
+              strokeWidth={2}
+              dot={false}
+              isAnimationActive={false}
+            />
+            <Line
+              type="monotone"
+              dataKey="rendaConsumoReal"
+              name="Renda de consumo do patrimônio"
+              stroke="var(--cenario-2)"
+              strokeWidth={2}
+              dot={false}
+              isAnimationActive={false}
+            />
             <Line
               type="monotone"
               dataKey="meta"
-              name="Meta aposentadoria"
-              stroke="#B33A3A"
+              name="Renda mensal desejada"
+              stroke="var(--voga-alerta)"
               strokeWidth={1.5}
               strokeDasharray="4 4"
               dot={false}

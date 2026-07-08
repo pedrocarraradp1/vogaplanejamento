@@ -77,10 +77,11 @@ export const CORES_FLUXO_CAIXA = {
 } as const
 
 export const CORES_FLUXO_PROJECAO = {
-  rendimento: VOGA.nuvem,
-  aporte: VOGA.brasilia,
+  // Mais contraste (pula tons adjacentes)
+  rendimento: VOGA.brasilia, // entrada principal (rentabilidade/retorno)
+  aporte: VOGA.noite,        // aportes bem contrastantes
   objetivos: VOGA.petroleo,
-  passivos: VOGA.alerta,
+  passivos: VOGA.nuvem,      // recessivo (dívidas)
   retirada: VOGA.alerta,
   metaRenda: VOGA.brasilia,
   positivo: VOGA.brasilia,

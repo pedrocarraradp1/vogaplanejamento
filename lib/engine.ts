@@ -517,6 +517,81 @@ export function projecaoEstrategiaRetirada(
   return proj.filter((p) => p.idade >= idadeApos && p.idade <= idadeApos + horizonte)
 }
 
+/**
+ * Encontra (por busca binária) a retirada mensal REAL (poder de compra de hoje)
+ * que faz o patrimônio REAL chegar a ~0 no fim do horizonte pós-aposentadoria,
+ * considerando objetivos/passivos anuais irregulares.
+ *
+ * Observação: usa a MESMA lógica de decumulação (ano a ano) da engine:
+ * saldo = saldo*(1+taxaReal) - retirada*12 - objetivosEternos - objetivosAno - dividasAno
+ * (tudo em termos reais).
+ */
+export function encontrarRendaDeConsumoMensalReal(
+  params: {
+    patrimonioRealInicioApos: number
+    taxaRealAnual: number
+    horizonteAnos: number
+    objetivosEternosAnuaisReal: number
+    objetivosFinitosPorAnoReal: number[] // tamanho >= horizonte
+    passivosPorAnoReal: number[] // tamanho >= horizonte
+    tolerancia?: number // default 1000
+    maxIter?: number // default 60
+  },
+): number {
+  const {
+    patrimonioRealInicioApos,
+    taxaRealAnual,
+    horizonteAnos,
+    objetivosEternosAnuaisReal,
+    objetivosFinitosPorAnoReal,
+    passivosPorAnoReal,
+    tolerancia = 1000,
+    maxIter = 60,
+  } = params
+
+  const P0 = Math.max(0, patrimonioRealInicioApos)
+  const r = taxaRealAnual
+  const H = Math.max(1, Math.floor(horizonteAnos))
+
+  const saldoFinal = (rendaMensal: number): number => {
+    let saldo = P0
+    const renda = Math.max(0, rendaMensal)
+    for (let ano = 0; ano < H; ano++) {
+      const obj = Math.max(0, objetivosFinitosPorAnoReal[ano] ?? 0)
+      const div = Math.max(0, passivosPorAnoReal[ano] ?? 0)
+      saldo = saldo * (1 + r) - renda * 12 - objetivosEternosAnuaisReal - obj - div
+    }
+    return saldo
+  }
+
+  // bounds: baixo => sobra patrimônio (saldo >= 0); alto => quebra (saldo <= 0)
+  let baixo = 0
+  let alto =
+    H > 0 ? Math.max(1000, P0 / Math.max(1, H * 12)) * 6 : Math.max(1000, P0 / 12)
+
+  // expande o teto até garantir saldoFinal(alto) <= 0
+  for (let i = 0; i < 40; i++) {
+    if (saldoFinal(alto) <= 0) break
+    alto *= 2
+    // guarda-corpo para evitar loops absurdos em edge cases
+    if (alto > P0 * 10) break
+  }
+
+  for (let i = 0; i < maxIter; i++) {
+    const mid = (baixo + alto) / 2
+    const s = saldoFinal(mid)
+    if (Math.abs(s) <= tolerancia) return mid
+    if (s > 0) baixo = mid
+    else alto = mid
+  }
+
+  // Retorna a maior renda que ainda não zera antes (saldo final >= 0).
+  // Se por alguma razão baixo já cruza, volta para alto.
+  const sBaixo = saldoFinal(baixo)
+  if (sBaixo >= 0) return baixo
+  return alto
+}
+
 // ─── Fluxo anual (gráficos de projeção) ───────────────────────────────────────
 
 export interface FluxoAnualRow {

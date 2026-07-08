@@ -31,6 +31,8 @@ export interface CenariosInvestimentoProps {
   onDisplayModeChange?: (mode: DisplayMode) => void
   /** Se false, exibe rentabilidades como texto (sem inputs). Default: true */
   editable?: boolean
+  /** Se false, não renderiza a seção de retirada (para usar em boxes separados). Default: true */
+  showEstrategiaRetirada?: boolean
 }
 
 type LinhaCenarios = {
@@ -47,6 +49,7 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
 
   const [showCenarios, setShowCenarios] = useState(true)
   const editable = props.editable ?? true
+  const showEstrategiaRetirada = props.showEstrategiaRetirada ?? true
 
   const cenarioConservador = premissas.rentabilidadeConservador ?? 7
   const cenarioModerado = premissas.rentabilidadeModerado ?? 10
@@ -60,7 +63,7 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
 
   const fmtPct = (v: number) => v.toFixed(1).replace(".", ",")
 
-  const [displayModeInternal, setDisplayModeInternal] = useState<DisplayMode>("nominal")
+  const [displayModeInternal, setDisplayModeInternal] = useState<DisplayMode>("real")
 
   const displayMode = props.displayMode ?? displayModeInternal
   const setDisplayMode = props.onDisplayModeChange ?? setDisplayModeInternal
@@ -246,9 +249,9 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
         "Conservador",
         "Maior previsibilidade",
         "Baixa",
-        "#1066DA",
-        "bg-[rgba(16,102,218,0.06)]",
-        "border-[#1066DA]/25",
+        "#1F6D3E",
+        "bg-[rgba(31,109,62,0.06)]",
+        "border-[#1F6D3E]/25",
         cenarioConservador,
         pCon,
         projecaoConservadora,
@@ -258,9 +261,9 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
         "Moderado",
         "Equilíbrio risco/retorno",
         "Média",
-        "var(--accent)",
-        "bg-[rgba(30,92,230,0.06)]",
-        "border-primary/25",
+        "#1066DA",
+        "bg-[rgba(16,102,218,0.06)]",
+        "border-[#1066DA]/25",
         cenarioModerado,
         pMod,
         projecaoModerada,
@@ -270,9 +273,9 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
         "Agressivo",
         "Maior retorno esperado",
         "Alta",
-        "#1066DA",
-        "bg-[rgba(245,166,35,0.06)]",
-        "border-[#1066DA]/25",
+        "#01121E",
+        "bg-[rgba(1,18,30,0.06)]",
+        "border-[#01121E]/25",
         cenarioAgressivo,
         pAgr,
         projecaoAgressiva,
@@ -424,19 +427,21 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
             ))}
           </div>
 
-          <EstrategiaRetiradaAposentadoria
-            premissasCompletas={premissasCompletas}
-            objetivosEngine={objetivosEngine}
-            passivos={passivos}
-            rentabilidadeLiquidaPct={rentabilidadeLiquidaDeBruta(cenarioModerado)}
-            displayMode={displayMode}
-            inflacaoGlobal={inflacaoGlobal}
-            idadeAtualCalculada={idadeAtualCalculada}
-            projecaoModerada={projecaoModerada}
-            aliquotaIR={aliquotaIR}
-            fmtFull={fmtFull}
-            formatarMoeda={formatarMoeda}
-          />
+          {showEstrategiaRetirada ? (
+            <EstrategiaRetiradaAposentadoria
+              premissasCompletas={premissasCompletas}
+              objetivosEngine={objetivosEngine}
+              passivos={passivos}
+              rentabilidadeLiquidaPct={rentabilidadeLiquidaDeBruta(cenarioModerado)}
+              displayMode={displayMode}
+              inflacaoGlobal={inflacaoGlobal}
+              idadeAtualCalculada={idadeAtualCalculada}
+              projecaoModerada={projecaoModerada}
+              aliquotaIR={aliquotaIR}
+              fmtFull={fmtFull}
+              formatarMoeda={formatarMoeda}
+            />
+          ) : null}
 
           <div className="rounded-xl border border-border bg-secondary overflow-hidden">
             <div className="px-5 py-4 border-b border-border">
@@ -530,9 +535,9 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
                       return String(value)
                     }}
                   />
-                  <Line type="monotone" dataKey="conservador" name="conservador" stroke="#1066DA" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="moderado" name="moderado" stroke="var(--accent)" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="agressivo" name="agressivo" stroke="#1066DA" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="conservador" name="conservador" stroke="#1F6D3E" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="moderado" name="moderado" stroke="#1066DA" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="agressivo" name="agressivo" stroke="#01121E" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             </div>

@@ -40,6 +40,18 @@ const LEGENDA_PAINEL1 = [
   { id: "despesa", label: "Despesa", fill: CORES_FLUXO_CAIXA.despesa },
 ]
 
+const CORES_FLUXO_ANUAL = {
+  rendimento: "var(--fluxo-entrada)",
+  aporte: "var(--voga-brasilia)",
+  objetivos: "var(--fluxo-objetivos)",
+  passivos: "var(--voga-alerta)",
+  retirada: "var(--voga-alerta)",
+  metaRenda: "var(--voga-concreto)",
+  positivo: "var(--fluxo-entrada)",
+  negativo: "var(--voga-alerta)",
+  eixo: "var(--text-label)",
+} as const
+
 function ToggleDois({
   a,
   b,
@@ -530,6 +542,7 @@ export function FluxoDeCaixa({ onNavigate }: FluxoDeCaixaProps) {
               anoBase={anoCorrente}
               formatarMoeda={formatarMoeda}
               formatarMoedaCompleta={formatarMoedaCompleta}
+              cores={CORES_FLUXO_ANUAL}
               hideTitle
               hideMetaRenda
             />

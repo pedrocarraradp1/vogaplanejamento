@@ -8,6 +8,11 @@
   --font-heading: var(--font-montserrat), 'Montserrat', sans-serif;
   --font-body: var(--font-overpass), 'Overpass', sans-serif;
 
+  /* Paleta padrão de cenários (sempre contraste alto entre si). */
+  --cenario-1: var(--voga-noite); /* #01121E — escuro/“denso” */
+  --cenario-2: var(--voga-brasilia); /* #1066DA — azul vibrante */
+  --cenario-3: #1F6D3E; /* verde escuro */
+
   /* Primárias */
   --voga-brasilia: #1066DA;
   --voga-noite: #01121E;
@@ -44,6 +49,10 @@
   /* Alerta / negativo */
   --voga-alerta: #B33A3A;
   --voga-alerta-texto: #7A2828;
+
+  /* Exceção semântica: Fluxo de Caixa */
+  --fluxo-entrada: #5B8C6E;
+  --fluxo-objetivos: #C99A44;
 
   /* Aliases legados → tokens Voga (compatibilidade) */
   --navy: var(--voga-noite);

@@ -168,7 +168,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
   const { dadosPessoais, premissas, ativos, passivos } = state
   const moeda = state.moeda ?? "BRL"
 
-  const [modoRN, setModoRN] = useState<"nominal" | "real">("nominal")
+  const [modoRN, setModoRN] = useState<"nominal" | "real">("real")
   const [modoProjecaoMag, setModoProjecaoMag] = useState<"nominal" | "real">("real")
   const [patTotal, setPatTotal] = useState(0)
   const [allocPrevPct, setAllocPrevPct] = useState(40)

@@ -1,4 +1,9 @@
-import { horizonteRendaSustentavelAnos, pmtDeAnuidade, type ProjecaoAno } from "@/lib/engine"
+import {
+  encontrarRendaDeConsumoMensalReal,
+  horizonteRendaSustentavelAnos,
+  rendaMensalGeradaReal,
+  type ProjecaoAno,
+} from "@/lib/engine"
 
 /** Ponto simplificado para o ComposedChart de fluxo anual (6 séries + meta). */
 export interface DadoFluxoGrafico {
@@ -16,15 +21,28 @@ export interface DadoFluxoGrafico {
   metaRenda: number
 }
 
-/** Ponto pronto para o gráfico de renda da carteira. */
+/** Ponto pronto para o gráfico de renda da carteira (sempre em termos reais). */
 export interface DadoRendaGrafico {
   idade: number
   t: number
-  rendaNominal: number
-  rendaPoderCompra: number
-  rendaReal: number
+  rendaGeradaReal: number
+  rendaConsumoReal: number
   meta: number
   acimaMeta: boolean
+}
+
+export interface BuildDadosRendaOptions {
+  taxaRealAnual: number
+  taxaNominalAnual: number
+  inflacaoAnual: number
+  horizonteAnos: number
+  /** Renda mensal desejada nas premissas (poder de compra de hoje). */
+  metaMensal: number
+  idadeAposentadoria: number
+  saldoInicial: number
+  objetivosEternosAnuais: number
+  aliquotaIR: number
+  fluxoAnual: Array<{ objetivos?: number; dividas?: number }>
 }
 
 export interface BuildDadosFluxoOptions {
@@ -148,51 +166,90 @@ export function buildDadosFluxoGrafico(
 }
 
 /**
- * Renda sustentável da carteira a cada ano (anuidade finita — `pmtDeAnuidade`).
- * Distinta da "Renda Mensal Gerada" (perpetuidade), usada no tooltip do gráfico de patrimônio.
+ * Renda gerada (perpetuidade) e renda de consumo (busca binária) a cada ano, em termos reais.
  */
 export function buildDadosRendaGrafico(
   projecao: ProjecaoAno[],
-  taxaRealAnual: number,
-  horizonteAnos: number,
-  metaMensal: number,
-  inflacaoPct: number,
-  displayMode: "nominal" | "real",
-  idadeAposentadoria = 0,
+  options: BuildDadosRendaOptions,
 ): DadoRendaGrafico[] {
-  const inf = inflacaoPct / 100
-  const horizonteOriginal = Math.max(1, horizonteAnos)
+  const {
+    taxaRealAnual,
+    taxaNominalAnual,
+    inflacaoAnual,
+    horizonteAnos,
+    metaMensal,
+    idadeAposentadoria,
+    saldoInicial,
+    objetivosEternosAnuais,
+    aliquotaIR,
+    fluxoAnual,
+  } = options
 
-  return projecao.map((p) => {
+  const horizonteOriginal = Math.max(1, horizonteAnos)
+  const meta = metaMensal
+
+  return projecao.map((p, i) => {
     const t = Number(p.t) || 0
-    const patrimonioAno = Number(p.saldoNominal) || 0
-    const def = Math.pow(1 + inf, Math.max(0, t))
-    const patrimonioReal =
-      Number(p.saldoReal) > 0 ? Number(p.saldoReal) : patrimonioAno / def
+    const prev = i > 0 ? projecao[i - 1] : null
+    const deflatorInicio = Math.pow(1 + inflacaoAnual, Math.max(0, prev ? Number(prev.t) || 0 : 0))
+    const saldoNominalInicio = prev ? Number(prev.saldoNominal) || 0 : saldoInicial
+    const patrimonioRealInicio = saldoNominalInicio / deflatorInicio
+    const patrimonioRealConsumo = Number(p.saldoReal) > 0 ? Number(p.saldoReal) : patrimonioRealInicio
+
+    const fluxoAno = fluxoAnual[i]
+    const deflator = Math.pow(1 + inflacaoAnual, Math.max(0, t))
+    const optsRendaGerada = {
+      objetivosAnuaisReal: objetivosEternosAnuais,
+      dividasAnuaisReal: (Number(fluxoAno?.dividas) || 0) / deflator,
+      aliquotaIR,
+    }
+
+    const rendaGeradaReal = Math.round(
+      rendaMensalGeradaReal(
+        patrimonioRealInicio,
+        taxaNominalAnual,
+        inflacaoAnual,
+        optsRendaGerada,
+      ),
+    )
 
     const horizonteNesseAno = horizonteRendaSustentavelAnos(
       p.idade,
       idadeAposentadoria,
       horizonteOriginal,
     )
-    const rendaReal = Math.round(
-      pmtDeAnuidade(patrimonioReal, taxaRealAnual, horizonteNesseAno) / 12,
-    )
-    const rendaNominal = Math.round(rendaReal * def)
-    const rendaPoderCompra = rendaReal
 
-    const metaNominal = metaMensal * def
-    const meta = displayMode === "nominal" ? metaNominal : metaMensal
-    const rendaComparar = displayMode === "nominal" ? rendaNominal : rendaReal
+    const objetivosFinitosPorAnoReal: number[] = []
+    const passivosPorAnoReal: number[] = []
+    for (let a = 0; a < horizonteNesseAno; a++) {
+      const j = i + a
+      const row = fluxoAnual[j]
+      const defFuturo = Math.pow(1 + inflacaoAnual, Math.max(0, Number(projecao[j]?.t) ?? t + a))
+      objetivosFinitosPorAnoReal.push((Number(row?.objetivos) || 0) / defFuturo)
+      passivosPorAnoReal.push((Number(row?.dividas) || 0) / defFuturo)
+    }
+
+    const rendaConsumoReal =
+      patrimonioRealConsumo > 0
+        ? Math.round(
+            encontrarRendaDeConsumoMensalReal({
+              patrimonioRealInicioApos: patrimonioRealConsumo,
+              taxaRealAnual,
+              horizonteAnos: horizonteNesseAno,
+              objetivosEternosAnuaisReal: objetivosEternosAnuais,
+              objetivosFinitosPorAnoReal,
+              passivosPorAnoReal,
+            }),
+          )
+        : 0
 
     return {
       idade: p.idade,
       t,
-      rendaNominal,
-      rendaPoderCompra,
-      rendaReal,
+      rendaGeradaReal,
+      rendaConsumoReal,
       meta,
-      acimaMeta: rendaComparar >= meta && meta > 0,
+      acimaMeta: rendaGeradaReal >= meta && meta > 0,
     }
   })
 }

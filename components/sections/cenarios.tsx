@@ -10,7 +10,7 @@ interface CenariosProps {
 }
 
 export function Cenarios({ onNavigate }: CenariosProps) {
-  const [displayMode, setDisplayMode] = useState<"nominal" | "real">("nominal")
+  const [displayMode, setDisplayMode] = useState<"nominal" | "real">("real")
 
   return (
     <div className="space-y-6">

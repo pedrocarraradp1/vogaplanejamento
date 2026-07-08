@@ -39,7 +39,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const { dadosPessoais, objetivos, premissas, sucessao, protecao } = state
   const moeda = state.moeda ?? "BRL"
 
-  const [viewMode, setViewMode] = useState<"nominal" | "real">("nominal")
+  const [viewMode, setViewMode] = useState<"nominal" | "real">("real")
   const [exportando, setExportando] = useState(false)
   const pieVogaTipo = usePieVogaProps()
   const pieVogaDescricao = usePieVogaProps()
@@ -184,23 +184,30 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
   const dadosRenda = useMemo(
     () =>
-      buildDadosRendaGrafico(
-        projecao,
-        taxaReal,
-        horizonteApos,
-        Number(premissas.retiradaMensal) || 0,
-        Number(premissas.inflacao) || 0,
-        viewMode,
-        Number(premissas.idadeApos) || 0,
-      ),
+      buildDadosRendaGrafico(projecao, {
+        taxaRealAnual: taxaReal,
+        taxaNominalAnual,
+        inflacaoAnual,
+        horizonteAnos: horizonteApos,
+        metaMensal: Number(premissas.retiradaMensal) || 0,
+        idadeAposentadoria: Number(premissas.idadeApos) || 0,
+        saldoInicial: premissasCompletas.saldoInicial,
+        objetivosEternosAnuais,
+        aliquotaIR: Number(premissas.aliquotaImpostoRendimento) || 0.15,
+        fluxoAnual,
+      }),
     [
       projecao,
       taxaReal,
+      taxaNominalAnual,
+      inflacaoAnual,
       horizonteApos,
       premissas.retiradaMensal,
-      premissas.inflacao,
       premissas.idadeApos,
-      viewMode,
+      premissas.aliquotaImpostoRendimento,
+      premissasCompletas.saldoInicial,
+      objetivosEternosAnuais,
+      fluxoAnual,
     ]
   )
 
@@ -731,7 +738,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             {dadosRenda && dadosRenda.length > 0 && (
               <RendaCarteiraChart
                 data={dadosRenda}
-                displayMode={viewMode}
                 formatarMoeda={fmt}
                 formatarMoedaCompleta={fmtFull}
               />
