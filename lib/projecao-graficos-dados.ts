@@ -1,4 +1,4 @@
-import { pmtDeAnuidade, type ProjecaoAno } from "@/lib/engine"
+import { horizonteRendaSustentavelAnos, pmtDeAnuidade, type ProjecaoAno } from "@/lib/engine"
 
 /** Ponto simplificado para o ComposedChart de fluxo anual (6 séries + meta). */
 export interface DadoFluxoGrafico {
@@ -148,9 +148,8 @@ export function buildDadosFluxoGrafico(
 }
 
 /**
- * Renda sustentável da carteira a cada ano pela MESMA anuidade (`pmtDeAnuidade`) usada
- * nos cards e no tooltip — nunca o método antigo de juros (patrimônio × taxa).
- * `taxaRealAnual` é a taxa real (Fisher) e `horizonteAnos` o horizonte de aposentadoria.
+ * Renda sustentável da carteira a cada ano (anuidade finita — `pmtDeAnuidade`).
+ * Distinta da "Renda Mensal Gerada" (perpetuidade), usada no tooltip do gráfico de patrimônio.
  */
 export function buildDadosRendaGrafico(
   projecao: ProjecaoAno[],
@@ -158,10 +157,11 @@ export function buildDadosRendaGrafico(
   horizonteAnos: number,
   metaMensal: number,
   inflacaoPct: number,
-  displayMode: "nominal" | "real"
+  displayMode: "nominal" | "real",
+  idadeAposentadoria = 0,
 ): DadoRendaGrafico[] {
   const inf = inflacaoPct / 100
-  const n = Math.max(1, horizonteAnos)
+  const horizonteOriginal = Math.max(1, horizonteAnos)
 
   return projecao.map((p) => {
     const t = Number(p.t) || 0
@@ -170,8 +170,14 @@ export function buildDadosRendaGrafico(
     const patrimonioReal =
       Number(p.saldoReal) > 0 ? Number(p.saldoReal) : patrimonioAno / def
 
-    // Anuidade sobre o patrimônio real do ano; nominal = real corrigido ao ano.
-    const rendaReal = Math.round(Math.max(0, pmtDeAnuidade(patrimonioReal, taxaRealAnual, n) / 12))
+    const horizonteNesseAno = horizonteRendaSustentavelAnos(
+      p.idade,
+      idadeAposentadoria,
+      horizonteOriginal,
+    )
+    const rendaReal = Math.round(
+      pmtDeAnuidade(patrimonioReal, taxaRealAnual, horizonteNesseAno) / 12,
+    )
     const rendaNominal = Math.round(rendaReal * def)
     const rendaPoderCompra = rendaReal
 

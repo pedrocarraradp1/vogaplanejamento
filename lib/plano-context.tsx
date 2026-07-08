@@ -637,6 +637,7 @@ export function PlanoProvider({
       premissasCompletas,
       receitaMensalAtual(fontes),
       state.dadosPessoais.despesa,
+      state.objetivos,
     )
 
     const totalPassivosInv = state.passivos.reduce((s, p) => s + getSaldoDevedorPassivo(p), 0)

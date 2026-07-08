@@ -23,7 +23,9 @@ import {
   calcularInventario,
   calcularProtecao,
   calcularFluxoAnual,
-  pmtDeAnuidade,
+  rendaMensalGeradaReal,
+  rendaMensalGeradaNominal,
+  totalObjetivosEternosAnuais,
   type ProjecaoAno,
 } from "@/lib/engine"
 import { getSaldoDevedorPassivo, labelTipoAtivo, CORES_GRUPOS_ATIVO, VOGA_CHART_COLORS, normalizeAtivoTipo } from "@/lib/patrimonio-utils"
@@ -92,9 +94,22 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     [premissasCompletas, objetivosEngine, state.passivos, premissas.aliquotaImpostoRendimento, viewMode]
   )
 
+  const taxaNominalAnual = Math.max(0, (Number(premissas.rendimento) || 0) / 100)
+  const inflacaoAnual = Math.max(0, (Number(premissas.inflacao) || 0) / 100)
+  const taxaReal = (1 + taxaNominalAnual) / (1 + inflacaoAnual) - 1
+  const horizonteApos = Math.max(1, Number(premissas.horizonteAposentadoria) || 35)
+
   const kpis = useMemo(() =>
-    calcularKPIs(projecao, premissasCompletas, rendaAtual, dadosPessoais.despesa)
-  , [projecao, premissasCompletas, rendaAtual, dadosPessoais.despesa])
+    calcularKPIs(projecao, premissasCompletas, rendaAtual, dadosPessoais.despesa, objetivosEngine)
+  , [projecao, premissasCompletas, rendaAtual, dadosPessoais.despesa, objetivosEngine])
+
+  const objetivosEternosAnuais = useMemo(
+    () => totalObjetivosEternosAnuais(objetivosEngine, taxaReal),
+    [objetivosEngine, taxaReal],
+  )
+  const objetivosEternosMensal = objetivosEternosAnuais / 12
+  const rendaMensalDesejada = Number(premissas.retiradaMensal) || 0
+  const necessidadeMensalTotal = rendaMensalDesejada + objetivosEternosMensal
 
   const totalPassivosInv = useMemo(
     () => state.passivos.reduce((s, p) => s + getSaldoDevedorPassivo(p), 0),
@@ -138,11 +153,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     return Math.pow(1 + inf, Math.max(0, t))
   }
 
-  const taxaNominalAnual = Math.max(0, (Number(premissas.rendimento) || 0) / 100)
-  const inflacaoAnual = Math.max(0, (Number(premissas.inflacao) || 0) / 100)
-  const taxaReal = (1 + taxaNominalAnual) / (1 + inflacaoAnual) - 1
-  const horizonteApos = Math.max(1, Number(premissas.horizonteAposentadoria) || 35)
-
   const dadosFluxo = useMemo(
     () =>
       buildDadosFluxoGrafico(projecao, {
@@ -180,7 +190,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         horizonteApos,
         Number(premissas.retiradaMensal) || 0,
         Number(premissas.inflacao) || 0,
-        viewMode
+        viewMode,
+        Number(premissas.idadeApos) || 0,
       ),
     [
       projecao,
@@ -188,23 +199,60 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       horizonteApos,
       premissas.retiradaMensal,
       premissas.inflacao,
+      premissas.idadeApos,
       viewMode,
     ]
   )
 
   const dadosGraficoPatrimonio = useMemo(() => {
-    return projecao.map((p) => {
+    const aliqIR = Number(premissas.aliquotaImpostoRendimento) || 0.15
+    return projecao.map((p, i) => {
       const t = Number(p.t) || 0
       const nominal = Number(p.saldoNominal) || 0
-      const poderCompraHoje = nominal / deflatorPorT(t)
+      const deflator = deflatorPorT(t)
+      const poderCompraHoje = nominal / deflator
+      const saldoNominalInicio =
+        i > 0 ? Number(projecao[i - 1].saldoNominal) || 0 : premissasCompletas.saldoInicial
+      const fluxoAno = fluxoAnual[i]
+      const optsGerada = {
+        objetivosAnuaisReal: objetivosEternosAnuais,
+        dividasAnuaisReal: (Number(fluxoAno?.dividas) || 0) / deflator,
+        aliquotaIR: aliqIR,
+      }
+      const patrimonioRealInicio = saldoNominalInicio / deflator
+      const rendaGeradaReal = rendaMensalGeradaReal(
+        patrimonioRealInicio,
+        taxaNominalAnual,
+        inflacaoAnual,
+        optsGerada,
+      )
+      const rendaGeradaNominal = rendaMensalGeradaNominal(
+        saldoNominalInicio,
+        taxaNominalAnual,
+        inflacaoAnual,
+        deflator,
+        optsGerada,
+      )
       return {
         ...p,
         valorNominal: nominal,
         poderCompraHoje,
         valor: viewMode === "nominal" ? nominal : poderCompraHoje,
+        rendaGeradaReal,
+        rendaGeradaNominal,
       }
     })
-  }, [projecao, viewMode, premissas.inflacao])
+  }, [
+    projecao,
+    fluxoAnual,
+    premissasCompletas.saldoInicial,
+    premissas.aliquotaImpostoRendimento,
+    viewMode,
+    premissas.inflacao,
+    taxaNominalAnual,
+    inflacaoAnual,
+    objetivosEternosAnuais,
+  ])
 
   const distribuicaoAtivos = useMemo(() => {
     const acc = new Map<string, { value: number; fill: string }>()
@@ -350,18 +398,60 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const kpiCards = [
     { label: "PATRIMÔNIO NA APOSENTADORIA", valor: fmt(kpis.patrimonioApos), subtexto: `${fmt(kpis.patrimonioAposReal)} em valor real`, icon: TrendingUp, cor: "blue" },
     (() => {
-      const anos = Math.max(0, (Number(premissas.idadeApos) || 0) - idadeAtual)
+      const patrimonioNominalApos = Number(kpis.patrimonioApos) || 0
       const patrimonioRealApos = Number(kpis.patrimonioAposReal) || 0
-      // Renda sustentável pela anuidade (mesmo método dos cards/gráficos de renda).
-      const rendaRealApos = Math.max(0, pmtDeAnuidade(patrimonioRealApos, taxaReal, horizonteApos) / 12)
-      const rendaNominalApos = rendaRealApos * Math.pow(1 + inflacaoAnual, anos)
+      const anos = Math.max(0, (Number(premissas.idadeApos) || 0) - idadeAtual)
+      const deflatorApos = Math.pow(1 + inflacaoAnual, anos)
+      const idxApos = projecao.findIndex((p) => p.idade === premissas.idadeApos)
+      const fluxoApos = idxApos >= 0 ? fluxoAnual[idxApos] : null
+      const saldoNominalInicioApos =
+        idxApos > 0 ? Number(projecao[idxApos - 1].saldoNominal) || 0 : premissasCompletas.saldoInicial
+      const optsGerada = {
+        objetivosAnuaisReal: objetivosEternosAnuais,
+        dividasAnuaisReal: (Number(fluxoApos?.dividas) || 0) / deflatorApos,
+        aliquotaIR: Number(premissas.aliquotaImpostoRendimento) || 0.15,
+      }
+      const patrimonioRealInicioApos = saldoNominalInicioApos / deflatorApos
+      const rendaRealApos = rendaMensalGeradaReal(
+        patrimonioRealInicioApos,
+        taxaNominalAnual,
+        inflacaoAnual,
+        optsGerada,
+      )
+      const rendaNominalApos = rendaMensalGeradaNominal(
+        saldoNominalInicioApos,
+        taxaNominalAnual,
+        inflacaoAnual,
+        deflatorApos,
+        optsGerada,
+      )
       const rendaHojeEq = rendaRealApos
 
       return viewMode === "nominal"
-        ? { label: "RENDA MENSAL NA APOSENTADORIA", valor: fmtFull(rendaNominalApos), subtexto: `(${fmtFull(rendaHojeEq)} hoje · anuidade por ${horizonteApos} anos)`, icon: DollarSign, cor: "green" }
-        : { label: "RENDA MENSAL NA APOSENTADORIA", valor: fmtFull(rendaRealApos), subtexto: `Anuidade por ${horizonteApos} anos`, icon: DollarSign, cor: "green" }
+        ? {
+            label: "RENDA MENSAL NA APOSENTADORIA",
+            valor: fmtFull(rendaNominalApos),
+            subtexto: `(${fmtFull(rendaHojeEq)} hoje · perpetuidade) · obj. eternos: ${fmtFull(objetivosEternosMensal)}/mês`,
+            icon: DollarSign,
+            cor: "green",
+          }
+        : {
+            label: "RENDA MENSAL NA APOSENTADORIA",
+            valor: fmtFull(rendaRealApos),
+            subtexto: `Perpetuidade · obj. eternos (equiv.): ${fmtFull(objetivosEternosMensal)}/mês`,
+            icon: DollarSign,
+            cor: "green",
+          }
     })(),
-    { label: "LIBERDADE FINANCEIRA",        valor: kpis.idadeLF ? `${kpis.idadeLF} anos` : "Não atingida", subtexto: kpis.idadeLF ? `Em ${kpis.idadeLF - idadeAtual} anos` : "Ajuste as premissas", icon: Clock, cor: "yellow" },
+    {
+      label: "LIBERDADE FINANCEIRA",
+      valor: kpis.idadeLF ? `${kpis.idadeLF} anos` : "Não atingida",
+      subtexto: kpis.idadeLF
+        ? `Em ${kpis.idadeLF - idadeAtual} anos · necessidade ${fmtFull(necessidadeMensalTotal)}/mês`
+        : `Necessidade total: ${fmtFull(necessidadeMensalTotal)}/mês`,
+      icon: Clock,
+      cor: "yellow",
+    },
     { label: "TAXA DE POUPANÇA",            valor: `${kpis.taxaPoupanca}%`, subtexto: `${fmtFull(aporteM)} / mês`, icon: PiggyBank, cor: "neutral" },
   ]
 
@@ -580,8 +670,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                     const t = Number(entry?.t) || 0
                     const saldoNominal = Number(entry?.saldoNominal) || 0
                     const poderCompraHoje = saldoNominal / deflatorPorT(t)
-                    const rendaReal = Math.max(0, pmtDeAnuidade(poderCompraHoje, taxaReal, horizonteApos) / 12)
-                    const rendaNominal = rendaReal * deflatorPorT(t)
+                    const rendaReal = Number(entry?.rendaGeradaReal) || 0
+                    const rendaNominal = Number(entry?.rendaGeradaNominal) || 0
 
                     return [
                       <div className="space-y-1">
@@ -592,6 +682,9 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                           <div>Poder de compra hoje: {fmtFull(poderCompraHoje)}</div>
                         )}
                         <div>Renda Mensal Gerada: {fmtFull(viewMode === "nominal" ? rendaNominal : rendaReal)}</div>
+                        <div className="text-muted-foreground">
+                          Objetivos eternos (equiv.): {fmtFull(objetivosEternosMensal)}/mês
+                        </div>
                       </div>,
                       "",
                     ]

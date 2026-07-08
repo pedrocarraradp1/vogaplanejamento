@@ -11,14 +11,8 @@ import {
   aporteMensalAtual,
   resolveAporteParaPremissas,
 } from "@/lib/renda-utils"
-import { calcularProjecao } from "@/lib/engine"
+import { calcularProjecao, pvAnuidade, totalObjetivosEternosAnuais } from "@/lib/engine"
 import { calcularRealizadoMensal } from "@/lib/fluxo-caixa-utils"
-
-/** Valor presente de uma anuidade (patrimônio necessário para pagar `pmtAnual` por `n` anos). */
-function pvAnuidade(pmtAnual: number, r: number, n: number): number {
-  if (r === 0) return pmtAnual * n
-  return (pmtAnual * (1 - Math.pow(1 + r, -n))) / r
-}
 
 function idadePorNascimento(nascimento: string): number {
   if (!nascimento) return 0
@@ -113,7 +107,12 @@ export function montarSnapshotCliente(state: PlanoState): SnapshotCliente {
     const inflacao = Math.max(0, (Number(premissas.inflacao) || 0) / 100)
     const taxaReal = (1 + taxaNominal) / (1 + inflacao) - 1
     const horizonte = Math.max(1, Number(premissas.horizonteAposentadoria) || 35)
-    const patrimonioNecessario = pvAnuidade(rendaDesejada * 12, taxaReal, horizonte)
+    const objetivosEternosAnuais = totalObjetivosEternosAnuais(objetivos, taxaReal)
+    const patrimonioNecessario = pvAnuidade(
+      rendaDesejada * 12 + objetivosEternosAnuais,
+      taxaReal,
+      horizonte,
+    )
 
     let idadeIndep: number | null = null
     for (const p of projecao) {

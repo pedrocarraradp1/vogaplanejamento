@@ -32,6 +32,85 @@ export function pmtDeAnuidade(pv: number, r: number, n: number): number {
   return (pv * r) / (1 - Math.pow(1 + r, -n))
 }
 
+/**
+ * Horizonte de anuidade para renda sustentável em um dado ano.
+ * Antes da aposentadoria: horizonte completo (hipótese "se parasse agora").
+ * Depois: horizonte restante do plano já em andamento.
+ */
+export function horizonteRendaSustentavelAnos(
+  idade: number,
+  idadeAposentadoria: number,
+  horizonteOriginal: number,
+): number {
+  const h = Math.max(1, horizonteOriginal)
+  if (!idadeAposentadoria || idade < idadeAposentadoria) return h
+  const anosDesdeAposentadoria = Math.max(0, idade - idadeAposentadoria)
+  return Math.max(1, h - anosDesdeAposentadoria)
+}
+
+export interface RendaGeradaOptions {
+  /** Objetivos anuais em poder de compra real do ano. */
+  objetivosAnuaisReal?: number
+  /** Dívidas anuais em poder de compra real do ano. */
+  dividasAnuaisReal?: number
+  /** Alíquota de IR sobre o rendimento (0–1). */
+  aliquotaIR?: number
+}
+
+/**
+ * Renda anual gerada (perpetuidade) em termos reais: rendimento real do ano
+ * (Fisher) líquido de IR, menos objetivos/dívidas eternos — o que sobra é a
+ * retirada que mantém o patrimônio REAL constante (fluxo líquido zero).
+ */
+export function rendaAnualGeradaReal(
+  patrimonioRealInicio: number,
+  taxaNominalAnual: number,
+  inflacaoAnual: number,
+  opts: RendaGeradaOptions = {},
+): number {
+  if (patrimonioRealInicio <= 0) return 0
+  const r = Math.max(0, taxaNominalAnual)
+  const inf = Math.max(0, inflacaoAnual)
+  const aliq = Math.max(0, Math.min(1, opts.aliquotaIR ?? 0))
+  const objetivos = Math.max(0, opts.objetivosAnuaisReal ?? 0)
+  const dividas = Math.max(0, opts.dividasAnuaisReal ?? 0)
+
+  const taxaReal = inf >= 0 && r >= 0 ? (1 + r) / (1 + inf) - 1 : 0
+  const rendimentoRealAno = patrimonioRealInicio * Math.max(0, taxaReal)
+  const rendimentoRealLiquido = rendimentoRealAno * (1 - aliq)
+
+  return Math.max(0, rendimentoRealLiquido - objetivos - dividas)
+}
+
+/** Renda mensal gerada (perpetuidade) em termos reais. */
+export function rendaMensalGeradaReal(
+  patrimonioRealInicio: number,
+  taxaNominalAnual: number,
+  inflacaoAnual: number,
+  opts: RendaGeradaOptions = {},
+): number {
+  return rendaAnualGeradaReal(patrimonioRealInicio, taxaNominalAnual, inflacaoAnual, opts) / 12
+}
+
+/** Renda mensal gerada em termos nominais (mesma perpetuidade, expressa no ano t). */
+export function rendaMensalGeradaNominal(
+  patrimonioNominalInicio: number,
+  taxaNominalAnual: number,
+  inflacaoAnual: number,
+  fatorInflacaoAno: number,
+  opts: RendaGeradaOptions = {},
+): number {
+  if (patrimonioNominalInicio <= 0 || fatorInflacaoAno <= 0) return 0
+  const patrimonioRealInicio = patrimonioNominalInicio / fatorInflacaoAno
+  const rendaRealMensal = rendaMensalGeradaReal(
+    patrimonioRealInicio,
+    taxaNominalAnual,
+    inflacaoAnual,
+    opts,
+  )
+  return rendaRealMensal * fatorInflacaoAno
+}
+
 export interface Objetivo {
   id: string
   descricao: string
@@ -45,6 +124,39 @@ export interface Objetivo {
   duracaoTipo?: "total" | "personalizado"
   /** Quantos anos de vigência (apenas quando `duracaoTipo` = "personalizado"). */
   duracaoAnos?: number
+}
+
+/** Objetivo recorrente com vigência até o fim do horizonte (= eterno/contínuo no modelo). */
+export function isObjetivoEterno(obj: Objetivo): boolean {
+  if (!obj.recorrente || obj.valor <= 0) return false
+  return (obj.duracaoTipo ?? "total") === "total"
+}
+
+/**
+ * Converte um objetivo eterno (que se repete a cada N anos, para sempre) no
+ * valor anual equivalente que precisa ser reservado, rendendo à taxa real,
+ * para sustentar essa recorrência indefinidamente.
+ * N=1 (todo ano) reduz para o próprio valor do objetivo, como esperado.
+ */
+export function custoAnualEquivalentePeriodico(
+  valorObjetivo: number,
+  taxaReal: number,
+  intervaloAnos: number,
+): number {
+  const N = Math.max(1, intervaloAnos)
+  if (valorObjetivo <= 0) return 0
+  if (taxaReal === 0) return valorObjetivo / N
+  return (valorObjetivo * taxaReal) / (Math.pow(1 + taxaReal, N) - 1)
+}
+
+/** Soma o custo anual equivalente de todos os objetivos recorrentes eternos. */
+export function totalObjetivosEternosAnuais(objetivos: Objetivo[], taxaReal: number): number {
+  return objetivos
+    .filter(isObjetivoEterno)
+    .reduce((soma, o) => {
+      const intervalo = Math.max(1, Number(o.frequenciaAnos) || 1)
+      return soma + custoAnualEquivalentePeriodico(o.valor, taxaReal, intervalo)
+    }, 0)
 }
 
 export interface Passivo {
@@ -93,6 +205,12 @@ export interface KPIs {
   rendaMensalReal: number
   idadeLF: number | null
   taxaPoupanca: number
+  /** Equivalente anual (real) reservado para objetivos recorrentes eternos. */
+  objetivosEternosAnuais: number
+  /** Renda anual desejada + objetivos eternos (real, poder de compra de hoje). */
+  necessidadeAnualTotal: number
+  /** Patrimônio necessário para LF (anuidade sobre necessidade total). */
+  patrimonioNecessarioLF: number
 }
 
 export interface InventarioResult {
@@ -293,6 +411,9 @@ export function calcularProjecao(
   } = premissas
   const retiradaEfetiva = Math.max(0, retiradaMensal - (rendaAposentadoria || 0))
 
+  const taxaReal = (1 + r) / (1 + inf) - 1
+  const objetivosEternosEq = totalObjetivosEternosAnuais(objetivos, taxaReal)
+
   const resultado: ProjecaoAno[] = []
   let saldo = saldoInicial
 
@@ -300,6 +421,7 @@ export function calcularProjecao(
     const idade        = idadeAtual + t
     const fatorInf     = Math.pow(1 + inf, t)
     const isAposentado = idade >= idadeApos
+    const saldoInicio  = saldo
     const objetivosAno = saqueObjetivosAno(t, objetivos, inf, prazo)
     const dividasAno   = passivos.reduce((s, p) => s + pagamentoDividaAno(p, t), 0)
     const aporteNominalAno =
@@ -323,19 +445,21 @@ export function calcularProjecao(
       saldo = saldo * (1 + r) + fvMensal(aporteNominalAno, r) - objetivosAno - dividasAno + entradaAno
     }
 
-    const saldoReal       = saldo / fatorInf
-    // Renda mensal sustentável pela anuidade (mesmo método dos cards/gráficos) — taxa
-    // real de Fisher e horizonte de aposentadoria; sem método de juros.
-    const taxaReal = (1 + r) / (1 + inf) - 1
-    const horizonteApos = Math.max(1, Number(premissas.horizonteAposentadoria) || 35)
-    const rendaMensalReal = Math.max(0, pmtDeAnuidade(saldoReal, taxaReal, horizonteApos) / 12)
+    const saldoRealInicio = saldoInicio / fatorInf
+    const saldoReal = saldo / fatorInf
+    const rendaMensalReal = Math.round(
+      rendaMensalGeradaReal(saldoRealInicio, r, inf, {
+        objetivosAnuaisReal: objetivosEternosEq,
+        dividasAnuaisReal: dividasAno / fatorInf,
+      }),
+    )
 
     resultado.push({
       t,
       idade,
       saldoNominal:    Math.round(saldo),
       saldoReal:       Math.round(saldoReal),
-      rendaMensalReal: Math.round(rendaMensalReal),
+      rendaMensalReal,
       isAposentado,
     })
   }
@@ -458,7 +582,8 @@ export function calcularKPIs(
   projecao: ProjecaoAno[],
   premissas: Premissas,
   renda: number,
-  despesa: number
+  despesa: number,
+  objetivos: Objetivo[] = [],
 ): KPIs {
   const anoApos            = projecao.find(p => p.idade === premissas.idadeApos)
   const patrimonioApos     = anoApos?.saldoNominal || 0
@@ -467,15 +592,21 @@ export function calcularKPIs(
 
   const r   = premissas.rendimento / 100
   const inf = premissas.inflacao   / 100
-  // Independência financeira pela MESMA anuidade do Bloco 1 (sem taxa de retirada fixa):
-  // taxa real de Fisher + patrimônio necessário = valor presente de `horizonte` anos de renda.
   const taxaReal             = (1 + r) / (1 + inf) - 1
   const horizonte            = Math.max(1, Number(premissas.horizonteAposentadoria) || 35)
-  const patrimonioNecessario = pvAnuidade(Math.max(0, premissas.retiradaMensal) * 12, taxaReal, horizonte)
+  const objetivosEternosAnuais = totalObjetivosEternosAnuais(objetivos, taxaReal)
+  const rendaAnualDesejada = Math.max(0, premissas.retiradaMensal) * 12
+  const necessidadeAnualTotal = rendaAnualDesejada + objetivosEternosAnuais
+  const patrimonioNecessario = pvAnuidade(necessidadeAnualTotal, taxaReal, horizonte)
 
   let idadeLF: number | null = null
+  // Liberdade financeira = perpetuidade (fluxo-zero): o rendimento REAL anual
+  // do patrimônio cobre a necessidade anual sem consumir principal.
+  // (Mesma lógica-base da "Renda Mensal Gerada", só que invertida.)
   for (const ano of projecao) {
-    if ((Number(ano.saldoReal) || 0) >= patrimonioNecessario) {
+    const patrimonioReal = Number(ano.saldoReal) || 0
+    const rendimentoRealAno = patrimonioReal * taxaReal
+    if (rendimentoRealAno >= necessidadeAnualTotal) {
       idadeLF = ano.idade
       break
     }
@@ -489,6 +620,9 @@ export function calcularKPIs(
     rendaMensalReal,
     idadeLF,
     taxaPoupanca: Math.round(taxaPoupanca),
+    objetivosEternosAnuais,
+    necessidadeAnualTotal,
+    patrimonioNecessarioLF: patrimonioNecessario,
   }
 }
 
