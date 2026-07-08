@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { usePlano } from "@/lib/plano-context"
 import { getFontesRenda, resolveAporteParaPremissas } from "@/lib/renda-utils"
-import { calcularProjecao, type ProjecaoAno } from "@/lib/engine"
+import { calcularProjecao, encontrarIdadeLiberdadeFinanceira, type ProjecaoAno } from "@/lib/engine"
 import {
   ResponsiveContainer,
   LineChart,
@@ -130,8 +130,10 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
 
   const anosAteAposentadoria = Math.max(0, (premissas.idadeApos || 0) - idadeAtualCalculada)
   const retiradaDesejada = premissas.retiradaMensal ?? 0
-  const rendaApos = premissas.rendaAposentadoria ?? 0
-  const retiradaLiquida = Math.max(0, retiradaDesejada - rendaApos)
+  /** Bruto líquido das Premissas (mesmo do KPI de Projeção). */
+  const rendimentoBrutoPlano = Number(premissas.rendimentoBruto) || 0
+  const moderadoCoincideComPlano =
+    Math.abs(cenarioModerado - rendimentoBrutoPlano) < 1e-9
 
   const deflatorAposentadoria = useMemo(() => {
     const inf = inflacaoGlobal / 100
@@ -151,20 +153,6 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
     if (Math.abs(valor) >= 1_000_000) return `${prefix}${(valor / 1_000_000).toFixed(1)}M`
     if (Math.abs(valor) >= 1_000) return `${prefix}${(valor / 1_000).toFixed(0)}K`
     return `${prefix}${valor.toFixed(0)}`
-  }
-
-  const objetivoPatrimonioParaTaxa = (taxaAnualPct: number) => {
-    const taxa = (Number(taxaAnualPct) || 0) / 100
-    return taxa > 0 ? (retiradaLiquida * 12) / taxa : Infinity
-  }
-
-  const idadeIndependenciaNaProjecao = (projecaoLocal: ProjecaoAno[], taxaAnualPct: number) => {
-    const objetivoPatrimonio = objetivoPatrimonioParaTaxa(taxaAnualPct)
-    if (!isFinite(objetivoPatrimonio)) return null
-    for (const ano of projecaoLocal) {
-      if (!ano.isAposentado && (ano.saldoNominal ?? 0) >= objetivoPatrimonio) return ano.idade
-    }
-    return null
   }
 
   const patrimonioNaIdadeApos = (projecaoLocal: ProjecaoAno[]) => {
@@ -240,7 +228,14 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
         patrimonioApos: patrimonio.nominal,
         patrimonioAposReal: patrimonio.real,
         rendaMensalAposReal: rendaMensalRealNaApos(patrimonio.real, taxaLiquida),
-        idadeIF: idadeIndependenciaNaProjecao(projecaoLocal, taxaLiquida),
+        // Mesma fonte do KPI "Liberdade Financeira" (perpetuidade / fluxo-zero).
+        idadeIF: encontrarIdadeLiberdadeFinanceira(
+          projecaoLocal,
+          taxaLiquida,
+          inflacaoGlobal,
+          retiradaDesejada,
+          objetivosEngine,
+        ),
       }
     }
 
@@ -288,6 +283,8 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
     cenarioAgressivo,
     aliquotaIR,
     inflacaoGlobal,
+    retiradaDesejada,
+    objetivosEngine,
     projecaoConservadora,
     projecaoModerada,
     projecaoAgressiva,
@@ -368,6 +365,24 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
 
       {showCenarios && (
         <CardContent className="space-y-6">
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Comparação ilustrativa com três rentabilidades brutas alternativas (
+            Conservador / Moderado / Agressivo), reutilizando aporte, objetivos e renda
+            desejada do plano.{" "}
+            {moderadoCoincideComPlano ? (
+              <>
+                O perfil Moderado ({cenarioModerado}% a.a. bruto) coincide com a
+                rentabilidade das Premissas — a linha Liberdade Financeira dessa coluna
+                deve bater com o KPI da Projeção.
+              </>
+            ) : (
+              <>
+                O Moderado usa {cenarioModerado}% a.a. bruto; as Premissas do cliente
+                estão em {rendimentoBrutoPlano}% a.a. bruto — números de Liberdade Financeira
+                só coincidem com o KPI quando essas taxas forem iguais.
+              </>
+            )}
+          </p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {cenarios.map((c) => (
               <div key={c.key} className={`rounded-xl border p-5 ${c.corBg} ${c.corBorder}`}>
@@ -472,7 +487,7 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
                   values: cenarios.map((c) => fmtFull(c.rendaMensalAposReal)),
                 },
                 {
-                  label: "Independência Financeira",
+                  label: "Liberdade Financeira",
                   values: cenarios.map((c) => (c.idadeIF ? `${c.idadeIF} anos` : "—")),
                 },
               ]}

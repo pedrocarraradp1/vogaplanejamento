@@ -856,6 +856,38 @@ export function calcularFluxoAnual(
 
 // ─── KPIs ─────────────────────────────────────────────────────────────────────
 
+/**
+ * Liberdade financeira (perpetuidade / fluxo-zero): primeira idade em que o
+ * rendimento REAL anual do patrimônio cobre a necessidade anual (renda desejada
+ * + objetivos eternos equivalentes), sem consumir o principal.
+ *
+ * Fonte única para o KPI "Liberdade Financeira" e a linha "Independência
+ * Financeira" da tabela de cenários.
+ */
+export function encontrarIdadeLiberdadeFinanceira(
+  projecao: ProjecaoAno[],
+  rendimentoLiquidoPct: number,
+  inflacaoPct: number,
+  retiradaMensalDesejada: number,
+  objetivos: Objetivo[] = [],
+): number | null {
+  const r = (Number(rendimentoLiquidoPct) || 0) / 100
+  const inf = (Number(inflacaoPct) || 0) / 100
+  const taxaReal = (1 + r) / (1 + inf) - 1
+  const objetivosEternosAnuais = totalObjetivosEternosAnuais(objetivos, taxaReal)
+  const necessidadeAnualTotal =
+    Math.max(0, Number(retiradaMensalDesejada) || 0) * 12 + objetivosEternosAnuais
+
+  for (const ano of projecao) {
+    const patrimonioReal = Number(ano.saldoReal) || 0
+    const rendimentoRealAno = patrimonioReal * taxaReal
+    if (rendimentoRealAno >= necessidadeAnualTotal) {
+      return ano.idade
+    }
+  }
+  return null
+}
+
 export function calcularKPIs(
   projecao: ProjecaoAno[],
   premissas: Premissas,
@@ -877,18 +909,13 @@ export function calcularKPIs(
   const necessidadeAnualTotal = rendaAnualDesejada + objetivosEternosAnuais
   const patrimonioNecessario = pvAnuidade(necessidadeAnualTotal, taxaReal, horizonte)
 
-  let idadeLF: number | null = null
-  // Liberdade financeira = perpetuidade (fluxo-zero): o rendimento REAL anual
-  // do patrimônio cobre a necessidade anual sem consumir principal.
-  // (Mesma lógica-base da "Renda Mensal Gerada", só que invertida.)
-  for (const ano of projecao) {
-    const patrimonioReal = Number(ano.saldoReal) || 0
-    const rendimentoRealAno = patrimonioReal * taxaReal
-    if (rendimentoRealAno >= necessidadeAnualTotal) {
-      idadeLF = ano.idade
-      break
-    }
-  }
+  const idadeLF = encontrarIdadeLiberdadeFinanceira(
+    projecao,
+    premissas.rendimento,
+    premissas.inflacao,
+    premissas.retiradaMensal,
+    objetivos,
+  )
 
   const taxaPoupanca = renda > 0 ? ((renda - despesa) / renda) * 100 : 0
 
