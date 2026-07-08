@@ -241,17 +241,26 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
     calcularKPIs(projecao, premissasCompletas, rendaMensalAtual, dadosPessoais.despesa)
   , [projecao, premissasCompletas, rendaMensalAtual, dadosPessoais.despesa])
 
-  const dadosGrafico = useMemo(() =>
-    projecao.map(p => ({
-      ...p,
-      valorNominal: Number(p.saldoNominal) || 0,
-      poderCompraHoje: (Number(p.saldoNominal) || 0) / deflatorPorIdade(p.idade),
-      valor:
-        displayMode === "nominal"
-          ? (Number(p.saldoNominal) || 0)
-          : (Number(p.saldoNominal) || 0) / deflatorPorIdade(p.idade),
-    }))
-  , [projecao, displayMode, premissas.inflacao, idadeAtualCalculada])
+  const dadosGrafico = useMemo(() => {
+    const horizonteApos = Math.max(1, Number(premissas.horizonteAposentadoria) || 35)
+    return projecao.map(p => {
+      const saldoNominal = Number(p.saldoNominal) || 0
+      const deflator = deflatorPorIdade(p.idade)
+      const patrimonioReal = Number(p.saldoReal) || 0
+      // Fonte única da "renda mensal sustentável": anuidade sobre o patrimônio real
+      // daquele ano (mesmo método dos Blocos 1/2/3). Nominal = real corrigido ao ano.
+      const rendaSustentavelReal = Math.max(0, pmtDeAnuidade(patrimonioReal, taxaReal, horizonteApos) / 12)
+      const rendaSustentavelNominal = rendaSustentavelReal * deflator
+      return {
+        ...p,
+        valorNominal: saldoNominal,
+        poderCompraHoje: saldoNominal / deflator,
+        valor: displayMode === "nominal" ? saldoNominal : saldoNominal / deflator,
+        rendaSustentavelReal,
+        rendaSustentavelNominal,
+      }
+    })
+  }, [projecao, displayMode, premissas.inflacao, premissas.horizonteAposentadoria, taxaReal, idadeAtualCalculada])
 
   // ── Independência financeira (anuidade, sem taxa de retirada fixa) ─────────
   const anoBase = new Date().getFullYear()
@@ -735,11 +744,12 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
                 <div>
                   <p className="field-label">Renda Mensal Sustentável</p>
                   {(() => {
-                    const anos = Math.max(0, (Number(premissas.idadeApos) || 0) - idadeAtualCalculada)
-                    const patrimonioRealApos = Number(kpis.patrimonioAposReal) || 0
-                    // Mesmo método dos Blocos 1/2/3: anuidade sobre o horizonte, sem taxa fixa.
-                    const rendaSustRealApos = Math.max(0, pmtDeAnuidade(patrimonioRealApos, taxaReal, horizonte) / 12)
-                    const rendaSustNominalApos = rendaSustRealApos * Math.pow(1 + inflacaoAnual, anos)
+                    // Mesma fonte do tooltip: ponto da série na idade de aposentadoria.
+                    const pontoApos =
+                      dadosGrafico.find((d) => d.idade === (Number(premissas.idadeApos) || 0)) ??
+                      dadosGrafico[dadosGrafico.length - 1]
+                    const rendaSustRealApos = Number(pontoApos?.rendaSustentavelReal) || 0
+                    const rendaSustNominalApos = Number(pontoApos?.rendaSustentavelNominal) || 0
 
                     if (displayMode === "nominal") {
                       return (
@@ -756,7 +766,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
                       <>
                         <p className="text-2xl font-bold text-[#22C787] mt-1">{formatarMoedaCompleta(rendaSustRealApos)}</p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Anuidade por {horizonte} anos · taxa real {(taxaReal * 100).toFixed(1).replace(".", ",")}% a.a.
+                          Anuidade por {horizonte} anos
                         </p>
                       </>
                     )
@@ -796,12 +806,12 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
                   formatter={(value: number, _name: string, props: any) => {
                     const entry = props?.payload
                     const idade = Number(entry?.idade) || idadeAtualCalculada
-                    const d = displayMode === "real" ? deflatorPorIdade(idade) : 1
                     const saldoNominal = Number(entry?.saldoNominal) || 0
-                    const saldoRealHoje = saldoNominal / deflatorPorIdade(idade)
                     const poderCompraHoje = saldoNominal / deflatorPorIdade(idade)
-                    const rendaNominal = Math.max(0, saldoNominal * taxaNominalMensal)
-                    const rendaReal = Math.max(0, saldoRealHoje * taxaRealMensal)
+                    const rendaSustentavel =
+                      displayMode === "nominal"
+                        ? Number(entry?.rendaSustentavelNominal) || 0
+                        : Number(entry?.rendaSustentavelReal) || 0
 
                     return [
                       <div className="space-y-1">
@@ -812,7 +822,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
                           <div>Poder de compra hoje: {formatarMoedaCompleta(poderCompraHoje)}</div>
                         )}
                         <div>
-                          Renda Mensal Gerada: {formatarMoedaCompleta(displayMode === "nominal" ? rendaNominal : rendaReal)}
+                          Renda Mensal Gerada: {formatarMoedaCompleta(rendaSustentavel)}
                         </div>
                       </div>,
                       "",
