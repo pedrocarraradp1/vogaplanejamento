@@ -17,8 +17,10 @@ import {
   calcularProjecao,
   calcularKPIs,
   calcularFluxoAnual,
+  encontrarAporteNecessario,
   encontrarRendaDeConsumoMensalReal,
   encontrarRendaDePreservacaoMensalReal,
+  saldoRealNaIdadeApos,
   rodarMonteCarlo,
   VOLATILIDADE_MONTE_CARLO_ANUAL,
   pvAnuidade,
@@ -307,50 +309,16 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
     idadeAtualCalculada,
   ])
 
-  const rendaConsumoPatrimonioRealApos = useMemo(() => {
-    const idadeApos = Number(premissas.idadeApos) || 0
-    const idxApos = projecao.findIndex((p) => p.idade === idadeApos)
-    if (idxApos < 0) return 0
-    // Início da aposentadoria = saldo do ANO ANTERIOR (antes da 1ª retirada).
-    const saldoNominalInicio =
-      idxApos > 0
-        ? Number(projecao[idxApos - 1].saldoNominal) || 0
-        : premissasCompletas.saldoInicial
-    const deflatorInicio = deflatorPorIdade(Math.max(idadeAtualCalculada, idadeApos - (idxApos > 0 ? 1 : 0)))
-    const patrimonioRealInicioApos =
-      idxApos > 0
-        ? saldoNominalInicio / deflatorPorIdade(projecao[idxApos - 1].idade)
-        : saldoNominalInicio / deflatorInicio
-
-    // Fluxos reais do motor (objetivos eternos já inclusos — NÃO somar equivalentes em paralelo).
-    const objetivosFinitosPorAnoReal: number[] = []
-    const passivosPorAnoReal: number[] = []
-    for (let ano = 0; ano < horizonteApos; ano++) {
-      const row = fluxoAnual[idxApos + ano]
-      const idade = idadeApos + ano
-      const deflator = deflatorPorIdade(idade)
-      objetivosFinitosPorAnoReal.push(((Number(row?.objetivos) || 0) / deflator) || 0)
-      passivosPorAnoReal.push(((Number(row?.dividas) || 0) / deflator) || 0)
-    }
-
-    return encontrarRendaDeConsumoMensalReal({
-      patrimonioRealInicioApos,
-      taxaRealAnual: taxaReal,
-      horizonteAnos: horizonteApos,
-      objetivosFinitosPorAnoReal,
-      passivosPorAnoReal,
-      tolerancia: 1000,
-    })
-  }, [
-    premissas.idadeApos,
-    horizonteApos,
-    premissasCompletas.saldoInicial,
-    projecao,
-    fluxoAnual,
-    taxaReal,
-    deflatorPorIdade,
-    idadeAtualCalculada,
-  ])
+  const rendaConsumoPatrimonioRealApos = useMemo(
+    () =>
+      encontrarRendaDeConsumoMensalReal({
+        premissas: premissasCompletas,
+        objetivos: objetivosEngine,
+        passivos: state.passivos,
+        tolerancia: 1000,
+      }),
+    [premissasCompletas, objetivosEngine, state.passivos],
+  )
 
   /** Série de objetivos/dívidas REAIS usada pelo KPI e pelos testes — mesma fonte do loop. */
   const seriesFluxoAposentadoriaReal = useMemo(() => {
@@ -393,6 +361,9 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
         objetivosEternosAnuais,
         aliquotaIR: Number(premissas.aliquotaImpostoRendimento) || 0.15,
         fluxoAnual,
+        premissas: premissasCompletas,
+        objetivos: objetivosEngine,
+        passivos: state.passivos,
       }),
     [
       projecao,
@@ -403,7 +374,9 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
       premissas.retiradaMensal,
       premissas.idadeApos,
       premissas.aliquotaImpostoRendimento,
-      premissasCompletas.saldoInicial,
+      premissasCompletas,
+      objetivosEngine,
+      state.passivos,
       objetivosEternosAnuais,
       fluxoAnual,
     ]
@@ -432,11 +405,9 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
     // Mesma lógica ano a ano do loop (objetivos/dívidas reais) — NÃO média isolada.
     // Busca W tal que patrimônio final ≈ patrimônio inicial (Preservação).
     const real = encontrarRendaDePreservacaoMensalReal({
-      patrimonioRealInicioApos: patrimonioRealInicio,
-      taxaRealAnual: taxaReal,
-      horizonteAnos: horizonteApos,
-      objetivosPorAnoReal: seriesFluxoAposentadoriaReal.objetivos,
-      passivosPorAnoReal: seriesFluxoAposentadoriaReal.dividas,
+      premissas: premissasCompletas,
+      objetivos: objetivosEngine,
+      passivos: state.passivos,
       tolerancia: 1000,
     })
 
@@ -468,7 +439,9 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
   }, [
     projecao,
     premissas.idadeApos,
-    premissasCompletas.saldoInicial,
+    premissasCompletas,
+    objetivosEngine,
+    state.passivos,
     idadeAtualCalculada,
     deflatorPorIdade,
     taxaReal,
@@ -513,22 +486,36 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
 
   const patrimonioNecessario = kpis.patrimonioNecessarioLF
 
-  // ── Bloco 2: aporte necessário (mesmo cálculo, só apresentação) ────────────
-  const b2RentPct = taxaReal * 100
-
+  // ── Bloco 2: aporte necessário (busca na simulação real do Bloco 1) ────────
   const b2Resultado = useMemo(() => {
-    const alvo = pvAnuidade(rendaMensalDesejada * 12, taxaReal, Math.max(1, horizonte))
-    const nMeses = Math.max(0, ((Number(premissas.idadeApos) || 0) - idadeAtualCalculada) * 12)
-    if (nMeses <= 0) {
-      return { alvo, aporteNecessario: 0, fvPatrimonio: saldoInicialCalculado, invalido: true }
+    const alvo = patrimonioNecessario
+    const idadeApos = Number(premissas.idadeApos) || 0
+    if (idadeApos <= idadeAtualCalculada) {
+      return { alvo, aporteNecessario: 0, patrimonioProjetado: saldoInicialCalculado, invalido: true }
     }
-    const rMensal = Math.pow(1 + taxaReal, 1 / 12) - 1
-    const fvPatrimonio = saldoInicialCalculado * Math.pow(1 + rMensal, nMeses)
-    const fatorAnuidade =
-      rMensal === 0 ? nMeses : (Math.pow(1 + rMensal, nMeses) - 1) / rMensal
-    const aporteNecessario = Math.max(0, (alvo - fvPatrimonio) / fatorAnuidade)
-    return { alvo, aporteNecessario, fvPatrimonio, invalido: false }
-  }, [rendaMensalDesejada, taxaReal, horizonte, premissas.idadeApos, idadeAtualCalculada, saldoInicialCalculado])
+    const premissasBusca = { ...premissasCompletas, aportePorAnoNominal: undefined }
+    const aporteNecessario = encontrarAporteNecessario({
+      premissas: premissasBusca,
+      objetivos: objetivosEngine,
+      passivos: state.passivos,
+      patrimonioNecessario: alvo,
+    })
+    const patrimonioProjetado = saldoRealNaIdadeApos(
+      { ...premissasBusca, aporteM: aporteNecessario },
+      objetivosEngine,
+      state.passivos,
+      aporteNecessario,
+    )
+    return { alvo, aporteNecessario, patrimonioProjetado, invalido: false }
+  }, [
+    patrimonioNecessario,
+    premissasCompletas,
+    objetivosEngine,
+    state.passivos,
+    premissas.idadeApos,
+    idadeAtualCalculada,
+    saldoInicialCalculado,
+  ])
 
   const gapAporte = aporteMensal - b2Resultado.aporteNecessario
   const maiorAporteComparativo = Math.max(aporteMensal, b2Resultado.aporteNecessario, 1)

@@ -1,6 +1,9 @@
 import {
   encontrarRendaDeConsumoMensalReal,
   rendaMensalGeradaReal,
+  type Objetivo,
+  type Passivo,
+  type Premissas,
   type ProjecaoAno,
 } from "@/lib/engine"
 
@@ -42,6 +45,9 @@ export interface BuildDadosRendaOptions {
   objetivosEternosAnuais: number
   aliquotaIR: number
   fluxoAnual: Array<{ objetivos?: number; dividas?: number }>
+  premissas: Premissas
+  objetivos: Objetivo[]
+  passivos: Passivo[]
 }
 
 export interface BuildDadosFluxoOptions {
@@ -183,49 +189,25 @@ export function buildDadosRendaGrafico(
     objetivosEternosAnuais,
     aliquotaIR,
     fluxoAnual,
+    premissas,
+    objetivos,
+    passivos,
   } = options
 
   const horizonteOriginal = Math.max(1, horizonteAnos)
   const meta = metaMensal
 
-  // Consumo: calculado UMA VEZ no início da aposentadoria (mesmo critério do KPI).
-  // Nunca recalcular por idade restante — isso explode perto do fim do horizonte.
-  const idxApos =
+  const rendaConsumoMensalReal =
     idadeAposentadoria > 0
-      ? projecao.findIndex((p) => p.idade === idadeAposentadoria)
-      : -1
-  let rendaConsumoMensalReal = 0
-  if (idxApos >= 0) {
-    const saldoNominalInicio =
-      idxApos > 0 ? Number(projecao[idxApos - 1].saldoNominal) || 0 : saldoInicial
-    const tInicio =
-      idxApos > 0 ? Number(projecao[idxApos - 1].t) || 0 : 0
-    const defInicio = Math.pow(1 + inflacaoAnual, Math.max(0, tInicio))
-    const patrimonioRealInicioApos = saldoNominalInicio / defInicio
-    const objetivosFinitosPorAnoReal: number[] = []
-    const passivosPorAnoReal: number[] = []
-    for (let ano = 0; ano < horizonteOriginal; ano++) {
-      const j = idxApos + ano
-      const row = fluxoAnual[j]
-      const tFuturo = Number(projecao[j]?.t) ?? Number(projecao[idxApos]?.t || 0) + ano
-      const defFuturo = Math.pow(1 + inflacaoAnual, Math.max(0, tFuturo))
-      // Objetivos do fluxo já incluem eternos — não somar custo anual equivalente em paralelo.
-      objetivosFinitosPorAnoReal.push((Number(row?.objetivos) || 0) / defFuturo)
-      passivosPorAnoReal.push((Number(row?.dividas) || 0) / defFuturo)
-    }
-    rendaConsumoMensalReal =
-      patrimonioRealInicioApos > 0
-        ? Math.round(
-            encontrarRendaDeConsumoMensalReal({
-              patrimonioRealInicioApos,
-              taxaRealAnual,
-              horizonteAnos: horizonteOriginal,
-              objetivosFinitosPorAnoReal,
-              passivosPorAnoReal,
-            }),
-          )
-        : 0
-  }
+      ? Math.round(
+          encontrarRendaDeConsumoMensalReal({
+            premissas,
+            objetivos,
+            passivos,
+            tolerancia: 1000,
+          }),
+        )
+      : 0
 
   return projecao.map((p, i) => {
     const t = Number(p.t) || 0

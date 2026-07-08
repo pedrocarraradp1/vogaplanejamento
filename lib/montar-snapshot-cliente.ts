@@ -11,7 +11,7 @@ import {
   aporteMensalAtual,
   resolveAporteParaPremissas,
 } from "@/lib/renda-utils"
-import { calcularProjecao, pvAnuidade, totalObjetivosEternosAnuais, horizontePosAposentadoriaAnos } from "@/lib/engine"
+import { calcularProjecao, pvAnuidade, totalObjetivosEternosAnuais, horizontePosAposentadoriaAnos, encontrarAporteNecessario } from "@/lib/engine"
 import { calcularRealizadoMensal } from "@/lib/fluxo-caixa-utils"
 
 function idadePorNascimento(nascimento: string): number {
@@ -129,14 +129,12 @@ export function montarSnapshotCliente(state: PlanoState): SnapshotCliente {
     const anosParaIndependencia =
       idadeIndep != null ? Math.max(0, idadeIndep - idadeAtual) : Math.max(0, idadeApos - idadeAtual)
 
-    // Aporte mensal necessário (composição mensal) para atingir o patrimônio
-    // necessário até a idade de aposentadoria.
-    const rMensal = Math.pow(1 + taxaReal, 1 / 12) - 1
-    const nMeses = Math.max(0, (idadeApos - idadeAtual) * 12)
-    const fvPatrimonio = saldoInicial * Math.pow(1 + rMensal, nMeses)
-    const fatorAnuidade = rMensal === 0 ? nMeses : (Math.pow(1 + rMensal, nMeses) - 1) / rMensal
-    const aporteMensalNecessario =
-      fatorAnuidade > 0 ? Math.max(0, (patrimonioNecessario - fvPatrimonio) / fatorAnuidade) : 0
+    const aporteMensalNecessario = encontrarAporteNecessario({
+      premissas: { ...premissas, saldoInicial, aporteM, idadeAtual, aportePorAnoNominal: undefined },
+      objetivos,
+      passivos,
+      patrimonioNecessario,
+    })
 
     snapshot.aposentadoria = {
       idadeAtual,

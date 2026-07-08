@@ -489,6 +489,82 @@ export function calcularProjecao(
   return resultado
 }
 
+/** Saldo REAL na idade de aposentadoria — mesma definição que Bloco 1 e KPIs. */
+export function saldoRealNaIdadeApos(
+  premissas: Premissas,
+  objetivos: Objetivo[],
+  passivos: Passivo[],
+  aporteMensal: number,
+): number {
+  const idadeApos = Number(premissas.idadeApos) || 0
+  const { aportePorAnoNominal: _omit, ...base } = premissas
+  const proj = calcularProjecao({ ...base, aporteM: aporteMensal }, objetivos, passivos, "real")
+  const ponto = proj.find((p) => p.idade === idadeApos)
+  return ponto ? Number(ponto.saldoReal) || 0 : 0
+}
+
+/**
+ * Aporte mensal (poder de compra de hoje) necessário para que o patrimônio REAL
+ * na idade de aposentadoria atinja `patrimonioNecessario`, por busca binária na
+ * MESMA simulação de acumulação que alimenta as barras do Bloco 1 (`calcularProjecao`
+ * com objetivos, passivos e entrada extra — não anuidade isolada).
+ */
+export function encontrarAporteNecessario(
+  params: {
+    premissas: Premissas
+    objetivos: Objetivo[]
+    passivos?: Passivo[]
+    patrimonioNecessario: number
+    tolerancia?: number
+    maxIter?: number
+  },
+): number {
+  const {
+    premissas,
+    objetivos,
+    passivos = [],
+    patrimonioNecessario,
+    tolerancia = 1000,
+    maxIter = 60,
+  } = params
+
+  const idadeAtual = Number(premissas.idadeAtual) || 0
+  const idadeApos = Number(premissas.idadeApos) || 0
+  const anos = idadeApos - idadeAtual
+  const alvo = Math.max(0, patrimonioNecessario)
+
+  if (anos <= 0 || alvo <= 0) return 0
+
+  const saldoNaApos = (aporteMensal: number) =>
+    saldoRealNaIdadeApos(premissas, objetivos, passivos, aporteMensal)
+
+  const saldoSemAporte = saldoNaApos(0)
+  if (saldoSemAporte >= alvo - tolerancia) return 0
+
+  let baixo = 0
+  let alto = Math.max(
+    1000,
+    (alvo - saldoSemAporte) / Math.max(1, anos * 12),
+    alvo / Math.max(1, anos * 12),
+  )
+
+  for (let i = 0; i < 40; i++) {
+    if (saldoNaApos(alto) >= alvo) break
+    alto *= 2
+    if (alto > 50_000_000) break
+  }
+
+  for (let i = 0; i < maxIter; i++) {
+    const mid = (baixo + alto) / 2
+    const diferenca = saldoNaApos(mid) - alvo
+    if (Math.abs(diferenca) < tolerancia) return mid
+    if (diferenca < 0) baixo = mid
+    else alto = mid
+  }
+
+  return (baixo + alto) / 2
+}
+
 export interface MonteCarloTrajetoriaAno {
   idade: number
   p10: number
@@ -633,89 +709,65 @@ export function calcularRendasReferenciaEstrategia(
   return { rendaGeradaMensal, rendaSustentavelMensal, taxaReal }
 }
 
-/**
- * Decumulação ano a ano em termos REAIS — fonte única para:
- * - busca binária da renda de consumo
- * - curvas do gráfico Comparativo (Acumulação/Preservação/Consumo)
- *
- * Modelo: saldo = saldo*(1+taxaReal) - retirada*12 - objetivosAno - dividasAno
- * (objetivos já vêm do fluxo anual, incluindo eternos — NÃO duplicar via custo anual equivalente)
- */
-export function projetarSaldoRealDecumulacao(
-  patrimonioRealInicio: number,
-  taxaRealAnual: number,
-  horizonteAnos: number,
-  retiradaMensalReal: number,
-  objetivosPorAnoReal: number[],
-  passivosPorAnoReal: number[],
-): number[] {
-  const P0 = Math.max(0, patrimonioRealInicio)
-  const r = taxaRealAnual
-  const H = Math.max(1, Math.floor(horizonteAnos))
-  const renda = Math.max(0, retiradaMensalReal)
-  const series: number[] = [P0]
-  let saldo = P0
-  for (let ano = 0; ano < H; ano++) {
-    const obj = Math.max(0, objetivosPorAnoReal[ano] ?? 0)
-    const div = Math.max(0, passivosPorAnoReal[ano] ?? 0)
-    saldo = saldo * (1 + r) - renda * 12 - obj - div
-    series.push(saldo)
-  }
-  return series
+/** Converte retirada do patrimônio (real) para o campo `retiradaMensal` das premissas. */
+function retiradaMensalNasPremissas(retiradaPortfolioReal: number, premissas: Premissas): number {
+  const rendaApos = Number(premissas.rendaAposentadoria) || 0
+  return Math.max(0, retiradaPortfolioReal) + rendaApos
+}
+
+/** Patrimônio REAL imediatamente antes da 1ª retirada na aposentadoria. */
+export function saldoRealInicioAposentadoria(
+  proj: ProjecaoAno[],
+  premissas: Premissas,
+): number {
+  const idadeApos = Number(premissas.idadeApos) || 0
+  const idxApos = proj.findIndex((p) => p.idade === idadeApos)
+  if (idxApos < 0) return 0
+  if (idxApos > 0) return Number(proj[idxApos - 1].saldoReal) || 0
+  return Number(proj[0]?.saldoReal) || Number(premissas.saldoInicial) || 0
+}
+
+/** Patrimônio REAL no último ano da simulação (`calcularProjecao`). */
+export function saldoRealFinalHorizonte(
+  premissas: Premissas,
+  objetivos: Objetivo[],
+  passivos: Passivo[],
+  retiradaPortfolioReal: number,
+): number {
+  const proj = calcularProjecao(
+    { ...premissas, retiradaMensal: retiradaMensalNasPremissas(retiradaPortfolioReal, premissas) },
+    objetivos,
+    passivos,
+    "real",
+  )
+  return Number(proj[proj.length - 1]?.saldoReal) || 0
 }
 
 /**
- * Encontra (por busca binária) a retirada mensal REAL constante que, rodando a
- * MESMA decumulação ano a ano do loop (`projetarSaldoRealDecumulacao` com os
- * mesmos objetivos/passivos por ano), deixa o patrimônio REAL no fim do horizonte
- * ≈ patrimônio inicial (± tolerância).
- *
- * É a definição operacional de "Renda mensal gerada / Preservação" quando há
- * fluxos irregulares: um único W compatível com a simulação real — sem média
- * isolada de objetivos/passivos.
+ * Encontra (por busca binária) a retirada mensal REAL do patrimônio que, rodando
+ * `calcularProjecao` com os mesmos fluxos da simulação principal, deixa o patrimônio
+ * REAL no fim do horizonte ≈ patrimônio real no início da aposentadoria.
  */
 export function encontrarRendaDePreservacaoMensalReal(
   params: {
-    patrimonioRealInicioApos: number
-    taxaRealAnual: number
-    horizonteAnos: number
-    objetivosPorAnoReal: number[]
-    passivosPorAnoReal: number[]
+    premissas: Premissas
+    objetivos: Objetivo[]
+    passivos?: Passivo[]
     tolerancia?: number
     maxIter?: number
   },
 ): number {
-  const {
-    patrimonioRealInicioApos,
-    taxaRealAnual,
-    horizonteAnos,
-    objetivosPorAnoReal,
-    passivosPorAnoReal,
-    tolerancia = 1000,
-    maxIter = 60,
-  } = params
+  const { premissas, objetivos, passivos = [], tolerancia = 1000, maxIter = 60 } = params
 
-  const P0 = Math.max(0, patrimonioRealInicioApos)
-  const H = Math.max(1, Math.floor(horizonteAnos))
+  const projBase = calcularProjecao(premissas, objetivos, passivos, "real")
+  const P0 = saldoRealInicioAposentadoria(projBase, premissas)
   if (P0 <= 0) return 0
 
-  const saldoFinal = (rendaMensal: number): number => {
-    const series = projetarSaldoRealDecumulacao(
-      P0,
-      taxaRealAnual,
-      H,
-      rendaMensal,
-      objetivosPorAnoReal,
-      passivosPorAnoReal,
-    )
-    return series[series.length - 1] ?? 0
-  }
+  const saldoFinal = (retiradaPortfolio: number) =>
+    saldoRealFinalHorizonte(premissas, objetivos, passivos, retiradaPortfolio)
 
-  // baixo = retirada pequena → sobra patrimônio (final > P0);
-  // alto  = retirada grande → consome (final < P0).
   let baixo = 0
-  let alto =
-    H > 0 ? Math.max(1000, P0 / Math.max(1, H * 12)) * 6 : Math.max(1000, P0 / 12)
+  let alto = Math.max(1000, P0 / Math.max(1, horizontePosAposentadoriaAnos(premissas) * 12)) * 6
 
   for (let i = 0; i < 40; i++) {
     if (saldoFinal(alto) <= P0) break
@@ -727,7 +779,6 @@ export function encontrarRendaDePreservacaoMensalReal(
     const mid = (baixo + alto) / 2
     const s = saldoFinal(mid)
     if (Math.abs(s - P0) <= tolerancia) return mid
-    // final > P0 → ainda sobra → pode retirar mais
     if (s > P0) baixo = mid
     else alto = mid
   }
@@ -738,58 +789,33 @@ export function encontrarRendaDePreservacaoMensalReal(
 }
 
 /**
- * Encontra (por busca binária) a retirada mensal REAL (poder de compra de hoje)
- * que faz o patrimônio REAL chegar a ~0 no fim do horizonte pós-aposentadoria,
- * considerando objetivos/passivos anuais irregulares do fluxo.
+ * Encontra (por busca binária) a retirada mensal REAL do patrimônio que zera o
+ * saldo REAL no fim do horizonte — mesma simulação completa de `calcularProjecao`.
  */
 export function encontrarRendaDeConsumoMensalReal(
   params: {
-    patrimonioRealInicioApos: number
-    taxaRealAnual: number
-    horizonteAnos: number
-    /** @deprecated Ignorado — objetivos eternos já entram via objetivosFinitosPorAnoReal do fluxo. */
-    objetivosEternosAnuaisReal?: number
-    objetivosFinitosPorAnoReal: number[] // tamanho >= horizonte
-    passivosPorAnoReal: number[] // tamanho >= horizonte
-    tolerancia?: number // default 1000
-    maxIter?: number // default 60
+    premissas: Premissas
+    objetivos: Objetivo[]
+    passivos?: Passivo[]
+    tolerancia?: number
+    maxIter?: number
   },
 ): number {
-  const {
-    patrimonioRealInicioApos,
-    taxaRealAnual,
-    horizonteAnos,
-    objetivosFinitosPorAnoReal,
-    passivosPorAnoReal,
-    tolerancia = 1000,
-    maxIter = 60,
-  } = params
+  const { premissas, objetivos, passivos = [], tolerancia = 1000, maxIter = 60 } = params
 
-  const P0 = Math.max(0, patrimonioRealInicioApos)
-  const H = Math.max(1, Math.floor(horizonteAnos))
+  const projBase = calcularProjecao(premissas, objetivos, passivos, "real")
+  const P0 = saldoRealInicioAposentadoria(projBase, premissas)
+  if (P0 <= 0) return 0
 
-  const saldoFinal = (rendaMensal: number): number => {
-    const series = projetarSaldoRealDecumulacao(
-      P0,
-      taxaRealAnual,
-      H,
-      rendaMensal,
-      objetivosFinitosPorAnoReal,
-      passivosPorAnoReal,
-    )
-    return series[series.length - 1] ?? 0
-  }
+  const saldoFinal = (retiradaPortfolio: number) =>
+    saldoRealFinalHorizonte(premissas, objetivos, passivos, retiradaPortfolio)
 
-  // bounds: baixo => sobra patrimônio (saldo >= 0); alto => quebra (saldo <= 0)
   let baixo = 0
-  let alto =
-    H > 0 ? Math.max(1000, P0 / Math.max(1, H * 12)) * 6 : Math.max(1000, P0 / 12)
+  let alto = Math.max(1000, P0 / Math.max(1, horizontePosAposentadoriaAnos(premissas) * 12)) * 6
 
-  // expande o teto até garantir saldoFinal(alto) <= 0
   for (let i = 0; i < 40; i++) {
     if (saldoFinal(alto) <= 0) break
     alto *= 2
-    // guarda-corpo para evitar loops absurdos em edge cases
     if (alto > P0 * 10) break
   }
 
@@ -801,69 +827,43 @@ export function encontrarRendaDeConsumoMensalReal(
     else alto = mid
   }
 
-  // Retorna a maior renda que ainda não zera antes (saldo final >= 0).
-  // Se por alguma razão baixo já cruza, volta para alto.
   const sBaixo = saldoFinal(baixo)
   if (sBaixo >= 0) return baixo
   return alto
 }
 
 /**
- * Projeção pós-aposentadoria para as 3 estratégias de retirada.
- * Usa a mesma decumulação real de `encontrarRendaDeConsumoMensalReal` /
- * `projetarSaldoRealDecumulacao` (não uma lógica paralela).
+ * Série pós-aposentadoria para as 3 estratégias — fonte única: `calcularProjecao`
+ * com apenas a retirada mensal do patrimônio variando.
  */
 export function projecaoEstrategiaRetirada(
   params: {
-    patrimonioRealInicioApos: number
-    taxaRealAnual: number
-    horizonteAnos: number
-    idadeApos: number
+    premissas: Premissas
+    objetivos: Objetivo[]
+    passivos?: Passivo[]
     retiradaMensalReal: number
-    objetivosPorAnoReal: number[]
-    passivosPorAnoReal: number[]
-    /** Para exibir nominal: multiplica poder de compra pelo deflator do ano. */
-    inflacaoAnual?: number
     displayMode?: DisplayModeProjecao
   },
 ): ProjecaoAno[] {
   const {
-    patrimonioRealInicioApos,
-    taxaRealAnual,
-    horizonteAnos,
-    idadeApos,
+    premissas,
+    objetivos,
+    passivos = [],
     retiradaMensalReal,
-    objetivosPorAnoReal,
-    passivosPorAnoReal,
-    inflacaoAnual = 0,
     displayMode = "real",
   } = params
 
-  const H = Math.max(1, Math.floor(horizonteAnos))
-  const series = projetarSaldoRealDecumulacao(
-    patrimonioRealInicioApos,
-    taxaRealAnual,
-    H,
-    retiradaMensalReal,
-    objetivosPorAnoReal,
-    passivosPorAnoReal,
+  const idadeApos = Number(premissas.idadeApos) || 0
+  const proj = calcularProjecao(
+    {
+      ...premissas,
+      retiradaMensal: retiradaMensalNasPremissas(retiradaMensalReal, premissas),
+    },
+    objetivos,
+    passivos,
+    displayMode,
   )
-
-  // series[0] = início; series[k] = saldo após k anos de decumulação
-  return series.map((saldoReal, k) => {
-    const idade = idadeApos + k
-    const deflator = Math.pow(1 + Math.max(0, inflacaoAnual), k)
-    const saldoNominal = saldoReal * deflator
-    const valor = displayMode === "nominal" ? saldoNominal : saldoReal
-    return {
-      t: k,
-      idade,
-      saldoNominal: Math.round(valor),
-      saldoReal: Math.round(saldoReal),
-      rendaMensalReal: Math.round(Math.max(0, retiradaMensalReal)),
-      isAposentado: true,
-    }
-  })
+  return proj.filter((p) => p.idade >= idadeApos)
 }
 
 // ─── Fluxo anual (gráficos de projeção) ───────────────────────────────────────
