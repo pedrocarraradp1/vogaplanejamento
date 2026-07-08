@@ -17,7 +17,8 @@ import {
   calcularProjecao,
   calcularKPIs,
   calcularFluxoAnual,
-  calcularPassivosPorAnoSeries,
+  pvAnuidade,
+  pmtDeAnuidade,
   type ProjecaoAno,
 } from "@/lib/engine"
 import { buildDadosFluxoGrafico, buildDadosRendaGrafico } from "@/lib/projecao-graficos-dados"
@@ -29,18 +30,6 @@ import { IndependenciaChart, type PontoIndependencia } from "@/components/charts
 const GOLD = "#C9A84C"
 const GREEN = "#10B981"
 const RED = "#EF4444"
-
-/** Valor presente de uma anuidade (patrimônio necessário para pagar `pmtAnual` por `n` anos). */
-function pvAnuidade(pmtAnual: number, r: number, n: number) {
-  if (r === 0) return pmtAnual * n
-  return pmtAnual * (1 - Math.pow(1 + r, -n)) / r
-}
-
-/** Pagamento anual sustentável a partir de um patrimônio `pv` por `n` anos. */
-function pmtDeAnuidade(pv: number, r: number, n: number) {
-  if (r === 0) return pv / n
-  return pv * r / (1 - Math.pow(1 + r, -n))
-}
 
 interface ProjecaoProps {
   onNavigate: (section: string) => void
@@ -161,9 +150,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
 
   const taxaNominalAnual = Math.max(0, (Number(premissas.rendimento) || 0) / 100)
   const inflacaoAnual = Math.max(0, (Number(premissas.inflacao) || 0) / 100)
-  const taxaNominalMensal = Math.pow(1 + taxaNominalAnual, 1 / 12) - 1
   const taxaReal = (1 + taxaNominalAnual) / (1 + inflacaoAnual) - 1
-  const taxaRealMensal = Math.pow(1 + taxaReal, 1 / 12) - 1
   // Cenários foram extraídos para `components/ui/cenarios-investimento.tsx`
 
   const projecao = useMemo(
@@ -183,11 +170,6 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
     [premissasCompletas, objetivosEngine, state.passivos, premissas.aliquotaImpostoRendimento, displayMode]
   )
 
-  const passivosPorAno = useMemo(
-    () => calcularPassivosPorAnoSeries(state.passivos, premissasCompletas.prazo),
-    [state.passivos, premissasCompletas.prazo]
-  )
-
   const dadosFluxo = useMemo(
     () =>
       buildDadosFluxoGrafico(projecao, {
@@ -198,15 +180,16 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
         rendaMensalMeta: Number(premissas.retiradaMensal) || 0,
         displayMode,
         inflacaoPct: Number(premissas.inflacao) || 0,
+        // Mesma fonte que a projeção de saldo deduz (calcularFluxoAnual usa os mesmos
+        // objetivosAno/dividasAno de calcularProjecao) — sem duplicar o cálculo.
         objetivosPorAno: fluxoAnual.map((r) => r.objetivos),
-        passivosPorAno,
+        passivosPorAno: fluxoAnual.map((r) => r.dividas),
         aportePorAno: fluxoAnual.map((r) => r.aporte),
         retiradaPorAno: fluxoAnual.map((r) => r.retirada),
       }),
     [
       projecao,
       fluxoAnual,
-      passivosPorAno,
       displayMode,
       premissas.inflacao,
       premissas.idadeApos,
@@ -221,16 +204,16 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
     () =>
       buildDadosRendaGrafico(
         projecao,
-        taxaNominalMensal,
-        taxaRealMensal,
+        taxaReal,
+        Math.max(1, Number(premissas.horizonteAposentadoria) || 35),
         Number(premissas.retiradaMensal) || 0,
         Number(premissas.inflacao) || 0,
         displayMode
       ),
     [
       projecao,
-      taxaNominalMensal,
-      taxaRealMensal,
+      taxaReal,
+      premissas.horizonteAposentadoria,
       premissas.retiradaMensal,
       premissas.inflacao,
       displayMode,

@@ -14,6 +14,22 @@ export interface Premissas {
   rendaAposentadoria: number // renda já existente na aposentadoria (INSS, aluguéis etc.)
   novaEntrada: number        // valor de entrada extra (herança, venda, etc.)
   idadeEntrada: number       // idade em que a entrada ocorre (0 = não usar)
+  /** Horizonte de aposentadoria em anos (quanto tempo o patrimônio precisa durar). Padrão 35. */
+  horizonteAposentadoria?: number
+}
+
+// ─── Anuidade (fonte única para toda a tela de aposentadoria) ─────────────────
+
+/** Valor presente de uma anuidade: patrimônio necessário para pagar `pmtAnual` por `n` anos. */
+export function pvAnuidade(pmtAnual: number, r: number, n: number): number {
+  if (r === 0) return pmtAnual * n
+  return (pmtAnual * (1 - Math.pow(1 + r, -n))) / r
+}
+
+/** Pagamento anual sustentável a partir de um patrimônio `pv` por `n` anos. */
+export function pmtDeAnuidade(pv: number, r: number, n: number): number {
+  if (r === 0) return pv / n
+  return (pv * r) / (1 - Math.pow(1 + r, -n))
 }
 
 export interface Objetivo {
@@ -301,18 +317,18 @@ export function calcularProjecao(
       saldo = saldoInicial + fvMensal(aporteNominalAno, r) - objetivosAno - dividasAno + entradaAno
     } else if (isAposentado) {
       const retiradaAno = retiradaAnualAposentadoria(retiradaEfetiva, t, inf, displayMode)
-      saldo = saldo * (1 + r) - retiradaAno + entradaAno
+      // Objetivos e dívidas também consomem patrimônio na aposentadoria.
+      saldo = saldo * (1 + r) - retiradaAno - objetivosAno - dividasAno + entradaAno
     } else {
       saldo = saldo * (1 + r) + fvMensal(aporteNominalAno, r) - objetivosAno - dividasAno + entradaAno
     }
 
     const saldoReal       = saldo / fatorInf
-    // Taxa real correta (Fisher) e conversão para mensal
+    // Renda mensal sustentável pela anuidade (mesmo método dos cards/gráficos) — taxa
+    // real de Fisher e horizonte de aposentadoria; sem método de juros.
     const taxaReal = (1 + r) / (1 + inf) - 1
-    const taxaRealMensal = Math.pow(1 + taxaReal, 1 / 12) - 1
-    const rendaMensalReal = isAposentado
-      ? retiradaEfetiva
-      : Math.max(0, saldoReal * taxaRealMensal)
+    const horizonteApos = Math.max(1, Number(premissas.horizonteAposentadoria) || 35)
+    const rendaMensalReal = Math.max(0, pmtDeAnuidade(saldoReal, taxaReal, horizonteApos) / 12)
 
     resultado.push({
       t,
@@ -426,7 +442,8 @@ export function calcularFluxoAnual(
     if (t === 0) {
       saldo = saldoInicial + aporte - objetivosVal - dividasVal + extra
     } else if (isAposentado) {
-      saldo = saldo * (1 + r) - retirada + extra
+      // Objetivos e dívidas também consomem patrimônio na aposentadoria.
+      saldo = saldo * (1 + r) - retirada - objetivosVal - dividasVal + extra
     } else {
       saldo = saldo * (1 + r) + aporte - objetivosVal - dividasVal + extra
     }
@@ -450,14 +467,15 @@ export function calcularKPIs(
 
   const r   = premissas.rendimento / 100
   const inf = premissas.inflacao   / 100
-  const taxaReal             = r - inf
-  const retiradaEfetiva      = Math.max(0, premissas.retiradaMensal - (premissas.rendaAposentadoria || 0))
-  const retiradaAnual        = retiradaEfetiva * 12
-  const patrimonioNecessario = taxaReal > 0 ? retiradaAnual / taxaReal : Infinity
+  // Independência financeira pela MESMA anuidade do Bloco 1 (sem taxa de retirada fixa):
+  // taxa real de Fisher + patrimônio necessário = valor presente de `horizonte` anos de renda.
+  const taxaReal             = (1 + r) / (1 + inf) - 1
+  const horizonte            = Math.max(1, Number(premissas.horizonteAposentadoria) || 35)
+  const patrimonioNecessario = pvAnuidade(Math.max(0, premissas.retiradaMensal) * 12, taxaReal, horizonte)
 
   let idadeLF: number | null = null
   for (const ano of projecao) {
-    if (!ano.isAposentado && ano.saldoReal >= patrimonioNecessario) {
+    if ((Number(ano.saldoReal) || 0) >= patrimonioNecessario) {
       idadeLF = ano.idade
       break
     }

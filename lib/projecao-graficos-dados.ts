@@ -1,4 +1,4 @@
-import type { ProjecaoAno } from "@/lib/engine"
+import { pmtDeAnuidade, type ProjecaoAno } from "@/lib/engine"
 
 /** Ponto simplificado para o ComposedChart de fluxo anual (6 séries + meta). */
 export interface DadoFluxoGrafico {
@@ -85,18 +85,23 @@ export function buildDadosFluxoGrafico(
   return projecao.map((p, i) => {
     const t = Number(p.t) || 0
     const def = Math.pow(1 + inf, Math.max(0, t))
+    const prev = i > 0 ? projecao[i - 1] : null
+    const defPrev = Math.pow(1 + inf, Math.max(0, prev ? Number(prev.t) || 0 : 0))
+
     const patrimonioNominal = Number(p.saldoNominal) || 0
-    const patrimonioReal = patrimonioNominal / def
+    const patrimonioNominalPrev = prev ? Number(prev.saldoNominal) || 0 : patrimonioNominal
 
     const isAposentado = p.isAposentado
 
     const scaleFluxoNominal = (v: number) =>
       displayMode === "nominal" ? v : v / def
 
+    // Base do gráfico de patrimônio (mesma da série "Simulação em tempo real").
     const patrimonioBase =
-      displayMode === "nominal" ? patrimonioNominal : patrimonioReal
+      displayMode === "nominal" ? patrimonioNominal : patrimonioNominal / def
+    const patrimonioBasePrev =
+      displayMode === "nominal" ? patrimonioNominalPrev : patrimonioNominalPrev / defPrev
 
-    const rendimento = Math.round(Math.max(0, patrimonioBase * taxaLiqAnual))
     const aporteAnualBase = aportePorAno
       ? Number(aportePorAno[i]) || 0
       : !isAposentado
@@ -109,12 +114,21 @@ export function buildDadosFluxoGrafico(
     const passivos = -Math.round(scaleFluxoNominal(passivosPos))
 
     const retiradaMotor = isAposentado ? Number(retiradaPorAno?.[i]) || 0 : 0
-    const metaRenda = isAposentado ? retiradaMotor : metaAnual
-    const retirada = isAposentado ? -Math.round(Math.abs(retiradaMotor)) : 0
+    const metaRenda = scaleFluxoNominal(isAposentado ? retiradaMotor : metaAnual)
+    const retirada = isAposentado ? -Math.round(scaleFluxoNominal(Math.abs(retiradaMotor))) : 0
+
+    // Fluxo líquido = variação do patrimônio no ano (mesma série do gráfico de patrimônio),
+    // garantindo que patrimonio[t] - patrimonio[t-1] == fluxo líquido exibido.
+    const fluxoLiquido = prev
+      ? Math.round(patrimonioBase - patrimonioBasePrev)
+      : Math.round(Math.max(0, patrimonioBase * taxaLiqAnual)) + aporte + objetivos + passivos + retirada
+
+    // Rendimento é o resíduo que reconcilia a variação do patrimônio com os fluxos explícitos
+    // (aporte, objetivos, passivos, retirada) — assim as barras empilhadas somam exatamente o fluxo líquido.
+    const rendimento = fluxoLiquido - aporte - objetivos - passivos - retirada
 
     const entradasTotal = rendimento + aporte
     const saidasTotal = Math.abs(objetivos) + Math.abs(passivos) + Math.abs(retirada)
-    const fluxoLiquido = entradasTotal - saidasTotal
 
     return {
       idade: p.idade,
@@ -133,15 +147,21 @@ export function buildDadosFluxoGrafico(
   })
 }
 
+/**
+ * Renda sustentável da carteira a cada ano pela MESMA anuidade (`pmtDeAnuidade`) usada
+ * nos cards e no tooltip — nunca o método antigo de juros (patrimônio × taxa).
+ * `taxaRealAnual` é a taxa real (Fisher) e `horizonteAnos` o horizonte de aposentadoria.
+ */
 export function buildDadosRendaGrafico(
   projecao: ProjecaoAno[],
-  taxaMensalLiq: number,
-  taxaRealMensal: number,
+  taxaRealAnual: number,
+  horizonteAnos: number,
   metaMensal: number,
   inflacaoPct: number,
   displayMode: "nominal" | "real"
 ): DadoRendaGrafico[] {
   const inf = inflacaoPct / 100
+  const n = Math.max(1, horizonteAnos)
 
   return projecao.map((p) => {
     const t = Number(p.t) || 0
@@ -150,9 +170,10 @@ export function buildDadosRendaGrafico(
     const patrimonioReal =
       Number(p.saldoReal) > 0 ? Number(p.saldoReal) : patrimonioAno / def
 
-    const rendaNominal = Math.round(Math.max(0, patrimonioAno * taxaMensalLiq))
-    const rendaPoderCompra = Math.round(Math.max(0, rendaNominal / def))
-    const rendaReal = Math.round(Math.max(0, patrimonioReal * taxaRealMensal))
+    // Anuidade sobre o patrimônio real do ano; nominal = real corrigido ao ano.
+    const rendaReal = Math.round(Math.max(0, pmtDeAnuidade(patrimonioReal, taxaRealAnual, n) / 12))
+    const rendaNominal = Math.round(rendaReal * def)
+    const rendaPoderCompra = rendaReal
 
     const metaNominal = metaMensal * def
     const meta = displayMode === "nominal" ? metaNominal : metaMensal

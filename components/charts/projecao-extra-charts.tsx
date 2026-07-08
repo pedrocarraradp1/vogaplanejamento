@@ -245,7 +245,7 @@ export function RendaCarteiraChart({
 
   return (
     <div className="mt-8 w-full min-w-0 space-y-2">
-      <h3 className="text-sm font-medium text-foreground">Renda Real da Carteira</h3>
+      <h3 className="text-sm font-medium text-foreground">Renda mensal sustentável</h3>
       <div className="w-full min-w-0" style={{ height: CHART_HEIGHT, minHeight: CHART_HEIGHT }}>
         <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
           <ComposedChart data={dados} margin={{ top: 16, right: 24, left: 8, bottom: 4 }}>
@@ -294,7 +294,7 @@ export function RendaCarteiraChart({
                     ) : (
                       <>
                         <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, marginTop: 6 }}>
-                          Renda real (Fisher): {formatarMoedaCompleta(p.rendaReal)}
+                          Renda sustentável: {formatarMoedaCompleta(p.rendaReal)}
                         </p>
                         <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, opacity: 0.85 }}>
                           Renda nominal (ref.): {formatarMoedaCompleta(p.rendaNominal)}
@@ -338,7 +338,7 @@ export function RendaCarteiraChart({
               <Line
                 type="monotone"
                 dataKey="rendaReal"
-                name="Renda real (Fisher)"
+                name="Renda sustentável"
                 stroke="var(--accent)"
                 strokeWidth={2}
                 dot={false}
