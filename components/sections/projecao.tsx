@@ -32,7 +32,8 @@ import { VOGA } from "@/lib/voga-tokens"
 import { buildDadosFluxoGrafico, buildDadosRendaGrafico } from "@/lib/projecao-graficos-dados"
 import { CHART_TOOLTIP_PROPS } from "@/lib/chart-tooltip"
 import { CenariosInvestimento } from "@/components/ui/cenarios-investimento"
-import { FluxoAnualChart, RendaCarteiraChart } from "@/components/charts/projecao-extra-charts"
+import { GraficoFluxoAnual } from "@/components/charts/grafico-fluxo-anual"
+import { RendaCarteiraChart } from "@/components/charts/projecao-extra-charts"
 import { IndependenciaChart, type PontoIndependencia } from "@/components/charts/independencia-chart"
 import { EstrategiaRetiradaAposentadoria } from "@/components/ui/estrategia-retirada-aposentadoria"
 
@@ -1142,14 +1143,6 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
             </p>
           )}
 
-          {dadosFluxo && dadosFluxo.length > 0 && (
-            <FluxoAnualChart
-              data={dadosFluxo}
-              formatarMoeda={formatarMoeda}
-              formatarMoedaCompleta={formatarMoedaCompleta}
-            />
-          )}
-
           {dadosRenda && dadosRenda.length > 0 && (
             <RendaCarteiraChart
               data={dadosRenda}
@@ -1159,6 +1152,17 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
           )}
         </CardContent>
       </Card>
+
+      <GraficoFluxoAnual
+        title="Fluxo Anual"
+        data={dadosFluxo ?? []}
+        anoBase={new Date().getFullYear()}
+        anoPlanoFim={new Date().getFullYear() + Math.max(0, Number(premissas.prazo) || 0)}
+        displayMode={displayMode}
+        onDisplayModeChange={setDisplayMode}
+        formatarMoeda={formatarMoeda}
+        formatarMoedaCompleta={formatarMoedaCompleta}
+      />
 
       {/* Card — Cenários Alternativos */}
       <CenariosInvestimento

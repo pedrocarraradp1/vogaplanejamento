@@ -9,7 +9,6 @@ import {
 import {
   ComposedChart,
   Bar,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -19,6 +18,7 @@ import {
   ReferenceLine,
   ReferenceArea,
   ReferenceDot,
+  Line,
 } from "recharts"
 import {
   filtrarDadosFluxoPorPeriodo,
@@ -26,18 +26,18 @@ import {
   type DadoRendaGrafico,
 } from "@/lib/projecao-graficos-dados"
 import { formatMoedaSaida } from "@/lib/fluxo-caixa-utils"
-import { CORES_FLUXO_PROJECAO } from "@/lib/voga-tokens"
+import { CORES_FLUXO_ANUAL } from "@/lib/voga-tokens"
+import { LegendaFluxo } from "@/components/charts/fluxo-caixa-charts"
 
-type CoresFluxo = typeof CORES_FLUXO_PROJECAO
+type CoresFluxo = typeof CORES_FLUXO_ANUAL
 
-const LEGENDA_FLUXO: Record<string, string> = {
-  rendimento: "Rendimento",
-  aporte: "Aporte Mensal",
-  objetivos: "Objetivos",
-  passivos: "Passivos",
-  retirada: "Retirada Aposentadoria",
-  metaRenda: "Renda Aposentadoria",
-}
+const LEGENDA_ITENS = [
+  { id: "rendimento", label: "Rendimento", fill: CORES_FLUXO_ANUAL.rendimento },
+  { id: "aporte", label: "Aporte Mensal", fill: CORES_FLUXO_ANUAL.aporte },
+  { id: "objetivos", label: "Objetivos", fill: CORES_FLUXO_ANUAL.objetivos },
+  { id: "passivos", label: "Passivos", fill: CORES_FLUXO_ANUAL.passivos },
+  { id: "retirada", label: "Retirada Aposentadoria", fill: CORES_FLUXO_ANUAL.retirada },
+] as const
 
 const CHART_HEIGHT = 280
 
@@ -46,21 +46,32 @@ interface ChartFormatters {
   formatarMoedaCompleta: (v: number) => string
 }
 
+/** Máximo ~12 rótulos no eixo X para não sobrepor texto. */
+function ticksIdadeSemSobrepor(idades: number[]): number[] {
+  if (idades.length === 0) return []
+  const step = Math.max(1, Math.ceil(idades.length / 12))
+  const ticks: number[] = []
+  for (let i = 0; i < idades.length; i += step) ticks.push(idades[i])
+  const last = idades[idades.length - 1]
+  if (ticks[ticks.length - 1] !== last) ticks.push(last)
+  return ticks
+}
+
 export function FluxoAnualChart({
   data,
   formatarMoeda,
   formatarMoedaCompleta,
   hideTitle = false,
-  hideMetaRenda = false,
+  hideMetaRenda = true,
   className,
   periodoInicioAno,
   periodoFimAno,
   anoBase,
-  cores = CORES_FLUXO_PROJECAO,
+  cores = CORES_FLUXO_ANUAL,
 }: {
   data: DadoFluxoGrafico[]
   hideTitle?: boolean
-  /** Oculta linha tracejada e tooltip de meta renda (ex.: Painel 3 do Fluxo de Caixa). */
+  /** Sempre true no gráfico unificado — linha de meta renda removida. */
   hideMetaRenda?: boolean
   className?: string
   /** Ano-calendário inicial do intervalo visível (ex: 2026). */
@@ -73,26 +84,32 @@ export function FluxoAnualChart({
 } & ChartFormatters) {
   const dadosVisiveis = useMemo(() => {
     const all = data ?? []
-    if (
-      periodoInicioAno == null ||
-      periodoFimAno == null ||
-      anoBase == null
-    ) {
+    if (periodoInicioAno == null || periodoFimAno == null || anoBase == null) {
       return all
     }
     return filtrarDadosFluxoPorPeriodo(all, anoBase, periodoInicioAno, periodoFimAno)
   }, [data, periodoInicioAno, periodoFimAno, anoBase])
 
   const primeiroAno = dadosVisiveis[0]
+  const xTicks = useMemo(
+    () => ticksIdadeSemSobrepor(dadosVisiveis.map((d) => d.idade)),
+    [dadosVisiveis],
+  )
   const chartKey = `${periodoInicioAno ?? "all"}-${periodoFimAno ?? "all"}-${dadosVisiveis.length}-${dadosVisiveis[0]?.idade ?? ""}-${dadosVisiveis[dadosVisiveis.length - 1]?.idade ?? ""}`
 
   if (dadosVisiveis.length === 0) {
     return null
   }
 
+  const legendItens = LEGENDA_ITENS.map((item) => ({
+    ...item,
+    fill: cores[item.id as keyof CoresFluxo] ?? item.fill,
+  }))
+
   return (
     <div className={`w-full min-w-0 space-y-2 ${className ?? (hideTitle ? "" : "mt-8")}`}>
       {!hideTitle ? <h3 className="text-sm font-medium text-foreground">Fluxo Anual</h3> : null}
+      <LegendaFluxo itens={[...legendItens]} />
       <div className="w-full min-w-0" style={{ height: CHART_HEIGHT, minHeight: CHART_HEIGHT }}>
         <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
           <ComposedChart
@@ -108,7 +125,8 @@ export function FluxoAnualChart({
               tick={{ fill: "var(--text-label)", fontSize: 11 }}
               tickLine={false}
               axisLine={{ stroke: "rgba(0,0,0,0.08)" }}
-              interval="preserveStartEnd"
+              ticks={xTicks}
+              interval={0}
             />
             <YAxis
               stroke="rgba(0,0,0,0.35)"
@@ -121,7 +139,7 @@ export function FluxoAnualChart({
               content={({ active, payload }) => {
                 if (!active || !payload?.length) return null
                 const p = payload[0]?.payload as DadoFluxoGrafico
-                const corLiq = p.fluxoLiquido >= 0 ? "#1066DA" : "#B33A3A"
+                const corLiq = p.fluxoLiquido >= 0 ? cores.positivo : cores.negativo
                 return (
                   <div style={{ ...CHART_TOOLTIP_STYLE, fontSize: 12, minWidth: 200 }}>
                     <p style={{ ...CHART_TOOLTIP_LABEL_STYLE, margin: 0 }}>
@@ -130,55 +148,41 @@ export function FluxoAnualChart({
                     <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, opacity: 0.85, marginTop: 2 }}>
                       Fase: {p.fase}
                     </p>
-                    <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, marginTop: 8, color: "#81ADD4" }}>
+                    <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, marginTop: 8, color: cores.rendimento }}>
                       Rendimento: {formatarMoedaCompleta(p.rendimento)}
                     </p>
-                    <p style={CHART_TOOLTIP_ITEM_STYLE}>Aporte: {formatarMoedaCompleta(p.aporte)}</p>
-                    <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, color: "#B3DAF8" }}>
+                    <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, color: cores.aporte }}>
+                      Aporte: {formatarMoedaCompleta(p.aporte)}
+                    </p>
+                    <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, color: cores.objetivos }}>
                       Objetivos: {formatMoedaSaida(formatarMoedaCompleta, p.objetivos)}
                     </p>
-                    <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, color: "#81ADD4" }}>
+                    <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, color: cores.passivos }}>
                       Passivos: {formatMoedaSaida(formatarMoedaCompleta, p.passivos)}
                     </p>
-                    <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, color: "#B33A3A" }}>
+                    <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, color: cores.retirada }}>
                       Retirada: {formatMoedaSaida(formatarMoedaCompleta, p.retirada)}
                     </p>
                     {!hideMetaRenda ? (
-                      <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, color: "#81ADD4" }}>
+                      <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, color: cores.metaRenda }}>
                         Meta renda (ref.): {formatarMoedaCompleta(p.metaRenda)}
                       </p>
                     ) : null}
-                    <p className="mt-1 font-medium" style={{ ...CHART_TOOLTIP_ITEM_STYLE, color: corLiq, marginTop: 6 }}>
+                    <p
+                      className="mt-1 font-medium"
+                      style={{ ...CHART_TOOLTIP_ITEM_STYLE, color: corLiq, marginTop: 6 }}
+                    >
                       Fluxo líquido: {formatarMoedaCompleta(p.fluxoLiquido)}
                     </p>
                   </div>
                 )
               }}
             />
-            <Legend
-              wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
-              formatter={(value: string) => LEGENDA_FLUXO[value] ?? value}
-            />
             <ReferenceLine y={0} stroke="rgba(0,0,0,0.18)" />
-            <Bar
-              dataKey="rendimento"
-              name="rendimento"
-              stackId="fluxo"
-              fill={cores.rendimento}
-            />
+            <Bar dataKey="rendimento" name="rendimento" stackId="fluxo" fill={cores.rendimento} />
             <Bar dataKey="aporte" name="aporte" stackId="fluxo" fill={cores.aporte} />
-            <Bar
-              dataKey="objetivos"
-              name="objetivos"
-              stackId="fluxo"
-              fill={cores.objetivos}
-            />
-            <Bar
-              dataKey="passivos"
-              name="passivos"
-              stackId="fluxo"
-              fill={cores.passivos}
-            />
+            <Bar dataKey="objetivos" name="objetivos" stackId="fluxo" fill={cores.objetivos} />
+            <Bar dataKey="passivos" name="passivos" stackId="fluxo" fill={cores.passivos} />
             <Bar
               dataKey="retirada"
               name="retirada"
@@ -187,18 +191,6 @@ export function FluxoAnualChart({
               legendType="rect"
               isAnimationActive={false}
             />
-            {!hideMetaRenda ? (
-              <Line
-                type="monotone"
-                dataKey="metaRenda"
-                name="metaRenda"
-                stroke={cores.metaRenda}
-                strokeWidth={2}
-                strokeDasharray="6 4"
-                dot={false}
-                isAnimationActive={false}
-              />
-            ) : null}
             {primeiroAno && (
               <ReferenceDot
                 x={primeiroAno.idade}
@@ -207,7 +199,7 @@ export function FluxoAnualChart({
                 label={{
                   value: formatarMoedaCompleta(primeiroAno.fluxoLiquido),
                   position: primeiroAno.fluxoLiquido >= 0 ? "top" : "bottom",
-                  fill: primeiroAno.fluxoLiquido >= 0 ? "#1066DA" : "#B33A3A",
+                  fill: primeiroAno.fluxoLiquido >= 0 ? cores.positivo : cores.negativo,
                   fontSize: 11,
                   fontWeight: 600,
                 }}
@@ -240,7 +232,7 @@ export function RendaCarteiraChart({
 
   return (
     <div className="mt-8 w-full min-w-0 space-y-2">
-      <h3 className="text-sm font-medium text-foreground">Renda gerada vs. renda de consumo</h3>
+      <h3 className="text-sm font-medium text-foreground">Renda gerada vs. renda desejada</h3>
       <div className="w-full min-w-0" style={{ height: CHART_HEIGHT, minHeight: CHART_HEIGHT }}>
         <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
           <ComposedChart data={dados} margin={{ top: 16, right: 24, left: 8, bottom: 4 }}>
@@ -281,12 +273,16 @@ export function RendaCarteiraChart({
                       Renda mensal gerada: {formatarMoedaCompleta(p.rendaGeradaReal)}
                     </p>
                     <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, opacity: 0.85 }}>
-                      Renda de consumo do patrimônio: {formatarMoedaCompleta(p.rendaConsumoReal)}
-                    </p>
-                    <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, opacity: 0.85 }}>
                       Renda mensal desejada: {formatarMoedaCompleta(p.meta)}
                     </p>
-                    <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, fontWeight: 500, color: corStatus, marginTop: 6 }}>
+                    <p
+                      style={{
+                        ...CHART_TOOLTIP_ITEM_STYLE,
+                        fontWeight: 500,
+                        color: corStatus,
+                        marginTop: 6,
+                      }}
+                    >
                       {status}
                     </p>
                   </div>
@@ -299,15 +295,6 @@ export function RendaCarteiraChart({
               dataKey="rendaGeradaReal"
               name="Renda mensal gerada"
               stroke="var(--cenario-1)"
-              strokeWidth={2}
-              dot={false}
-              isAnimationActive={false}
-            />
-            <Line
-              type="monotone"
-              dataKey="rendaConsumoReal"
-              name="Renda de consumo do patrimônio"
-              stroke="var(--cenario-2)"
               strokeWidth={2}
               dot={false}
               isAnimationActive={false}

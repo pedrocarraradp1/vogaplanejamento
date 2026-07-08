@@ -179,6 +179,13 @@
     color: var(--text-label);
   }
 
+  /* Em células de tabela, `display: block` empilha o cabeçalho na vertical. */
+  th.field-label,
+  td.field-label {
+    display: table-cell;
+    margin-bottom: 0;
+  }
+
   /* Cards de seção */
   .form-card,
   .section-card {

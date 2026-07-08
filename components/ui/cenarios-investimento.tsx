@@ -22,6 +22,7 @@ import {
 } from "recharts"
 import { CHART_TOOLTIP_PROPS } from "@/lib/chart-tooltip"
 import { EstrategiaRetiradaAposentadoria } from "@/components/ui/estrategia-retirada-aposentadoria"
+import { TabelaComparacaoCenarios } from "@/components/ui/tabela-comparacao-cenarios"
 
 type DisplayMode = "nominal" | "real"
 
@@ -447,55 +448,35 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
             <div className="px-5 py-4 border-b border-border">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Comparação de Resultados</p>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="py-3 px-4 text-left field-label">
-                      Métrica
-                    </th>
-                    {cenarios.map((c) => (
-                      <th
-                        key={c.key}
-                        className="py-3 px-4 text-right field-label"
-                      >
-                        {c.nome}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {[
-                    {
-                      label: "Rentabilidade",
-                      values: cenarios.map(
-                        (c) => `${c.taxaBruta}% a.a. bruto (${fmtPct(c.taxaLiquida)}% líq.)`,
-                      ),
-                    },
-                    {
-                      label: "Patrimônio na Aposentadoria",
-                      values: cenarios.map((c) =>
-                        fmtFull(displayMode === "real" ? c.patrimonioApos / deflatorAposentadoria : c.patrimonioApos),
-                      ),
-                    },
-                    {
-                      label: "Renda Mensal na Aposentadoria (real)",
-                      values: cenarios.map((c) => fmtFull(c.rendaMensalAposReal)),
-                    },
-                    { label: "Independência Financeira", values: cenarios.map((c) => (c.idadeIF ? `${c.idadeIF} anos` : "—")) },
-                  ].map((row) => (
-                    <tr key={row.label} className="border-b border-border last:border-b-0">
-                      <td className="py-3 px-4 text-sm text-muted-foreground">{row.label}</td>
-                      {row.values.map((v, i) => (
-                        <td key={i} className="py-3 px-4 text-right text-sm text-foreground tabular-nums">
-                          {v}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <TabelaComparacaoCenarios
+              colunas={cenarios.map((c) => ({ key: c.key, nome: c.nome }))}
+              linhas={[
+                {
+                  label: "Rentabilidade",
+                  values: cenarios.map(
+                    (c) => `${c.taxaBruta}% a.a. bruto (${fmtPct(c.taxaLiquida)}% líq.)`,
+                  ),
+                },
+                {
+                  label: "Patrimônio na Aposentadoria",
+                  values: cenarios.map((c) =>
+                    fmtFull(
+                      displayMode === "real"
+                        ? c.patrimonioApos / deflatorAposentadoria
+                        : c.patrimonioApos,
+                    ),
+                  ),
+                },
+                {
+                  label: "Renda Mensal na Aposentadoria (real)",
+                  values: cenarios.map((c) => fmtFull(c.rendaMensalAposReal)),
+                },
+                {
+                  label: "Independência Financeira",
+                  values: cenarios.map((c) => (c.idadeIF ? `${c.idadeIF} anos` : "—")),
+                },
+              ]}
+            />
           </div>
 
           <div className="rounded-xl border border-border bg-secondary p-5">

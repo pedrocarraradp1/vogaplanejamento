@@ -26,7 +26,7 @@ import {
   GraficoOrcadoVsRealizado,
   LegendaFluxo,
 } from "@/components/charts/fluxo-caixa-charts"
-import { FluxoAnualChart } from "@/components/charts/projecao-extra-charts"
+import { GraficoFluxoAnual } from "@/components/charts/grafico-fluxo-anual"
 
 interface FluxoDeCaixaProps {
   onNavigate: (section: string) => void
@@ -39,18 +39,6 @@ const LEGENDA_PAINEL1 = [
   { id: "receita", label: "Receita", fill: CORES_FLUXO_CAIXA.receita },
   { id: "despesa", label: "Despesa", fill: CORES_FLUXO_CAIXA.despesa },
 ]
-
-const CORES_FLUXO_ANUAL = {
-  rendimento: "var(--fluxo-entrada)",
-  aporte: "var(--voga-brasilia)",
-  objetivos: "var(--fluxo-objetivos)",
-  passivos: "var(--voga-alerta)",
-  retirada: "var(--voga-alerta)",
-  metaRenda: "var(--voga-concreto)",
-  positivo: "var(--fluxo-entrada)",
-  negativo: "var(--voga-alerta)",
-  eixo: "var(--text-label)",
-} as const
 
 function ToggleDois({
   a,
@@ -94,8 +82,6 @@ export function FluxoDeCaixa({ onNavigate }: FluxoDeCaixaProps) {
   const anoCorrente = new Date().getFullYear()
   const prazoTotal = Math.max(0, Number(premissas.prazo) || 0)
   const anoPlanoFim = anoCorrente + prazoTotal
-  const [periodoInicio, setPeriodoInicio] = useState(anoCorrente)
-  const [periodoFim, setPeriodoFim] = useState(anoPlanoFim)
 
   const saldoInicial = getSaldoInicialLiquido()
   const idadeAtual = getIdadeAtual()
@@ -303,13 +289,6 @@ export function FluxoDeCaixa({ onNavigate }: FluxoDeCaixaProps) {
     })
   }
 
-  const aplicarPresetPeriodo = (anos: number | "todos") => {
-    const inicio = anoCorrente
-    const fim = anos === "todos" ? anoPlanoFim : Math.min(inicio + anos - 1, anoPlanoFim)
-    setPeriodoInicio(inicio)
-    setPeriodoFim(fim)
-  }
-
   return (
     <div className="space-y-6">
       <div>
@@ -459,96 +438,16 @@ export function FluxoDeCaixa({ onNavigate }: FluxoDeCaixaProps) {
         </CardContent>
       </Card>
 
-      {/* Painel 3 */}
-      <Card className="form-card">
-        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4 pb-4">
-          <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            Projeção anual orçada
-          </CardTitle>
-          <ToggleDois
-            a={{ id: "real", label: "Real" }}
-            b={{ id: "nominal", label: "Nominal" }}
-            value={displayModeP3}
-            onChange={(v) => setDisplayModeP3(v as "real" | "nominal")}
-          />
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              alignItems: "center",
-              gap: 10,
-            }}
-          >
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {(
-                [
-                  { label: "5 anos", anos: 5 },
-                  { label: "10 anos", anos: 10 },
-                  { label: "25 anos", anos: 25 },
-                  { label: "Todos", anos: "todos" as const },
-                ] as const
-              ).map((preset) => (
-                <Button
-                  key={preset.label}
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 text-xs bg-white"
-                  onClick={() => aplicarPresetPeriodo(preset.anos)}
-                >
-                  {preset.label}
-                </Button>
-              ))}
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <label style={{ fontSize: 12, color: "#5F85B8" }}>De</label>
-              <Input
-                type="number"
-                min={anoCorrente}
-                max={periodoFim}
-                value={periodoInicio}
-                onChange={(e) => {
-                  const v = parseInt(e.target.value, 10)
-                  if (!Number.isNaN(v)) {
-                    setPeriodoInicio(Math.max(anoCorrente, Math.min(v, periodoFim)))
-                  }
-                }}
-                className="h-8 w-[88px] text-sm bg-white"
-              />
-              <label style={{ fontSize: 12, color: "#5F85B8" }}>até</label>
-              <Input
-                type="number"
-                min={periodoInicio}
-                max={anoPlanoFim}
-                value={periodoFim}
-                onChange={(e) => {
-                  const v = parseInt(e.target.value, 10)
-                  if (!Number.isNaN(v)) {
-                    setPeriodoFim(Math.min(anoPlanoFim, Math.max(v, periodoInicio)))
-                  }
-                }}
-                className="h-8 w-[88px] text-sm bg-white"
-              />
-            </div>
-          </div>
-
-          <div style={{ background: PAINEL_BG, borderRadius: 12, padding: "16px" }}>
-            <FluxoAnualChart
-              data={dadosFluxo}
-              periodoInicioAno={periodoInicio}
-              periodoFimAno={periodoFim}
-              anoBase={anoCorrente}
-              formatarMoeda={formatarMoeda}
-              formatarMoedaCompleta={formatarMoedaCompleta}
-              cores={CORES_FLUXO_ANUAL}
-              hideTitle
-              hideMetaRenda
-            />
-          </div>
-        </CardContent>
-      </Card>
+      <GraficoFluxoAnual
+        title="Projeção anual orçada"
+        data={dadosFluxo}
+        anoBase={anoCorrente}
+        anoPlanoFim={anoPlanoFim}
+        displayMode={displayModeP3}
+        onDisplayModeChange={setDisplayModeP3}
+        formatarMoeda={formatarMoeda}
+        formatarMoedaCompleta={formatarMoedaCompleta}
+      />
 
       <div className="nav-footer">
         <Button variant="ghost" className="btn-back" onClick={() => onNavigate("objetivos")}>

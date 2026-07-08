@@ -76,15 +76,18 @@ export const CORES_FLUXO_CAIXA = {
   diffNegativa: VOGA.alertaTexto,
 } as const
 
+/** Paleta única do gráfico de fluxo anual (Projeção + Fluxo de Caixa). */
 export const CORES_FLUXO_PROJECAO = {
-  // Mais contraste (pula tons adjacentes)
-  rendimento: VOGA.brasilia, // entrada principal (rentabilidade/retorno)
-  aporte: VOGA.noite,        // aportes bem contrastantes
-  objetivos: VOGA.petroleo,
-  passivos: VOGA.nuvem,      // recessivo (dívidas)
+  rendimento: "#5B8C6E", // --fluxo-entrada
+  aporte: VOGA.brasilia, // --voga-brasilia
+  objetivos: "#C99A44", // --fluxo-objetivos
+  passivos: VOGA.alerta, // --voga-alerta
   retirada: VOGA.alerta,
-  metaRenda: VOGA.brasilia,
-  positivo: VOGA.brasilia,
+  metaRenda: VOGA.concreto,
+  positivo: "#5B8C6E",
   negativo: VOGA.alerta,
   eixo: VOGA.nota,
 } as const
+
+/** Alias — mesma paleta (legado do painel Fluxo de Caixa). */
+export const CORES_FLUXO_ANUAL = CORES_FLUXO_PROJECAO

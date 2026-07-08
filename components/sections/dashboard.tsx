@@ -13,7 +13,8 @@ import {
 import { usePlano } from "@/lib/plano-context"
 import { getFontesRenda, receitaMensalAtual, resolveAporteParaPremissas } from "@/lib/renda-utils"
 import { CenariosInvestimento } from "@/components/ui/cenarios-investimento"
-import { FluxoAnualChart, RendaCarteiraChart } from "@/components/charts/projecao-extra-charts"
+import { GraficoFluxoAnual } from "@/components/charts/grafico-fluxo-anual"
+import { RendaCarteiraChart } from "@/components/charts/projecao-extra-charts"
 import { buildDadosFluxoGrafico, buildDadosRendaGrafico } from "@/lib/projecao-graficos-dados"
 import { CHART_TOOLTIP_PROPS, donutTooltipFormatter } from "@/lib/chart-tooltip"
 import { usePieVogaProps } from "@/components/charts/use-pie-voga"
@@ -731,13 +732,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           )}
 
           <div className="mt-6 space-y-6">
-            {dadosFluxo && dadosFluxo.length > 0 && (
-              <FluxoAnualChart
-                data={dadosFluxo}
-                formatarMoeda={fmt}
-                formatarMoedaCompleta={fmtFull}
-              />
-            )}
             {dadosRenda && dadosRenda.length > 0 && (
               <RendaCarteiraChart
                 data={dadosRenda}
@@ -748,6 +742,17 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           </div>
         </CardContent>
       </Card>
+
+      <GraficoFluxoAnual
+        title="Fluxo Anual"
+        data={dadosFluxo ?? []}
+        anoBase={new Date().getFullYear()}
+        anoPlanoFim={new Date().getFullYear() + Math.max(0, Number(premissas.prazo) || 0)}
+        displayMode={viewMode}
+        onDisplayModeChange={setViewMode}
+        formatarMoeda={fmt}
+        formatarMoedaCompleta={fmtFull}
+      />
 
       {/* Cenários Alternativos de Investimento */}
       <CenariosInvestimento editable={false} />
