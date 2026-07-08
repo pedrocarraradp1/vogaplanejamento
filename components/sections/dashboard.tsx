@@ -26,6 +26,7 @@ import {
   rendaMensalGeradaReal,
   rendaMensalGeradaNominal,
   totalObjetivosEternosAnuais,
+  horizontePosAposentadoriaAnos,
   type ProjecaoAno,
 } from "@/lib/engine"
 import { getSaldoDevedorPassivo, labelTipoAtivo, CORES_GRUPOS_ATIVO, VOGA_CHART_COLORS, normalizeAtivoTipo } from "@/lib/patrimonio-utils"
@@ -97,7 +98,15 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const taxaNominalAnual = Math.max(0, (Number(premissas.rendimento) || 0) / 100)
   const inflacaoAnual = Math.max(0, (Number(premissas.inflacao) || 0) / 100)
   const taxaReal = (1 + taxaNominalAnual) / (1 + inflacaoAnual) - 1
-  const horizonteApos = Math.max(1, Number(premissas.horizonteAposentadoria) || 35)
+  const horizonteApos = useMemo(
+    () => horizontePosAposentadoriaAnos({
+      idadeAtual,
+      idadeApos: Number(premissas.idadeApos) || 0,
+      prazo: Number(premissas.prazo) || 0,
+      horizonteAposentadoria: premissas.horizonteAposentadoria,
+    }),
+    [idadeAtual, premissas.idadeApos, premissas.prazo, premissas.horizonteAposentadoria],
+  )
 
   const kpis = useMemo(() =>
     calcularKPIs(projecao, premissasCompletas, rendaAtual, dadosPessoais.despesa, objetivosEngine)
@@ -212,7 +221,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   )
 
   const dadosGraficoPatrimonio = useMemo(() => {
-    const aliqIR = Number(premissas.aliquotaImpostoRendimento) || 0.15
     return projecao.map((p, i) => {
       const t = Number(p.t) || 0
       const nominal = Number(p.saldoNominal) || 0
@@ -222,9 +230,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         i > 0 ? Number(projecao[i - 1].saldoNominal) || 0 : premissasCompletas.saldoInicial
       const fluxoAno = fluxoAnual[i]
       const optsGerada = {
-        objetivosAnuaisReal: objetivosEternosAnuais,
-        dividasAnuaisReal: (Number(fluxoAno?.dividas) || 0) / deflator,
-        aliquotaIR: aliqIR,
+        aliquotaIR: 0,
       }
       const patrimonioRealInicio = saldoNominalInicio / deflator
       const rendaGeradaReal = rendaMensalGeradaReal(
@@ -253,12 +259,9 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     projecao,
     fluxoAnual,
     premissasCompletas.saldoInicial,
-    premissas.aliquotaImpostoRendimento,
     viewMode,
-    premissas.inflacao,
     taxaNominalAnual,
     inflacaoAnual,
-    objetivosEternosAnuais,
   ])
 
   const distribuicaoAtivos = useMemo(() => {

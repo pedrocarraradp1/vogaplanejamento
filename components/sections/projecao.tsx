@@ -18,9 +18,11 @@ import {
   calcularKPIs,
   calcularFluxoAnual,
   encontrarRendaDeConsumoMensalReal,
+  encontrarRendaDePreservacaoMensalReal,
   pvAnuidade,
   pmtDeAnuidade,
   horizonteRendaSustentavelAnos,
+  horizontePosAposentadoriaAnos,
   rendaMensalGeradaReal,
   rendaMensalGeradaNominal,
   totalObjetivosEternosAnuais,
@@ -158,7 +160,13 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
   const taxaNominalAnual = Math.max(0, (Number(premissas.rendimento) || 0) / 100)
   const inflacaoAnual = Math.max(0, (Number(premissas.inflacao) || 0) / 100)
   const taxaReal = (1 + taxaNominalAnual) / (1 + inflacaoAnual) - 1
-  // Cenários foram extraídos para `components/ui/cenarios-investimento.tsx`
+
+  const horizonteApos = useMemo(
+    () => horizontePosAposentadoriaAnos(premissasCompletas),
+    [premissasCompletas],
+  )
+  const idadeFimSimulacao =
+    idadeAtualCalculada + Math.max(0, Number(premissas.prazo) || 0)
 
   const projecao = useMemo(
     () => calcularProjecao(premissasCompletas, objetivosEngine, state.passivos, displayMode),
@@ -212,35 +220,6 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
     [objetivosEngine, taxaReal],
   )
 
-  const dadosRenda = useMemo(
-    () =>
-      buildDadosRendaGrafico(projecao, {
-        taxaRealAnual: taxaReal,
-        taxaNominalAnual,
-        inflacaoAnual,
-        horizonteAnos: Math.max(1, Number(premissas.horizonteAposentadoria) || 35),
-        metaMensal: Number(premissas.retiradaMensal) || 0,
-        idadeAposentadoria: Number(premissas.idadeApos) || 0,
-        saldoInicial: premissasCompletas.saldoInicial,
-        objetivosEternosAnuais,
-        aliquotaIR: Number(premissas.aliquotaImpostoRendimento) || 0.15,
-        fluxoAnual,
-      }),
-    [
-      projecao,
-      taxaReal,
-      taxaNominalAnual,
-      inflacaoAnual,
-      premissas.horizonteAposentadoria,
-      premissas.retiradaMensal,
-      premissas.idadeApos,
-      premissas.aliquotaImpostoRendimento,
-      premissasCompletas.saldoInicial,
-      objetivosEternosAnuais,
-      fluxoAnual,
-    ]
-  )
-
   const kpis = useMemo(() =>
     calcularKPIs(projecao, premissasCompletas, rendaMensalAtual, dadosPessoais.despesa, objetivosEngine)
   , [projecao, premissasCompletas, rendaMensalAtual, dadosPessoais.despesa, objetivosEngine])
@@ -249,28 +228,28 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
   const necessidadeMensalTotal = (Number(premissas.retiradaMensal) || 0) + objetivosEternosMensal
 
   const dadosGrafico = useMemo(() => {
-    const horizonteApos = Math.max(1, Number(premissas.horizonteAposentadoria) || 35)
     const idadeApos = Number(premissas.idadeApos) || 0
-    const aliqIR = Number(premissas.aliquotaImpostoRendimento) || 0.15
-    const optsObjetivosEternos = { objetivosAnuaisReal: objetivosEternosAnuais }
+    const retiradaDesejada = Number(premissas.retiradaMensal) || 0
+    const rendaApos = Number(premissas.rendaAposentadoria) || 0
+    // Mesma fórmula do loop: só o excedente da renda desejada sobre a renda permanente
+    // é sacado do patrimônio.
+    const retiradaEfetivaMensalHoje = Math.max(0, retiradaDesejada - rendaApos)
+
     return projecao.map((p, i) => {
       const saldoNominal = Number(p.saldoNominal) || 0
       const deflator = deflatorPorIdade(p.idade)
       const patrimonioReal = Number(p.saldoReal) || 0
+      const prev = i > 0 ? projecao[i - 1] : null
       const saldoNominalInicio =
-        i > 0 ? Number(projecao[i - 1].saldoNominal) || 0 : premissasCompletas.saldoInicial
+        prev ? Number(prev.saldoNominal) || 0 : premissasCompletas.saldoInicial
       const patrimonioRealInicio = saldoNominalInicio / deflator
-      const fluxoAno = fluxoAnual[i]
-      const optsRendaGerada = {
-        ...optsObjetivosEternos,
-        dividasAnuaisReal: (Number(fluxoAno?.dividas) || 0) / deflator,
-        aliquotaIR: aliqIR,
-      }
+      const patrimonioRealAnterior = prev ? Number(prev.saldoReal) || 0 : patrimonioReal
+      const deltaPatrimonioReal = patrimonioReal - patrimonioRealAnterior
+
+      const optsRendaGerada = { aliquotaIR: 0 }
       const horizonteNesseAno = horizonteRendaSustentavelAnos(p.idade, idadeApos, horizonteApos)
-      // Renda sustentável (anuidade finita) — KPI e Blocos 1/2/3.
       const rendaSustentavelReal = pmtDeAnuidade(patrimonioReal, taxaReal, horizonteNesseAno) / 12
       const rendaSustentavelNominal = rendaSustentavelReal * deflator
-      // Renda gerada (perpetuidade) — tooltip; fluxo líquido zero se usada como retirada.
       const rendaGeradaReal = rendaMensalGeradaReal(
         patrimonioRealInicio,
         taxaNominalAnual,
@@ -284,6 +263,15 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
         deflator,
         optsRendaGerada,
       )
+
+      const isAposentado = !!p.isAposentado
+      // Retirada APLICADA na simulação (PP de hoje) — diferente da "renda gerada" do ano.
+      const retiradaAplicadaMensalReal = isAposentado ? retiradaEfetivaMensalHoje : 0
+      const retiradaAplicadaMensal =
+        displayMode === "nominal"
+          ? retiradaAplicadaMensalReal * deflator
+          : retiradaAplicadaMensalReal
+
       return {
         ...p,
         valorNominal: saldoNominal,
@@ -293,32 +281,43 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
         rendaSustentavelNominal,
         rendaGeradaReal,
         rendaGeradaNominal,
+        retiradaAplicadaMensal,
+        retiradaAplicadaMensalReal,
+        deltaPatrimonioReal,
       }
     })
   }, [
     projecao,
     fluxoAnual,
     premissasCompletas.saldoInicial,
-    premissas.aliquotaImpostoRendimento,
     displayMode,
     premissas.inflacao,
-    premissas.horizonteAposentadoria,
+    premissas.retiradaMensal,
+    premissas.rendaAposentadoria,
+    horizonteApos,
     premissas.idadeApos,
     taxaReal,
     taxaNominalAnual,
     inflacaoAnual,
     idadeAtualCalculada,
-    objetivosEternosAnuais,
   ])
 
   const rendaConsumoPatrimonioRealApos = useMemo(() => {
     const idadeApos = Number(premissas.idadeApos) || 0
-    const horizonteApos = Math.max(1, Number(premissas.horizonteAposentadoria) || 35)
     const idxApos = projecao.findIndex((p) => p.idade === idadeApos)
     if (idxApos < 0) return 0
-    const patrimonioRealInicioApos = Number(projecao[idxApos]?.saldoReal) || 0
+    // Início da aposentadoria = saldo do ANO ANTERIOR (antes da 1ª retirada).
+    const saldoNominalInicio =
+      idxApos > 0
+        ? Number(projecao[idxApos - 1].saldoNominal) || 0
+        : premissasCompletas.saldoInicial
+    const deflatorInicio = deflatorPorIdade(Math.max(idadeAtualCalculada, idadeApos - (idxApos > 0 ? 1 : 0)))
+    const patrimonioRealInicioApos =
+      idxApos > 0
+        ? saldoNominalInicio / deflatorPorIdade(projecao[idxApos - 1].idade)
+        : saldoNominalInicio / deflatorInicio
 
-    // Fluxos em termos reais (poder de compra de hoje), alinhados ao motor.
+    // Fluxos reais do motor (objetivos eternos já inclusos — NÃO somar equivalentes em paralelo).
     const objetivosFinitosPorAnoReal: number[] = []
     const passivosPorAnoReal: number[] = []
     for (let ano = 0; ano < horizonteApos; ano++) {
@@ -333,20 +332,77 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
       patrimonioRealInicioApos,
       taxaRealAnual: taxaReal,
       horizonteAnos: horizonteApos,
-      objetivosEternosAnuaisReal: objetivosEternosAnuais,
       objetivosFinitosPorAnoReal,
       passivosPorAnoReal,
       tolerancia: 1000,
     })
   }, [
     premissas.idadeApos,
-    premissas.horizonteAposentadoria,
+    horizonteApos,
+    premissasCompletas.saldoInicial,
     projecao,
     fluxoAnual,
     taxaReal,
-    objetivosEternosAnuais,
     deflatorPorIdade,
+    idadeAtualCalculada,
   ])
+
+  /** Série de objetivos/dívidas REAIS usada pelo KPI e pelos testes — mesma fonte do loop. */
+  const seriesFluxoAposentadoriaReal = useMemo(() => {
+    const idadeApos = Number(premissas.idadeApos) || 0
+    const idxApos = fluxoAnual.findIndex((r) => r.idade === idadeApos)
+    const objetivos: number[] = []
+    const dividas: number[] = []
+    for (let ano = 0; ano < horizonteApos; ano++) {
+      const row = idxApos >= 0 ? fluxoAnual[idxApos + ano] : undefined
+      const deflator = deflatorPorIdade(idadeApos + ano)
+      objetivos.push(((Number(row?.objetivos) || 0) / deflator) || 0)
+      dividas.push(((Number(row?.dividas) || 0) / deflator) || 0)
+    }
+    const media = (arr: number[]) =>
+      arr.length === 0 ? 0 : arr.reduce((s, v) => s + Math.max(0, v), 0) / arr.length
+    return {
+      objetivos,
+      dividas,
+      mediaObjetivos: media(objetivos),
+      mediaDividas: media(dividas),
+      amostra: objetivos.slice(0, 6).map((obj, i) => ({
+        idade: idadeApos + i,
+        objetivosAno: Math.round(obj),
+        dividasAno: Math.round(dividas[i] || 0),
+      })),
+    }
+  }, [fluxoAnual, premissas.idadeApos, horizonteApos, deflatorPorIdade])
+
+  // Gráfico de renda: consumo é o valor fixo do KPI (linha flat), não recalculado por idade.
+  const dadosRenda = useMemo(
+    () =>
+      buildDadosRendaGrafico(projecao, {
+        taxaRealAnual: taxaReal,
+        taxaNominalAnual,
+        inflacaoAnual,
+        horizonteAnos: horizonteApos,
+        metaMensal: Number(premissas.retiradaMensal) || 0,
+        idadeAposentadoria: Number(premissas.idadeApos) || 0,
+        saldoInicial: premissasCompletas.saldoInicial,
+        objetivosEternosAnuais,
+        aliquotaIR: Number(premissas.aliquotaImpostoRendimento) || 0.15,
+        fluxoAnual,
+      }),
+    [
+      projecao,
+      taxaReal,
+      taxaNominalAnual,
+      inflacaoAnual,
+      horizonteApos,
+      premissas.retiradaMensal,
+      premissas.idadeApos,
+      premissas.aliquotaImpostoRendimento,
+      premissasCompletas.saldoInicial,
+      objetivosEternosAnuais,
+      fluxoAnual,
+    ]
+  )
 
   const pontoAposentadoria = useMemo(() => {
     return (
@@ -356,11 +412,74 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
   }, [dadosGrafico, premissas.idadeApos])
 
   const rendaGeradaApos = useMemo(() => {
-    if (!pontoAposentadoria) return 0
-    return displayMode === "nominal"
-      ? Number(pontoAposentadoria.rendaGeradaNominal) || 0
-      : Number(pontoAposentadoria.rendaGeradaReal) || 0
-  }, [pontoAposentadoria, displayMode])
+    const idadeApos = Number(premissas.idadeApos) || 0
+    const idxApos = projecao.findIndex((p) => p.idade === idadeApos)
+    if (idxApos < 0) return { valor: 0, valorHoje: 0, diagnostic: null as null | object }
+
+    const saldoNominalInicio =
+      idxApos > 0
+        ? Number(projecao[idxApos - 1].saldoNominal) || 0
+        : premissasCompletas.saldoInicial
+    const idadeInicio =
+      idxApos > 0 ? projecao[idxApos - 1].idade : idadeAtualCalculada
+    const patrimonioRealInicio = saldoNominalInicio / deflatorPorIdade(idadeInicio)
+
+    // Mesma lógica ano a ano do loop (objetivos/dívidas reais) — NÃO média isolada.
+    // Busca W tal que patrimônio final ≈ patrimônio inicial (Preservação).
+    const real = encontrarRendaDePreservacaoMensalReal({
+      patrimonioRealInicioApos: patrimonioRealInicio,
+      taxaRealAnual: taxaReal,
+      horizonteAnos: horizonteApos,
+      objetivosPorAnoReal: seriesFluxoAposentadoriaReal.objetivos,
+      passivosPorAnoReal: seriesFluxoAposentadoriaReal.dividas,
+      tolerancia: 1000,
+    })
+
+    // Comparativo legado (só diagnóstico): média vs série real do loop.
+    const mediaLegacy = rendaMensalGeradaReal(patrimonioRealInicio, taxaNominalAnual, inflacaoAnual, {
+      objetivosAnuaisReal: seriesFluxoAposentadoriaReal.mediaObjetivos,
+      dividasAnuaisReal: seriesFluxoAposentadoriaReal.mediaDividas,
+      aliquotaIR: 0,
+    })
+    const puraLegacy = rendaMensalGeradaReal(patrimonioRealInicio, taxaNominalAnual, inflacaoAnual, {
+      aliquotaIR: 0,
+    })
+
+    return {
+      valorHoje: real,
+      valor: displayMode === "nominal" ? real * deflatorPorIdade(idadeApos) : real,
+      diagnostic: {
+        patrimonioRealInicio: Math.round(patrimonioRealInicio),
+        taxaReal,
+        horizonteApos,
+        amostraLoop: seriesFluxoAposentadoriaReal.amostra,
+        mediaObjetivos: Math.round(seriesFluxoAposentadoriaReal.mediaObjetivos),
+        mediaDividas: Math.round(seriesFluxoAposentadoriaReal.mediaDividas),
+        kpiPreservacaoAnoAAno: Math.round(real),
+        kpiLegacyMedia: Math.round(mediaLegacy),
+        kpiLegacyPura: Math.round(puraLegacy),
+      },
+    }
+  }, [
+    projecao,
+    premissas.idadeApos,
+    premissasCompletas.saldoInicial,
+    idadeAtualCalculada,
+    deflatorPorIdade,
+    taxaReal,
+    taxaNominalAnual,
+    inflacaoAnual,
+    horizonteApos,
+    seriesFluxoAposentadoriaReal,
+    displayMode,
+  ])
+
+  // Instrumentação pedida: compara série do loop vs média no console (uma vez por mudança).
+  useEffect(() => {
+    if (!rendaGeradaApos.diagnostic) return
+    // eslint-disable-next-line no-console
+    console.log("[diagnostico-renda-gerada]", rendaGeradaApos.diagnostic)
+  }, [rendaGeradaApos.diagnostic])
 
   const rendaConsumoApos = useMemo(() => {
     if (!pontoAposentadoria) return { valor: 0, valorHoje: 0 }
@@ -384,7 +503,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
 
   // ── Independência financeira (anuidade, sem taxa de retirada fixa) ─────────
   const anoBase = new Date().getFullYear()
-  const horizonte = Math.max(1, Number(premissas.horizonteAposentadoria) || 35)
+  const horizonte = horizonteApos
   const rendaMensalDesejada = Number(premissas.retiradaMensal) || 0
 
   const patrimonioNecessario = kpis.patrimonioNecessarioLF
@@ -860,9 +979,9 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
               <div className="flex items-start justify-between">
                 <div>
                   <p className="field-label font-semibold text-foreground">Renda mensal gerada</p>
-                  <p className="text-2xl font-bold text-[#1066DA] mt-1">{formatarMoedaCompleta(rendaGeradaApos)}</p>
+                  <p className="text-2xl font-bold text-[#1066DA] mt-1">{formatarMoedaCompleta(rendaGeradaApos.valor)}</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Perpetuidade {displayMode === "nominal" ? `· (${formatarMoedaCompleta(Number(pontoAposentadoria?.rendaGeradaReal) || 0)} hoje)` : ""}
+                    Perpetuidade {displayMode === "nominal" ? `· (${formatarMoedaCompleta(rendaGeradaApos.valorHoje)} hoje)` : ""}
                   </p>
                 </div>
                 <DollarSign className="w-5 h-5 text-[#1066DA]" />
@@ -878,11 +997,11 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
                   <p className="text-xs text-muted-foreground mt-1">
                     {displayMode === "nominal"
                       ? `(${formatarMoedaCompleta(rendaConsumoApos.valorHoje)} hoje · anuidade por ${horizonte} anos)`
-                      : `Zera aos ${(Number(premissas.idadeApos) || 0) + horizonte} anos`}
+                      : `Zera aos ${idadeFimSimulacao} anos`}
                   </p>
                   {displayMode === "nominal" && (
                     <p className="text-xs text-muted-foreground mt-1">
-                      Zera aos {(Number(premissas.idadeApos) || 0) + horizonte} anos
+                      Zera aos {idadeFimSimulacao} anos
                     </p>
                   )}
                 </div>
@@ -943,35 +1062,55 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
                   tickLine={false} axisLine={false} tickFormatter={formatarMoeda} />
                 <Tooltip
                   {...CHART_TOOLTIP_PROPS}
-                  formatter={(value: number, _name: string, props: any) => {
-                    const entry = props?.payload
-                    const idade = Number(entry?.idade) || idadeAtualCalculada
-                    const saldoNominal = Number(entry?.saldoNominal) || 0
-                    const poderCompraHoje = saldoNominal / deflatorPorIdade(idade)
+                  content={({ active, payload, label }) => {
+                    if (!active || !payload?.length) return null
+                    const entry = payload[0]?.payload as {
+                      valor?: number
+                      saldoNominal?: number
+                      idade?: number
+                      isAposentado?: boolean
+                      rendaGeradaReal?: number
+                      rendaGeradaNominal?: number
+                      retiradaAplicadaMensal?: number
+                      retiradaAplicadaMensalReal?: number
+                      deltaPatrimonioReal?: number
+                    }
+                    const idade = Number(entry?.idade) || Number(label) || 0
+                    const patrimonio = Number(entry?.valor) || 0
                     const rendaGerada =
                       displayMode === "nominal"
                         ? Number(entry?.rendaGeradaNominal) || 0
                         : Number(entry?.rendaGeradaReal) || 0
+                    const retiradaAplicada = Number(entry?.retiradaAplicadaMensal) || 0
+                    const deltaReal = Number(entry?.deltaPatrimonioReal) || 0
+                    const sinalDelta = deltaReal > 0 ? "+" : ""
 
-                    return [
-                      <div className="space-y-1">
-                        <div>
-                          {displayMode === "nominal" ? "Nominal" : "Real"}: {formatarMoedaCompleta(value)}
-                        </div>
-                        {displayMode === "nominal" && (
-                          <div>Poder de compra hoje: {formatarMoedaCompleta(poderCompraHoje)}</div>
+                    return (
+                      <div className="rounded-md border border-border bg-card px-3 py-2 text-xs shadow-md space-y-1">
+                        <p className="font-medium text-foreground">Idade: {idade} anos</p>
+                        <p>
+                          Patrimônio ({displayMode === "nominal" ? "nominal" : "real"}):{" "}
+                          {formatarMoedaCompleta(patrimonio)}
+                        </p>
+                        {entry?.isAposentado ? (
+                          <p>
+                            Retirada aplicada (simulação): {formatarMoedaCompleta(retiradaAplicada)}
+                            /mês
+                          </p>
+                        ) : (
+                          <p className="text-muted-foreground">Ainda em acumulação (sem retirada)</p>
                         )}
-                        <div>
-                          Renda Mensal Gerada: {formatarMoedaCompleta(rendaGerada)}
-                        </div>
-                        <div className="text-muted-foreground">
-                          Objetivos eternos (equiv.): {formatarMoedaCompleta(objetivosEternosMensal)}/mês
-                        </div>
-                      </div>,
-                      "",
-                    ]
+                        <p>
+                          Variação real vs. ano anterior: {sinalDelta}
+                          {formatarMoedaCompleta(deltaReal)}
+                        </p>
+                        <p className="text-muted-foreground border-t border-border pt-1 mt-1">
+                          Renda mensal gerada (hipótese se parasse aqui):{" "}
+                          {formatarMoedaCompleta(rendaGerada)}/mês
+                        </p>
+                      </div>
+                    )
                   }}
-                  labelFormatter={(label) => `Idade: ${label} anos`}
                 />
                 <ReferenceLine x={premissas.idadeApos} stroke="#1066DA" strokeDasharray="5 5"
                   label={{ value: "Aposentadoria", position: "top", fill: "#1066DA", fontSize: 12 }} />

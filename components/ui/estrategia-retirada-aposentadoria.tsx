@@ -13,11 +13,11 @@ import {
   Legend,
 } from "recharts"
 import {
-  calcularPassivosPorAnoSeries,
   calcularFluxoAnual,
-  calcularRendasReferenciaEstrategia,
   encontrarRendaDeConsumoMensalReal,
+  encontrarRendaDePreservacaoMensalReal,
   projecaoEstrategiaRetirada,
+  horizontePosAposentadoriaAnos,
   type Objetivo,
   type Passivo,
   type Premissas,
@@ -27,7 +27,6 @@ import { CHART_TOOLTIP_PROPS } from "@/lib/chart-tooltip"
 import { VOGA } from "@/lib/voga-tokens"
 import { Slider } from "@/components/ui/slider"
 import { Label } from "@/components/ui/label"
-import { totalObjetivosEternosAnuais } from "@/lib/engine"
 
 const CENARIO_VERDE = "#1F6D3E"
 
@@ -48,19 +47,6 @@ export interface EstrategiaRetiradaAposentadoriaProps {
 }
 
 type EstrategiaKey = "acumulacao" | "preservacao" | "consumo"
-
-function valorPatrimonioDisplay(
-  row: ProjecaoAno,
-  displayMode: DisplayMode,
-  idadeAtual: number,
-  inflacaoPct: number,
-): number {
-  const saldoNominal = Number(row.saldoNominal) || 0
-  if (displayMode === "nominal") return saldoNominal
-  const inf = Math.max(0, inflacaoPct) / 100
-  const anos = Math.max(0, row.idade - idadeAtual)
-  return saldoNominal / Math.pow(1 + inf, anos)
-}
 
 function SparklinePatrimonio({
   data,
@@ -111,14 +97,17 @@ export function EstrategiaRetiradaAposentadoria({
   inflacaoGlobal,
   idadeAtualCalculada,
   projecaoModerada,
-  aliquotaIR,
+  aliquotaIR: _aliquotaIR,
   fmtFull,
   formatarMoeda,
 }: EstrategiaRetiradaAposentadoriaProps) {
   const [pctAcumulacao, setPctAcumulacao] = useState(70)
 
   const idadeApos = Number(premissasCompletas.idadeApos) || 0
-  const horizonte = Math.max(1, Number(premissasCompletas.horizonteAposentadoria) || 35)
+  const horizonte = horizontePosAposentadoriaAnos(premissasCompletas)
+  const taxaNominalAnual = Math.max(0, rentabilidadeLiquidaPct) / 100
+  const inflacaoAnual = Math.max(0, inflacaoGlobal) / 100
+  const taxaReal = (1 + taxaNominalAnual) / (1 + inflacaoAnual) - 1
 
   const premissasModerado = useMemo(
     () => ({
@@ -128,121 +117,116 @@ export function EstrategiaRetiradaAposentadoria({
     [premissasCompletas, rentabilidadeLiquidaPct],
   )
 
-  const patrimonioRealInicioApos = useMemo(() => {
+  /**
+   * Patrimônio REAL no INÍCIO da aposentadoria (antes da 1ª retirada) —
+   * saldo do ano anterior, deflacionado. Mesma base do KPI de consumo.
+   */
+  const baseDecumulacao = useMemo(() => {
     const idxApos = projecaoModerada.findIndex((p) => p.idade === idadeApos)
     const saldoNominalInicioApos =
       idxApos > 0
         ? Number(projecaoModerada[idxApos - 1].saldoNominal) || 0
         : Number(premissasCompletas.saldoInicial) || 0
     const anos = Math.max(0, idadeApos - idadeAtualCalculada)
-    const deflatorApos = Math.pow(1 + Math.max(0, inflacaoGlobal) / 100, anos)
-    return { patrimonioReal: saldoNominalInicioApos / deflatorApos, deflatorApos, tApos: anos }
-  }, [projecaoModerada, idadeApos, premissasCompletas.saldoInicial, idadeAtualCalculada, inflacaoGlobal])
+    const deflatorApos = Math.pow(1 + inflacaoAnual, anos)
+    const patrimonioReal = saldoNominalInicioApos / deflatorApos
 
-  const dividasAnuaisRealApos = useMemo(() => {
-    const tApos = patrimonioRealInicioApos.tApos
-    const serie = calcularPassivosPorAnoSeries(passivos, tApos)
-    const dividasNominal = serie[tApos] ?? 0
-    return dividasNominal / patrimonioRealInicioApos.deflatorApos
-  }, [passivos, patrimonioRealInicioApos])
-
-  const rendasReferencia = useMemo(
-    () =>
-      calcularRendasReferenciaEstrategia(
-        patrimonioRealInicioApos.patrimonioReal,
-        rentabilidadeLiquidaPct,
-        inflacaoGlobal,
-        horizonte,
-        idadeApos,
-        objetivosEngine,
-        { aliquotaIR, dividasAnuaisReal: dividasAnuaisRealApos },
-      ),
-    [
-      patrimonioRealInicioApos,
-      rentabilidadeLiquidaPct,
-      inflacaoGlobal,
-      horizonte,
-      idadeApos,
-      objetivosEngine,
-      aliquotaIR,
-      dividasAnuaisRealApos,
-    ],
-  )
-
-  const rendaConsumoPatrimonioRealApos = useMemo(() => {
-    // Fluxo anual nominal completo (alinhado ao motor). Depois convertemos para real por ano.
+    // Fluxo nominal → real ano a ano (objetivos/passivos do motor; eternos já inclusos).
     const fluxo = calcularFluxoAnual(
       premissasModerado,
       objetivosEngine,
       passivos,
-      aliquotaIR,
+      0,
       "nominal",
     )
-    const idxApos = fluxo.findIndex((r) => r.idade === idadeApos)
-    if (idxApos < 0) return 0
-
-    const objetivosFinitosPorAnoReal: number[] = []
+    const idxFluxo = fluxo.findIndex((r) => r.idade === idadeApos)
+    const objetivosPorAnoReal: number[] = []
     const passivosPorAnoReal: number[] = []
     for (let ano = 0; ano < horizonte; ano++) {
-      const row = fluxo[idxApos + ano]
+      const row = idxFluxo >= 0 ? fluxo[idxFluxo + ano] : undefined
       const idade = idadeApos + ano
-      const anos = Math.max(0, idade - idadeAtualCalculada)
-      const deflator = Math.pow(1 + Math.max(0, inflacaoGlobal) / 100, anos)
-      objetivosFinitosPorAnoReal.push(((Number(row?.objetivos) || 0) / deflator) || 0)
+      const anosDef = Math.max(0, idade - idadeAtualCalculada)
+      const deflator = Math.pow(1 + inflacaoAnual, anosDef)
+      objetivosPorAnoReal.push(((Number(row?.objetivos) || 0) / deflator) || 0)
       passivosPorAnoReal.push(((Number(row?.dividas) || 0) / deflator) || 0)
     }
 
-    return encontrarRendaDeConsumoMensalReal({
-      patrimonioRealInicioApos: patrimonioRealInicioApos.patrimonioReal,
-      taxaRealAnual: rendasReferencia.taxaReal,
+    // Mesma lógica do KPI: W tal que patrim. final ≈ inicial na decumulação
+    // ano a ano (objetivos/dívidas reais do fluxo — sem média isolada).
+    const rendaGeradaMensal = encontrarRendaDePreservacaoMensalReal({
+      patrimonioRealInicioApos: patrimonioReal,
+      taxaRealAnual: taxaReal,
       horizonteAnos: horizonte,
-      objetivosEternosAnuaisReal: totalObjetivosEternosAnuais(objetivosEngine, rendasReferencia.taxaReal),
-      objetivosFinitosPorAnoReal,
+      objetivosPorAnoReal,
       passivosPorAnoReal,
       tolerancia: 1000,
     })
+
+    const rendaConsumoMensal = encontrarRendaDeConsumoMensalReal({
+      patrimonioRealInicioApos: patrimonioReal,
+      taxaRealAnual: taxaReal,
+      horizonteAnos: horizonte,
+      objetivosFinitosPorAnoReal: objetivosPorAnoReal,
+      passivosPorAnoReal,
+      tolerancia: 1000,
+    })
+
+    return {
+      patrimonioReal,
+      objetivosPorAnoReal,
+      passivosPorAnoReal,
+      rendaGeradaMensal,
+      rendaConsumoMensal,
+    }
   }, [
+    projecaoModerada,
+    idadeApos,
+    premissasCompletas.saldoInicial,
+    idadeAtualCalculada,
+    inflacaoAnual,
     premissasModerado,
     objetivosEngine,
     passivos,
-    aliquotaIR,
-    idadeApos,
     horizonte,
-    idadeAtualCalculada,
-    inflacaoGlobal,
-    patrimonioRealInicioApos,
-    rendasReferencia.taxaReal,
+    taxaNominalAnual,
+    taxaReal,
   ])
 
   const retiradas = useMemo(
     () => ({
-      acumulacao: rendasReferencia.rendaGeradaMensal * (pctAcumulacao / 100),
-      preservacao: rendasReferencia.rendaGeradaMensal,
-      consumo: rendaConsumoPatrimonioRealApos,
+      acumulacao: baseDecumulacao.rendaGeradaMensal * (pctAcumulacao / 100),
+      preservacao: baseDecumulacao.rendaGeradaMensal,
+      consumo: baseDecumulacao.rendaConsumoMensal,
     }),
-    [rendasReferencia, pctAcumulacao, rendaConsumoPatrimonioRealApos],
+    [baseDecumulacao, pctAcumulacao],
   )
 
   const projecoesEstrategia = useMemo(() => {
+    // Sempre em poder de compra (real): Preservação flat e Consumo→0 são propriedades
+    // do patrimônio REAL. Em nominal a Preservação “cresce” com a inflação e confunde.
     const run = (retirada: number) =>
-      projecaoEstrategiaRetirada(
-        premissasModerado,
-        objetivosEngine,
-        passivos,
-        retirada,
-        displayMode,
-      )
+      projecaoEstrategiaRetirada({
+        patrimonioRealInicioApos: baseDecumulacao.patrimonioReal,
+        taxaRealAnual: taxaReal,
+        horizonteAnos: horizonte,
+        idadeApos,
+        retiradaMensalReal: retirada,
+        objetivosPorAnoReal: baseDecumulacao.objetivosPorAnoReal,
+        passivosPorAnoReal: baseDecumulacao.passivosPorAnoReal,
+        inflacaoAnual,
+        displayMode: "real",
+      })
     return {
       acumulacao: run(retiradas.acumulacao),
       preservacao: run(retiradas.preservacao),
       consumo: run(retiradas.consumo),
     }
-  }, [premissasModerado, objetivosEngine, passivos, retiradas, displayMode])
+  }, [baseDecumulacao, taxaReal, horizonte, idadeApos, inflacaoAnual, retiradas])
 
   const toSerie = (rows: ProjecaoAno[]) =>
     rows.map((row) => ({
       idade: row.idade,
-      patrimonio: valorPatrimonioDisplay(row, displayMode, idadeAtualCalculada, inflacaoGlobal),
+      patrimonio: Number(row.saldoReal) || 0,
     }))
 
   const series = useMemo(
@@ -251,7 +235,7 @@ export function EstrategiaRetiradaAposentadoria({
       preservacao: toSerie(projecoesEstrategia.preservacao),
       consumo: toSerie(projecoesEstrategia.consumo),
     }),
-    [projecoesEstrategia, displayMode, idadeAtualCalculada, inflacaoGlobal],
+    [projecoesEstrategia],
   )
 
   const dadosComparativo = useMemo(() => {
@@ -405,6 +389,7 @@ export function EstrategiaRetiradaAposentadoria({
       <div className="rounded-xl border border-border bg-secondary p-5">
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">
           Comparativo de patrimônio — estratégias de retirada
+          <span className="normal-case font-normal tracking-normal"> (poder de compra de hoje)</span>
         </p>
         <div className="h-72">
           <ResponsiveContainer width="100%" height="100%">
