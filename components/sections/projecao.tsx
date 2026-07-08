@@ -20,7 +20,6 @@ import {
   encontrarAporteNecessario,
   encontrarRendaDeConsumoMensalReal,
   encontrarRendaDePreservacaoMensalReal,
-  saldoRealNaIdadeApos,
   rodarMonteCarlo,
   VOLATILIDADE_MONTE_CARLO_ANUAL,
   pvAnuidade,
@@ -486,27 +485,34 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
 
   const patrimonioNecessario = kpis.patrimonioNecessarioLF
 
-  // ── Bloco 2: aporte necessário (busca na simulação real do Bloco 1) ────────
+  // ── Bloco 2: aporte necessário (busca na simulação real, série escalada) ───
   const b2Resultado = useMemo(() => {
     const alvo = patrimonioNecessario
     const idadeApos = Number(premissas.idadeApos) || 0
     if (idadeApos <= idadeAtualCalculada) {
-      return { alvo, aporteNecessario: 0, patrimonioProjetado: saldoInicialCalculado, invalido: true }
+      return {
+        alvo,
+        aporteNecessario: 0,
+        escala: 0,
+        aportePorAnoNominal: [] as number[],
+        patrimonioProjetado: saldoInicialCalculado,
+        invalido: true,
+      }
     }
-    const premissasBusca = { ...premissasCompletas, aportePorAnoNominal: undefined }
-    const aporteNecessario = encontrarAporteNecessario({
-      premissas: premissasBusca,
+    const resultado = encontrarAporteNecessario({
+      premissas: premissasCompletas,
       objetivos: objetivosEngine,
       passivos: state.passivos,
       patrimonioNecessario: alvo,
     })
-    const patrimonioProjetado = saldoRealNaIdadeApos(
-      { ...premissasBusca, aporteM: aporteNecessario },
-      objetivosEngine,
-      state.passivos,
-      aporteNecessario,
-    )
-    return { alvo, aporteNecessario, patrimonioProjetado, invalido: false }
+    return {
+      alvo,
+      aporteNecessario: resultado.aporteMensalEquivalente,
+      escala: resultado.escala,
+      aportePorAnoNominal: resultado.aportePorAnoNominal,
+      patrimonioProjetado: resultado.patrimonioNaAposentadoria,
+      invalido: false,
+    }
   }, [
     patrimonioNecessario,
     premissasCompletas,
@@ -520,21 +526,44 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
   const gapAporte = aporteMensal - b2Resultado.aporteNecessario
   const maiorAporteComparativo = Math.max(aporteMensal, b2Resultado.aporteNecessario, 1)
 
+  const [ritmoIndependencia, setRitmoIndependencia] = useState<"atual" | "necessario">("atual")
+
+  const projecaoIndependencia = useMemo(() => {
+    if (ritmoIndependencia === "atual" || b2Resultado.invalido) return projecao
+    return calcularProjecao(
+      {
+        ...premissasCompletas,
+        aporteM: b2Resultado.aporteNecessario,
+        aportePorAnoNominal: b2Resultado.aportePorAnoNominal,
+      },
+      objetivosEngine,
+      state.passivos,
+      "real",
+    )
+  }, [
+    ritmoIndependencia,
+    b2Resultado,
+    projecao,
+    premissasCompletas,
+    objetivosEngine,
+    state.passivos,
+  ])
+
   const idadeIndependencia = useMemo(() => {
-    for (const p of projecao) {
+    for (const p of projecaoIndependencia) {
       if ((Number(p.saldoReal) || 0) >= patrimonioNecessario) return p.idade
     }
     return null
-  }, [projecao, patrimonioNecessario])
+  }, [projecaoIndependencia, patrimonioNecessario])
 
   const dadosIndependencia = useMemo<PontoIndependencia[]>(
     () =>
-      projecao.map((p) => ({
+      projecaoIndependencia.map((p) => ({
         idade: p.idade,
         ano: anoBase + p.t,
         patrimonio: Number(p.saldoReal) || 0,
       })),
-    [projecao, anoBase],
+    [projecaoIndependencia, anoBase],
   )
 
   const anosAteIndependencia =
@@ -1184,14 +1213,35 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
       {/* Bloco 1 — Tempo até a independência financeira */}
       <Card className="form-card">
         <CardHeader className="pb-4">
-          <CardTitle className="text-base font-medium text-foreground">
-            Tempo até a independência financeira
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Patrimônio necessário calculado pelo valor presente de uma anuidade sobre a necessidade
-            total (renda desejada + objetivos eternos) e o horizonte de aposentadoria ({horizonte} anos)
-            — sem taxa de retirada fixa.
-          </p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <CardTitle className="text-base font-medium text-foreground">
+                Tempo até a independência financeira
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Patrimônio necessário calculado pelo valor presente de uma anuidade sobre a necessidade
+                total (renda desejada + objetivos eternos) e o horizonte de aposentadoria ({horizonte} anos)
+                — sem taxa de retirada fixa.
+              </p>
+            </div>
+            <div className="inline-flex rounded-lg bg-card p-1 shrink-0">
+              {(["atual", "necessario"] as const).map((modo) => (
+                <button
+                  key={modo}
+                  type="button"
+                  onClick={() => setRitmoIndependencia(modo)}
+                  disabled={modo === "necessario" && b2Resultado.invalido}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                    ritmoIndependencia === modo
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground disabled:opacity-40"
+                  }`}
+                >
+                  {modo === "atual" ? "Ritmo atual" : "Aporte necessário"}
+                </button>
+              ))}
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1241,8 +1291,9 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
               formatarMoedaCompleta={formatarMoedaCompleta}
             />
             <p className="text-xs text-muted-foreground mt-2">
-              Barras: patrimônio acumulado ano a ano (mesma projeção da Simulação em tempo real,
-              poder de compra de hoje). Linha dourada: patrimônio necessário.
+              {ritmoIndependencia === "atual"
+                ? "Barras: patrimônio com o aporte atual (mesma projeção da Simulação em tempo real, poder de compra de hoje). Linha dourada: patrimônio necessário."
+                : `Barras: patrimônio simulado com o aporte necessário (${formatarMoedaCompleta(b2Resultado.aporteNecessario)}/mês equivalente hoje). Na aposentadoria, a barra deve encostar na linha do alvo.`}
             </p>
           </div>
         </CardContent>

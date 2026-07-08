@@ -129,12 +129,13 @@ export function montarSnapshotCliente(state: PlanoState): SnapshotCliente {
     const anosParaIndependencia =
       idadeIndep != null ? Math.max(0, idadeIndep - idadeAtual) : Math.max(0, idadeApos - idadeAtual)
 
-    const aporteMensalNecessario = encontrarAporteNecessario({
-      premissas: { ...premissas, saldoInicial, aporteM, idadeAtual, aportePorAnoNominal: undefined },
+    const resultadoAporte = encontrarAporteNecessario({
+      premissas: { ...premissas, saldoInicial, aporteM, idadeAtual, aportePorAnoNominal },
       objetivos,
       passivos,
       patrimonioNecessario,
     })
+    const aporteMensalNecessario = resultadoAporte.aporteMensalEquivalente
 
     snapshot.aposentadoria = {
       idadeAtual,

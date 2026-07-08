@@ -489,25 +489,71 @@ export function calcularProjecao(
   return resultado
 }
 
-/** Saldo REAL na idade de aposentadoria — mesma definição que Bloco 1 e KPIs. */
+/** Série anual de aporte nominal escalada (mesma forma da simulação principal). */
+export function seriesAportePorEscala(premissas: Premissas, escala: number): number[] {
+  const prazo = Math.max(0, Number(premissas.prazo) || 0)
+  const inf = (Number(premissas.inflacao) || 0) / 100
+  const k = Math.max(0, escala)
+  const base = premissas.aportePorAnoNominal
+  if (base && base.length > 0) {
+    return Array.from({ length: prazo + 1 }, (_, t) => (Number(base[t]) || 0) * k)
+  }
+  const aporteM = Number(premissas.aporteM) || 0
+  return Array.from({ length: prazo + 1 }, (_, t) => aporteM * k * Math.pow(1 + inf, t))
+}
+
+/** Premissas com aporteM e aportePorAnoNominal escalados pelo mesmo fator. */
+export function premissasComEscalaAporte(premissas: Premissas, escala: number): Premissas {
+  const k = Math.max(0, escala)
+  return {
+    ...premissas,
+    aporteM: (Number(premissas.aporteM) || 0) * k,
+    aportePorAnoNominal: seriesAportePorEscala(premissas, k),
+  }
+}
+
+/** Saldo REAL na idade de aposentadoria com escala sobre a série de aportes. */
+export function saldoRealNaIdadeAposComEscala(
+  premissas: Premissas,
+  objetivos: Objetivo[],
+  passivos: Passivo[],
+  escala: number,
+): number {
+  const idadeApos = Number(premissas.idadeApos) || 0
+  const proj = calcularProjecao(
+    premissasComEscalaAporte(premissas, escala),
+    objetivos,
+    passivos,
+    "real",
+  )
+  const ponto = proj.find((p) => p.idade === idadeApos)
+  return ponto ? Number(ponto.saldoReal) || 0 : 0
+}
+
+/** Saldo REAL na idade de aposentadoria — escala derivada de aporteMensal / aporteM base. */
 export function saldoRealNaIdadeApos(
   premissas: Premissas,
   objetivos: Objetivo[],
   passivos: Passivo[],
   aporteMensal: number,
 ): number {
-  const idadeApos = Number(premissas.idadeApos) || 0
-  const { aportePorAnoNominal: _omit, ...base } = premissas
-  const proj = calcularProjecao({ ...base, aporteM: aporteMensal }, objetivos, passivos, "real")
-  const ponto = proj.find((p) => p.idade === idadeApos)
-  return ponto ? Number(ponto.saldoReal) || 0 : 0
+  const baseM = Number(premissas.aporteM) || 0
+  const escala = baseM > 0 ? Math.max(0, aporteMensal) / baseM : 0
+  return saldoRealNaIdadeAposComEscala(premissas, objetivos, passivos, escala)
+}
+
+export interface ResultadoAporteNecessario {
+  /** Fator sobre a série `aportePorAnoNominal` (1 = ritmo atual das fontes). */
+  escala: number
+  /** Equivalente mensal hoje para exibição: escala × aporteM. */
+  aporteMensalEquivalente: number
+  aportePorAnoNominal: number[]
+  patrimonioNaAposentadoria: number
 }
 
 /**
- * Aporte mensal (poder de compra de hoje) necessário para que o patrimônio REAL
- * na idade de aposentadoria atinja `patrimonioNecessario`, por busca binária na
- * MESMA simulação de acumulação que alimenta as barras do Bloco 1 (`calcularProjecao`
- * com objetivos, passivos e entrada extra — não anuidade isolada).
+ * Escala (busca binária) sobre a mesma série `aportePorAnoNominal` da simulação
+ * principal, para que o patrimônio REAL na idade de aposentadoria ≈ alvo.
  */
 export function encontrarAporteNecessario(
   params: {
@@ -518,7 +564,7 @@ export function encontrarAporteNecessario(
     tolerancia?: number
     maxIter?: number
   },
-): number {
+): ResultadoAporteNecessario {
   const {
     premissas,
     objetivos,
@@ -532,37 +578,49 @@ export function encontrarAporteNecessario(
   const idadeApos = Number(premissas.idadeApos) || 0
   const anos = idadeApos - idadeAtual
   const alvo = Math.max(0, patrimonioNecessario)
+  const aporteMBase = Number(premissas.aporteM) || 0
 
-  if (anos <= 0 || alvo <= 0) return 0
+  const build = (escala: number): ResultadoAporteNecessario => ({
+    escala,
+    aporteMensalEquivalente: aporteMBase * escala,
+    aportePorAnoNominal: seriesAportePorEscala(premissas, escala),
+    patrimonioNaAposentadoria: saldoRealNaIdadeAposComEscala(
+      premissas,
+      objetivos,
+      passivos,
+      escala,
+    ),
+  })
 
-  const saldoNaApos = (aporteMensal: number) =>
-    saldoRealNaIdadeApos(premissas, objetivos, passivos, aporteMensal)
+  if (anos <= 0 || alvo <= 0) return build(0)
+
+  const saldoNaApos = (escala: number) =>
+    saldoRealNaIdadeAposComEscala(premissas, objetivos, passivos, escala)
 
   const saldoSemAporte = saldoNaApos(0)
-  if (saldoSemAporte >= alvo - tolerancia) return 0
+  if (saldoSemAporte >= alvo - tolerancia) return build(0)
 
   let baixo = 0
-  let alto = Math.max(
-    1000,
-    (alvo - saldoSemAporte) / Math.max(1, anos * 12),
-    alvo / Math.max(1, anos * 12),
-  )
+  let alto = 1
 
-  for (let i = 0; i < 40; i++) {
-    if (saldoNaApos(alto) >= alvo) break
-    alto *= 2
-    if (alto > 50_000_000) break
+  if (saldoNaApos(alto) < alvo) {
+    for (let i = 0; i < 40; i++) {
+      if (saldoNaApos(alto) >= alvo) break
+      alto *= 2
+      if (alto > 10_000) break
+    }
   }
 
   for (let i = 0; i < maxIter; i++) {
     const mid = (baixo + alto) / 2
     const diferenca = saldoNaApos(mid) - alvo
-    if (Math.abs(diferenca) < tolerancia) return mid
+    if (Math.abs(diferenca) < tolerancia) return build(mid)
     if (diferenca < 0) baixo = mid
     else alto = mid
   }
 
-  return (baixo + alto) / 2
+  const escalaFinal = (baixo + alto) / 2
+  return build(escalaFinal)
 }
 
 export interface MonteCarloTrajetoriaAno {
