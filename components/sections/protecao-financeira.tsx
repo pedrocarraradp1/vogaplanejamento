@@ -316,7 +316,7 @@ export function ProtecaoFinanceira({ onNavigate }: ProtecaoFinanceiraProps) {
         <div className="h-64 mb-8">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} layout="vertical" margin={{ left: 20, right: 40 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" horizontal vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" horizontal vertical={false} />
               <XAxis type="number" tickFormatter={formatCompact}
                 stroke="#8E96AC" fontSize={12} axisLine={false} tickLine={false} />
               <YAxis type="category" dataKey="name"

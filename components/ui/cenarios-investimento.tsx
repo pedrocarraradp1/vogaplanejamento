@@ -500,18 +500,18 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={dadosLinhaCenariosDisplay} margin={{ top: 10, right: 30, left: 20, bottom: 10 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
                   <XAxis
                     dataKey="idade"
-                    stroke="#5F85B8"
-                    tick={{ fill: "#5F85B8", fontSize: 12 }}
+                    stroke="rgba(0,0,0,0.35)"
+                    tick={{ fill: "var(--text-label)", fontSize: 12 }}
                     tickLine={false}
-                    axisLine={{ stroke: "rgba(255,255,255,0.04)" }}
+                    axisLine={{ stroke: "rgba(0,0,0,0.08)" }}
                     interval="preserveStartEnd"
                   />
                   <YAxis
-                    stroke="#5F85B8"
-                    tick={{ fill: "#5F85B8", fontSize: 12 }}
+                    stroke="rgba(0,0,0,0.35)"
+                    tick={{ fill: "var(--text-label)", fontSize: 12 }}
                     tickLine={false}
                     axisLine={false}
                     tickFormatter={formatarMoeda}

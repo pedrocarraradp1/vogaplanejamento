@@ -61,12 +61,12 @@ const VOGA_GOLD_LIGHT = VOGA.estrela
 const VOGA_GOLD_DARK = VOGA.nota
 
 const PALETA_OBJETIVOS = [
-  { fill: VOGA_CHART_SCALE[0], bg: VOGA.gelo, text: VOGA.noite },
-  { fill: VOGA_CHART_SCALE[1], bg: VOGA.estrela, text: VOGA.noite },
-  { fill: VOGA_CHART_SCALE[2], bg: VOGA.moeda, text: VOGA.noite },
+  { fill: VOGA_CHART_SCALE[0], bg: "var(--surface-1)", text: "var(--text-primary)" },
+  { fill: VOGA_CHART_SCALE[1], bg: "var(--bg-page)", text: "var(--text-primary)" },
+  { fill: VOGA_CHART_SCALE[2], bg: "var(--surface-2)", text: "var(--text-primary)" },
   { fill: VOGA_CHART_SCALE[3], bg: VOGA.verdeQuadrado, text: VOGA.noite },
   { fill: VOGA_CHART_SCALE[4], bg: VOGA.amareloExplanada, text: VOGA.noite },
-  { fill: VOGA_CHART_SCALE[5], bg: VOGA.gelo, text: VOGA.noite },
+  { fill: VOGA_CHART_SCALE[5], bg: "var(--surface-1)", text: "var(--text-primary)" },
 ] as const
 
 type CorObjetivo = (typeof PALETA_OBJETIVOS)[number]

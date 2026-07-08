@@ -652,17 +652,17 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dadosGraficoPatrimonio} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
                 <XAxis
                   dataKey="idade"
-                  stroke="#5F85B8"
-                  tick={{ fill: "#5F85B8", fontSize: 12 }}
+                  stroke="rgba(0,0,0,0.35)"
+                  tick={{ fill: "var(--text-label)", fontSize: 12 }}
                   tickLine={false}
-                  axisLine={{ stroke: "rgba(255,255,255,0.04)" }}
+                  axisLine={{ stroke: "rgba(0,0,0,0.08)" }}
                   interval="preserveStartEnd"
                   tickCount={15}
                 />
-                <YAxis stroke="#5F85B8" tick={{ fill: "#5F85B8", fontSize: 12 }} tickLine={false} axisLine={false} tickFormatter={fmt} />
+                <YAxis stroke="rgba(0,0,0,0.35)" tick={{ fill: "var(--text-label)", fontSize: 12 }} tickLine={false} axisLine={false} tickFormatter={fmt} />
                 <Tooltip
                   {...CHART_TOOLTIP_PROPS}
                   formatter={(value: number, _name: string, props: any) => {
@@ -702,7 +702,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                   <Line
                     type="monotone"
                     dataKey="poderCompraHoje"
-                    stroke="rgba(255,255,255,0.65)"
+                    stroke="rgba(0,0,0,0.45)"
                     strokeWidth={2}
                     strokeDasharray="6 4"
                     dot={false}

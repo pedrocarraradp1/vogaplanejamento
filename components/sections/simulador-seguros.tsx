@@ -1027,10 +1027,10 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
         <CardContent className="h-[340px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={linhaPatrimonioHerdeiros} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-              <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
-              <XAxis dataKey="idade" tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 11 }} />
+              <CartesianGrid stroke="rgba(0,0,0,0.06)" vertical={false} />
+              <XAxis dataKey="idade" tick={{ fill: "var(--text-label)", fontSize: 11 }} />
               <YAxis
-                tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 11 }}
+                tick={{ fill: "var(--text-label)", fontSize: 11 }}
                 tickFormatter={(v) => fmtShort(Number(v), moeda)}
                 width={56}
               />

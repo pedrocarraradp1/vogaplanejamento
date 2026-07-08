@@ -428,7 +428,7 @@ function AtivosLiquidosComposicao({
     if (semSub.length > 0) {
       const valor = semSub.reduce((s, a) => s + (Number(a.valor) || 0), 0)
       if (valor > 0) {
-        slices.push({ name: "Sem subcategoria", value: valor, fill: "#5B8FA8" })
+        slices.push({ name: "Sem subcategoria", value: valor, fill: CORES_SUBCATEGORIA.carteira_geral ?? "#393939" })
       }
     }
     return slices.sort((a, b) => b.value - a.value)
@@ -2329,13 +2329,20 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                           <SelectValue placeholder="Selecione" />
                         </SelectTrigger>
                         <SelectContent className="form-card">
-                          {SUBCATEGORIAS_LIQUIDO.map((s) => (
+                          <SelectItem value="carteira_geral">
+                            Carteira geral · sem detalhamento
+                          </SelectItem>
+                          <SelectSeparator />
+                          {SUBCATEGORIAS_LIQUIDO.filter((s) => s.value !== "carteira_geral").map((s) => (
                             <SelectItem key={s.value} value={s.value}>
                               {s.label}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
+                      <p className="text-xs text-muted-foreground">
+                        Use &quot;Carteira geral&quot; quando não quiser detalhar por subcategoria — lança o valor total do ativo de uma vez.
+                      </p>
                     </div>
                     <div className="space-y-2">
                       <label className="field-label">Localização</label>

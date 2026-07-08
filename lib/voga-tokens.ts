@@ -30,12 +30,12 @@ export const VOGA = {
 
 /** Escala de azuis para séries/categorias neutras em gráficos empilhados. */
 export const VOGA_CHART_SCALE = [
-  VOGA.mare,
-  VOGA.onda,
-  VOGA.nautico,
-  VOGA.petroleo,
-  VOGA.chuva,
   VOGA.nuvem,
+  VOGA.brasilia,
+  VOGA.noite,
+  VOGA.onda,
+  VOGA.petroleo,
+  VOGA.credito,
 ] as const
 
 export const VOGA_CHART_COLORS = [...VOGA_CHART_SCALE, VOGA.brasilia, VOGA.credito] as const
@@ -48,6 +48,7 @@ export const CORES_GRUPOS_ATIVO: Record<string, string> = {
 }
 
 export const CORES_SUBCATEGORIA: Record<string, string> = {
+  carteira_geral: VOGA.concreto,
   pre_fixado: VOGA.noite,
   pos_fixado: VOGA.nuvem,
   inflacao: VOGA.brasilia,

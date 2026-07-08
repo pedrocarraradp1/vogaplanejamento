@@ -99,18 +99,18 @@ export function FluxoAnualChart({
             margin={{ top: 28, right: 24, left: 8, bottom: 4 }}
             stackOffset="sign"
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
             <XAxis
               dataKey="idade"
-              stroke="#5F85B8"
-              tick={{ fill: "#5F85B8", fontSize: 11 }}
+              stroke="rgba(0,0,0,0.35)"
+              tick={{ fill: "var(--text-label)", fontSize: 11 }}
               tickLine={false}
-              axisLine={{ stroke: "rgba(255,255,255,0.04)" }}
+              axisLine={{ stroke: "rgba(0,0,0,0.08)" }}
               interval="preserveStartEnd"
             />
             <YAxis
-              stroke="#5F85B8"
-              tick={{ fill: "#5F85B8", fontSize: 11 }}
+              stroke="rgba(0,0,0,0.35)"
+              tick={{ fill: "var(--text-label)", fontSize: 11 }}
               tickLine={false}
               axisLine={false}
               tickFormatter={formatarMoeda}
@@ -157,7 +157,7 @@ export function FluxoAnualChart({
               wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
               formatter={(value: string) => LEGENDA_FLUXO[value] ?? value}
             />
-            <ReferenceLine y={0} stroke="rgba(255,255,255,0.15)" />
+            <ReferenceLine y={0} stroke="rgba(0,0,0,0.18)" />
             <Bar
               dataKey="rendimento"
               name="rendimento"
@@ -243,18 +243,18 @@ export function RendaCarteiraChart({
       <div className="w-full min-w-0" style={{ height: CHART_HEIGHT, minHeight: CHART_HEIGHT }}>
         <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
           <ComposedChart data={dados} margin={{ top: 16, right: 24, left: 8, bottom: 4 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
             <XAxis
               dataKey="idade"
-              stroke="#5F85B8"
-              tick={{ fill: "#5F85B8", fontSize: 11 }}
+              stroke="rgba(0,0,0,0.35)"
+              tick={{ fill: "var(--text-label)", fontSize: 11 }}
               tickLine={false}
-              axisLine={{ stroke: "rgba(255,255,255,0.04)" }}
+              axisLine={{ stroke: "rgba(0,0,0,0.08)" }}
               interval="preserveStartEnd"
             />
             <YAxis
-              stroke="#5F85B8"
-              tick={{ fill: "#5F85B8", fontSize: 11 }}
+              stroke="rgba(0,0,0,0.35)"
+              tick={{ fill: "var(--text-label)", fontSize: 11 }}
               tickLine={false}
               axisLine={false}
               tickFormatter={formatarMoeda}

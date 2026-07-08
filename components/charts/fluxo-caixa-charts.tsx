@@ -275,12 +275,12 @@ export function GraficoOrcadoVsRealizado({
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
             <XAxis
               dataKey="label"
-              tick={{ fill: "#5F85B8", fontSize: 11 }}
+              tick={{ fill: "var(--text-label)", fontSize: 11 }}
               axisLine={{ stroke: "rgba(0,0,0,0.1)" }}
               tickLine={false}
             />
             <YAxis
-              tick={{ fill: "#5F85B8", fontSize: 10 }}
+              tick={{ fill: "var(--text-label)", fontSize: 10 }}
               tickLine={false}
               axisLine={false}
               tickFormatter={(v) => formatBRL(v).replace("R$", "").trim()}

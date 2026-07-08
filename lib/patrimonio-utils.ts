@@ -32,6 +32,7 @@ export const DESCRICOES_ATIVOS_POR_TIPO: Record<TipoAtivoSlug, string[]> = {
 }
 
 export const SUBCATEGORIAS_LIQUIDO = [
+  { value: "carteira_geral", label: "Carteira geral · sem detalhamento" },
   { value: "pre_fixado", label: "Pré-fixado" },
   { value: "pos_fixado", label: "Pós-fixado (CDI / Selic)" },
   { value: "inflacao", label: "Inflação (IPCA+ / IGPM+)" },

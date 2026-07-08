@@ -61,7 +61,7 @@ export function IndependenciaChart({
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
             <XAxis
               dataKey="idade"
-              tick={{ fill: "#5F85B8", fontSize: 11 }}
+              tick={{ fill: "var(--text-label)", fontSize: 11 }}
               tickLine={false}
               axisLine={{ stroke: "rgba(0,0,0,0.1)" }}
               interval="preserveStartEnd"
@@ -69,7 +69,7 @@ export function IndependenciaChart({
             <YAxis
               yAxisId="left"
               width={AXIS_WIDTH}
-              tick={{ fill: "#5F85B8", fontSize: 10 }}
+              tick={{ fill: "var(--text-label)", fontSize: 10 }}
               tickLine={false}
               axisLine={false}
               tickFormatter={formatarMoeda}

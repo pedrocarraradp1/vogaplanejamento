@@ -50,14 +50,17 @@
   --navy-light: var(--voga-remo);
   --accent: var(--voga-brasilia);
   --accent-light: var(--voga-estrela);
-  --bg-page: var(--voga-branco);
-  --surface: var(--voga-gelo);
-  --surface-1: var(--voga-gelo);
-  --input-bg: var(--voga-prata);
-  --border: var(--voga-prata);
-  --text-primary: var(--voga-concreto);
-  --text-secondary: var(--voga-nota);
-  --text-label: var(--voga-nota);
+
+  /* Neutros do design system (fundos/painéis/tracks) — NÃO são a paleta Voga */
+  --bg-page: #FFFFFF;
+  --surface-1: #F5F5F5;
+  --surface-2: #E8EAEB;
+  --surface: var(--surface-2); /* legado */
+  --input-bg: #D9D9D9;
+  --border: var(--surface-2);
+  --text-primary: #1A1A1A;
+  --text-secondary: #9A9B9B;
+  --text-label: #9A9B9B;
   --text-sidebar: var(--voga-estrela);
   --text-group: var(--voga-credito);
   --green-badge: var(--voga-brasilia);
@@ -71,9 +74,9 @@
   --popover-foreground: var(--text-primary);
   --primary: var(--voga-brasilia);
   --primary-foreground: var(--voga-branco);
-  --secondary: var(--voga-gelo);
+  --secondary: var(--surface-1);
   --secondary-foreground: var(--text-primary);
-  --muted: var(--voga-gelo);
+  --muted: var(--surface-1);
   --muted-foreground: var(--text-label);
   --accent-foreground: var(--voga-branco);
   --destructive: var(--voga-alerta);
