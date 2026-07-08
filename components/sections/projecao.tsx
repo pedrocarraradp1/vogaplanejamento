@@ -218,21 +218,13 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
     return Math.pow(1 + inf, anos)
   }
 
-  const rentabilidadeRealAtualPct = useMemo(() => {
+  const rentabilidadeBrutaPct = Number(premissas.rendimentoBruto) || 0
+  const inflacaoPctPremissas = Number(premissas.inflacao) || 0
+  const rentabilidadeRealEquivalentePct = useMemo(() => {
     const nominalLiquida = (Number(premissas.rendimento) || 0) / 100
-    const inflacaoPct = (Number(premissas.inflacao) || 0) / 100
-    return ((1 + nominalLiquida) / (1 + inflacaoPct) - 1) * 100
-  }, [premissas.rendimento, premissas.inflacao])
-
-  const handleRentabilidadeRealChange = (realPct: number) => {
-    const inflacaoPct = (Number(premissas.inflacao) || 0) / 100
-    const aliq = Number(premissas.aliquotaImpostoRendimento) || 0
-    const nominalLiquida = (1 + realPct / 100) * (1 + inflacaoPct) - 1
-    const fatorLiquido = Math.max(0.0001, 1 - Math.max(0, Math.min(1, aliq)))
-    setPremissas({
-      rendimentoBruto: (nominalLiquida / fatorLiquido) * 100,
-    })
-  }
+    const inflacao = inflacaoPctPremissas / 100
+    return ((1 + nominalLiquida) / (1 + inflacao) - 1) * 100
+  }, [premissas.rendimento, inflacaoPctPremissas])
 
   const taxaNominalAnual = Math.max(0, (Number(premissas.rendimento) || 0) / 100)
   const inflacaoAnual = Math.max(0, (Number(premissas.inflacao) || 0) / 100)
@@ -710,15 +702,17 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
     </div>
   )
 
-  const renderControlesTempoReal = () => (
+  const controlesTempoReal = (
     <ControlesSimulacao
-      rentabilidadeReal={rentabilidadeRealAtualPct}
+      rentabilidadeBruta={rentabilidadeBrutaPct}
+      rentabilidadeRealEquivalente={rentabilidadeRealEquivalentePct}
+      inflacaoPct={inflacaoPctPremissas}
       despesaMensal={Number(dadosPessoais.despesa) || 0}
       aporteMensal={aporteMensal}
       retiradaMensal={Number(premissas.retiradaMensal) || 0}
       idadeAposentadoria={Number(premissas.idadeApos) || 30}
       formatarMoedaCompleta={formatarMoedaCompleta}
-      onRentabilidadeRealChange={handleRentabilidadeRealChange}
+      onRentabilidadeBrutaChange={(valor) => setPremissas({ rendimentoBruto: valor })}
       onDespesaMensalChange={(valor) => setDadosPessoais({ despesa: valor })}
       onRetiradaMensalChange={(valor) => setPremissas({ retiradaMensal: valor })}
       onIdadeAposentadoriaChange={(valor) => setPremissas({ idadeApos: valor })}
@@ -1066,8 +1060,6 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
           {ToggleNominalReal}
         </CardHeader>
         <CardContent className="space-y-6">
-          {renderControlesTempoReal()}
-
           {/* KPIs */}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
             <KpiCardComTooltip
@@ -1180,7 +1172,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
           </div>
 
           {/* Gráfico */}
-          {renderControlesTempoReal()}
+          {controlesTempoReal}
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dadosGrafico} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
