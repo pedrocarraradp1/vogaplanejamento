@@ -1,6 +1,8 @@
-/** Estilos padrão para tooltips do Recharts (tema navy Voga). */
+/** Estilos padrão para tooltips do Recharts (tema Voga). */
+import { VOGA } from "@/lib/voga-tokens"
+
 export const CHART_TOOLTIP_STYLE = {
-  backgroundColor: "#012137",
+  backgroundColor: VOGA.noite,
   border: "none",
   borderRadius: 6,
   padding: 10,
@@ -8,13 +10,13 @@ export const CHART_TOOLTIP_STYLE = {
 } as const
 
 export const CHART_TOOLTIP_LABEL_STYLE = {
-  color: "#C8E2F5",
+  color: VOGA.estrela,
   fontWeight: 600,
   marginBottom: 4,
 } as const
 
 export const CHART_TOOLTIP_ITEM_STYLE = {
-  color: "#ffffff",
+  color: VOGA.branco,
 } as const
 
 /** Props padrão para `<Tooltip />` do Recharts. */

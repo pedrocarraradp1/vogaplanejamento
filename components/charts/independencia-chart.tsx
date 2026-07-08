@@ -11,11 +11,12 @@ import {
   ReferenceLine,
 } from "recharts"
 import { TooltipFlutuante, useTooltipHover } from "@/components/charts/chart-tooltip"
+import { VOGA } from "@/lib/voga-tokens"
 
 const CHART_HEIGHT = 300
-const NAVY = "#1B2A4A"
-const GOLD = "#C9A84C"
-const GREEN = "#10B981"
+const NAVY = VOGA.noite
+const GOLD = VOGA.brasilia
+const GREEN = VOGA.brasilia
 
 export interface PontoIndependencia {
   idade: number
@@ -60,7 +61,7 @@ export function IndependenciaChart({
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
             <XAxis
               dataKey="idade"
-              tick={{ fill: "#6B7280", fontSize: 11 }}
+              tick={{ fill: "#5F85B8", fontSize: 11 }}
               tickLine={false}
               axisLine={{ stroke: "rgba(0,0,0,0.1)" }}
               interval="preserveStartEnd"
@@ -68,7 +69,7 @@ export function IndependenciaChart({
             <YAxis
               yAxisId="left"
               width={AXIS_WIDTH}
-              tick={{ fill: "#6B7280", fontSize: 10 }}
+              tick={{ fill: "#5F85B8", fontSize: 10 }}
               tickLine={false}
               axisLine={false}
               tickFormatter={formatarMoeda}

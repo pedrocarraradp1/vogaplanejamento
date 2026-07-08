@@ -26,15 +26,9 @@ import {
   type DadoRendaGrafico,
 } from "@/lib/projecao-graficos-dados"
 import { formatMoedaSaida } from "@/lib/fluxo-caixa-utils"
+import { CORES_FLUXO_PROJECAO } from "@/lib/voga-tokens"
 
-const CORES_FLUXO = {
-  rendimento: "#378ADD",
-  aporte: "var(--accent)",
-  objetivos: "#BA7517",
-  passivos: "#7C3AED",
-  retirada: "#E24B4A",
-  metaRenda: "#1D9E75",
-} as const
+const CORES_FLUXO = CORES_FLUXO_PROJECAO
 
 const LEGENDA_FLUXO: Record<string, string> = {
   rendimento: "Rendimento",
@@ -108,15 +102,15 @@ export function FluxoAnualChart({
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
             <XAxis
               dataKey="idade"
-              stroke="#4A5268"
-              tick={{ fill: "#4A5268", fontSize: 11 }}
+              stroke="#5F85B8"
+              tick={{ fill: "#5F85B8", fontSize: 11 }}
               tickLine={false}
               axisLine={{ stroke: "rgba(255,255,255,0.04)" }}
               interval="preserveStartEnd"
             />
             <YAxis
-              stroke="#4A5268"
-              tick={{ fill: "#4A5268", fontSize: 11 }}
+              stroke="#5F85B8"
+              tick={{ fill: "#5F85B8", fontSize: 11 }}
               tickLine={false}
               axisLine={false}
               tickFormatter={formatarMoeda}
@@ -125,7 +119,7 @@ export function FluxoAnualChart({
               content={({ active, payload }) => {
                 if (!active || !payload?.length) return null
                 const p = payload[0]?.payload as DadoFluxoGrafico
-                const corLiq = p.fluxoLiquido >= 0 ? "#1D9E75" : "#E24B4A"
+                const corLiq = p.fluxoLiquido >= 0 ? "#1066DA" : "#B33A3A"
                 return (
                   <div style={{ ...CHART_TOOLTIP_STYLE, fontSize: 12, minWidth: 200 }}>
                     <p style={{ ...CHART_TOOLTIP_LABEL_STYLE, margin: 0 }}>
@@ -134,21 +128,21 @@ export function FluxoAnualChart({
                     <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, opacity: 0.85, marginTop: 2 }}>
                       Fase: {p.fase}
                     </p>
-                    <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, marginTop: 8, color: "#7CB9E8" }}>
+                    <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, marginTop: 8, color: "#81ADD4" }}>
                       Rendimento: {formatarMoedaCompleta(p.rendimento)}
                     </p>
                     <p style={CHART_TOOLTIP_ITEM_STYLE}>Aporte: {formatarMoedaCompleta(p.aporte)}</p>
-                    <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, color: "#F5C97A" }}>
+                    <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, color: "#B3DAF8" }}>
                       Objetivos: {formatMoedaSaida(formatarMoedaCompleta, p.objetivos)}
                     </p>
-                    <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, color: "#C4B5FD" }}>
+                    <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, color: "#81ADD4" }}>
                       Passivos: {formatMoedaSaida(formatarMoedaCompleta, p.passivos)}
                     </p>
-                    <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, color: "#F5A5A4" }}>
+                    <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, color: "#B33A3A" }}>
                       Retirada: {formatMoedaSaida(formatarMoedaCompleta, p.retirada)}
                     </p>
                     {!hideMetaRenda ? (
-                      <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, color: "#7FE0B8" }}>
+                      <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, color: "#81ADD4" }}>
                         Meta renda (ref.): {formatarMoedaCompleta(p.metaRenda)}
                       </p>
                     ) : null}
@@ -211,7 +205,7 @@ export function FluxoAnualChart({
                 label={{
                   value: formatarMoedaCompleta(primeiroAno.fluxoLiquido),
                   position: primeiroAno.fluxoLiquido >= 0 ? "top" : "bottom",
-                  fill: primeiroAno.fluxoLiquido >= 0 ? "#1D9E75" : "#E24B4A",
+                  fill: primeiroAno.fluxoLiquido >= 0 ? "#1066DA" : "#B33A3A",
                   fontSize: 11,
                   fontWeight: 600,
                 }}
@@ -252,15 +246,15 @@ export function RendaCarteiraChart({
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
             <XAxis
               dataKey="idade"
-              stroke="#4A5268"
-              tick={{ fill: "#4A5268", fontSize: 11 }}
+              stroke="#5F85B8"
+              tick={{ fill: "#5F85B8", fontSize: 11 }}
               tickLine={false}
               axisLine={{ stroke: "rgba(255,255,255,0.04)" }}
               interval="preserveStartEnd"
             />
             <YAxis
-              stroke="#4A5268"
-              tick={{ fill: "#4A5268", fontSize: 11 }}
+              stroke="#5F85B8"
+              tick={{ fill: "#5F85B8", fontSize: 11 }}
               tickLine={false}
               axisLine={false}
               tickFormatter={formatarMoeda}
@@ -269,7 +263,7 @@ export function RendaCarteiraChart({
               <ReferenceArea
                 x1={areaIndependencia.x1}
                 x2={areaIndependencia.x2}
-                fill="rgba(34,199,135,0.08)"
+                fill="rgba(16,102,218,0.08)"
                 strokeOpacity={0}
               />
             )}
@@ -278,7 +272,7 @@ export function RendaCarteiraChart({
                 if (!active || !payload?.length) return null
                 const p = payload[0]?.payload as DadoRendaGrafico
                 const status = p.acimaMeta ? "Acima da meta" : "Abaixo da meta"
-                const corStatus = p.acimaMeta ? "#22C787" : "#EF4444"
+                const corStatus = p.acimaMeta ? "#1066DA" : "#B33A3A"
                 return (
                   <div style={{ ...CHART_TOOLTIP_STYLE, fontSize: 12 }}>
                     <p style={{ ...CHART_TOOLTIP_LABEL_STYLE, margin: 0 }}>Idade {p.idade}</p>
@@ -327,7 +321,7 @@ export function RendaCarteiraChart({
                   type="monotone"
                   dataKey="rendaPoderCompra"
                   name="Poder de compra (hoje)"
-                  stroke="#4A9EFF"
+                  stroke="#1066DA"
                   strokeWidth={2}
                   strokeDasharray="6 4"
                   dot={false}
@@ -349,7 +343,7 @@ export function RendaCarteiraChart({
               type="monotone"
               dataKey="meta"
               name="Meta aposentadoria"
-              stroke="#EF4444"
+              stroke="#B33A3A"
               strokeWidth={1.5}
               strokeDasharray="4 4"
               dot={false}

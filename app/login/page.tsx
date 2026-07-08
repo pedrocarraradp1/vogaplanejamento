@@ -163,7 +163,7 @@ export default function LoginPage() {
               />
             </div>
             {success ? (
-              <p className="text-sm text-[#22C787]" role="status">
+              <p className="text-sm text-[#1066DA]" role="status">
                 {success}
               </p>
             ) : null}

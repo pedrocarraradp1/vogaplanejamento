@@ -1,12 +1,21 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter } from 'next/font/google'
+import { Montserrat, Overpass } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from '@/components/ui/toaster'
 import './globals.css'
 
-const inter = Inter({ 
-  subsets: ["latin"],
-  variable: '--font-inter'
+const montserrat = Montserrat({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-montserrat',
+  display: 'swap',
+})
+
+const overpass = Overpass({
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  variable: '--font-overpass',
+  display: 'swap',
 })
 
 export const metadata: Metadata = {
@@ -33,7 +42,7 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: '#012137',
+  themeColor: '#01121E',
 }
 
 export default function RootLayout({
@@ -42,8 +51,8 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="pt-BR">
-      <body className={`${inter.variable} font-sans antialiased`}>
+    <html lang="pt-BR" className={`${montserrat.variable} ${overpass.variable}`}>
+      <body className="font-sans antialiased">
         {children}
         <Toaster />
         {process.env.NODE_ENV === 'production' && <Analytics />}

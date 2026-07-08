@@ -31,6 +31,7 @@ import {
 } from "lucide-react"
 import { usePlano, type Objetivo } from "@/lib/plano-context"
 import { GraficoCapitalPorAno } from "@/components/charts/objetivos-charts"
+import { VOGA, VOGA_CHART_SCALE } from "@/lib/voga-tokens"
 
 interface ObjetivosProps {
   onNavigate: (section: string) => void
@@ -54,17 +55,18 @@ const OBJETIVOS_PREDEFINIDOS = [
 
 type CategoriaObjetivo = "aposentadoria" | "viagem" | "educacao" | "imovel" | "outros"
 
-const VOGA_NAVY = "#1B2A4A"
-const VOGA_GOLD = "#C9A84C"
-const VOGA_GOLD_LIGHT = "#FAF0DA"
-const VOGA_GOLD_DARK = "#8A6E35"
+const VOGA_NAVY = VOGA.noite
+const VOGA_GOLD = VOGA.brasilia
+const VOGA_GOLD_LIGHT = VOGA.estrela
+const VOGA_GOLD_DARK = VOGA.nota
 
 const PALETA_OBJETIVOS = [
-  { fill: "#0F6E56", bg: "#E1F5EE", text: "#085041" },
-  { fill: "#993C1D", bg: "#FAECE7", text: "#712B13" },
-  { fill: "#C9A84C", bg: "#FAF0DA", text: "#8A6E35" },
-  { fill: "#185FA5", bg: "#E6F1FB", text: "#0C447C" },
-  { fill: "#534AB7", bg: "#EEEDFE", text: "#3C3489" },
+  { fill: VOGA_CHART_SCALE[0], bg: VOGA.gelo, text: VOGA.noite },
+  { fill: VOGA_CHART_SCALE[1], bg: VOGA.estrela, text: VOGA.noite },
+  { fill: VOGA_CHART_SCALE[2], bg: VOGA.moeda, text: VOGA.noite },
+  { fill: VOGA_CHART_SCALE[3], bg: VOGA.verdeQuadrado, text: VOGA.noite },
+  { fill: VOGA_CHART_SCALE[4], bg: VOGA.amareloExplanada, text: VOGA.noite },
+  { fill: VOGA_CHART_SCALE[5], bg: VOGA.gelo, text: VOGA.noite },
 ] as const
 
 type CorObjetivo = (typeof PALETA_OBJETIVOS)[number]
@@ -238,12 +240,12 @@ function CardRow({ label, value }: { label: string; value: string }) {
         borderBottom: "0.5px solid rgba(0,0,0,0.08)",
       }}
     >
-      <span style={{ fontSize: 13, color: "#6B7280" }}>{label}</span>
+      <span style={{ fontSize: 13, color: "#5F85B8" }}>{label}</span>
       <span
         style={{
           fontSize: 13,
           fontWeight: 600,
-          color: "#1A1A1A",
+          color: "#393939",
           textAlign: "right",
         }}
       >
@@ -629,7 +631,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                     ))}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <label style={{ fontSize: 12, color: "#6B7280" }}>De</label>
+                    <label style={{ fontSize: 12, color: "#5F85B8" }}>De</label>
                     <Input
                       type="number"
                       min={anoCorrente}
@@ -638,7 +640,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                       onChange={(e) => handlePeriodoInicioChange(e.target.value)}
                       className="h-8 w-[88px] text-sm bg-white"
                     />
-                    <label style={{ fontSize: 12, color: "#6B7280" }}>até</label>
+                    <label style={{ fontSize: 12, color: "#5F85B8" }}>até</label>
                     <Input
                       type="number"
                       min={periodoInicio}
@@ -685,7 +687,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                         <span
                           style={{
                             fontSize: 11,
-                            color: "#4B5563",
+                            color: "#393939",
                             overflow: "hidden",
                             textOverflow: "ellipsis",
                             whiteSpace: "nowrap",
@@ -730,7 +732,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                       style={{
                         margin: 0,
                         fontSize: 11,
-                        color: "#6B7280",
+                        color: "#5F85B8",
                         lineHeight: 1.3,
                       }}
                     >
@@ -741,7 +743,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                         margin: "6px 0 0",
                         fontSize: 18,
                         fontWeight: 700,
-                        color: "#1A1A1A",
+                        color: "#393939",
                         fontVariantNumeric: "tabular-nums",
                         lineHeight: 1.2,
                       }}
@@ -765,7 +767,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                     padding: "14px 16px",
                     borderRadius: 10,
                     background: "#FEF3C7",
-                    border: "1px solid #F59E0B",
+                    border: "1px solid #173C6E",
                   }}
                 >
                   <AlertTriangle
@@ -870,7 +872,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                               margin: 0,
                               fontSize: 13,
                               fontWeight: 600,
-                              color: "#1A1A1A",
+                              color: "#393939",
                               lineHeight: 1.35,
                             }}
                           >
@@ -956,7 +958,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                             margin: "0 0 10px",
                             fontSize: 11,
                             fontWeight: 600,
-                            color: "#6B7280",
+                            color: "#5F85B8",
                             letterSpacing: "0.04em",
                           }}
                         >
@@ -1002,12 +1004,12 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                                       margin: 0,
                                       fontSize: 13,
                                       fontWeight: 600,
-                                      color: "#1A1A1A",
+                                      color: "#393939",
                                     }}
                                   >
                                     {(o.descricao || "Objetivo").trim()}
                                   </p>
-                                  <p style={{ margin: "2px 0 0", fontSize: 12, color: "#6B7280" }}>
+                                  <p style={{ margin: "2px 0 0", fontSize: 12, color: "#5F85B8" }}>
                                     {subtitulo}
                                   </p>
                                 </div>
@@ -1015,7 +1017,7 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                                   style={{
                                     fontSize: 13,
                                     fontWeight: 600,
-                                    color: "#1A1A1A",
+                                    color: "#393939",
                                     flexShrink: 0,
                                     fontVariantNumeric: "tabular-nums",
                                   }}

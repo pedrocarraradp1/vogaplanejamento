@@ -89,7 +89,7 @@ export function GraficoRealizadoMensal({
                 top: tick.y,
                 transform: "translateY(-50%)",
                 fontSize: 9,
-                color: "#6B7280",
+                color: "#5F85B8",
                 fontVariantNumeric: "tabular-nums",
                 whiteSpace: "nowrap",
               }}
@@ -106,7 +106,7 @@ export function GraficoRealizadoMensal({
                 top: tick.y,
                 transform: "translateY(-50%)",
                 fontSize: 9,
-                color: "#6B7280",
+                color: "#5F85B8",
                 fontVariantNumeric: "tabular-nums",
                 whiteSpace: "nowrap",
               }}
@@ -226,7 +226,7 @@ export function GraficoRealizadoMensal({
               flex: 1,
               textAlign: "center",
               fontSize: 11,
-              color: "#6B7280",
+              color: "#5F85B8",
             }}
           >
             {d.label}
@@ -275,12 +275,12 @@ export function GraficoOrcadoVsRealizado({
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
             <XAxis
               dataKey="label"
-              tick={{ fill: "#6B7280", fontSize: 11 }}
+              tick={{ fill: "#5F85B8", fontSize: 11 }}
               axisLine={{ stroke: "rgba(0,0,0,0.1)" }}
               tickLine={false}
             />
             <YAxis
-              tick={{ fill: "#6B7280", fontSize: 10 }}
+              tick={{ fill: "#5F85B8", fontSize: 10 }}
               tickLine={false}
               axisLine={false}
               tickFormatter={(v) => formatBRL(v).replace("R$", "").trim()}
@@ -384,7 +384,7 @@ export function LegendaFluxo({ itens }: { itens: CategoriaLegenda[] }) {
               flexShrink: 0,
             }}
           />
-          <span style={{ fontSize: 11, color: "#4B5563" }}>{item.label}</span>
+          <span style={{ fontSize: 11, color: "#393939" }}>{item.label}</span>
         </div>
       ))}
     </div>

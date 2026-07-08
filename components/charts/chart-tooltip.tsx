@@ -48,14 +48,14 @@ export function TooltipFlutuante({
           margin: 0,
           fontSize: 16,
           fontWeight: 700,
-          color: "#1A1A1A",
+          color: "#393939",
           fontVariantNumeric: "tabular-nums",
           textAlign: "center",
         }}
       >
         {titulo}
       </p>
-      <p style={{ margin: "4px 0 0", fontSize: 11, color: "#6B7280", textAlign: "center" }}>{subtitulo}</p>
+      <p style={{ margin: "4px 0 0", fontSize: 11, color: "#5F85B8", textAlign: "center" }}>{subtitulo}</p>
       {detalhes && detalhes.length > 0 ? (
         <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 5 }}>
           {detalhes.map((item) => (
@@ -93,7 +93,7 @@ export function TooltipFlutuante({
               <span
                 style={{
                   fontWeight: 600,
-                  color: item.valorColor ?? "#1A1A1A",
+                  color: item.valorColor ?? "#393939",
                   flexShrink: 0,
                   fontVariantNumeric: "tabular-nums",
                 }}

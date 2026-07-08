@@ -491,7 +491,7 @@ export function FluxoDeCaixa({ onNavigate }: FluxoDeCaixaProps) {
               ))}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <label style={{ fontSize: 12, color: "#6B7280" }}>De</label>
+              <label style={{ fontSize: 12, color: "#5F85B8" }}>De</label>
               <Input
                 type="number"
                 min={anoCorrente}
@@ -505,7 +505,7 @@ export function FluxoDeCaixa({ onNavigate }: FluxoDeCaixaProps) {
                 }}
                 className="h-8 w-[88px] text-sm bg-white"
               />
-              <label style={{ fontSize: 12, color: "#6B7280" }}>até</label>
+              <label style={{ fontSize: 12, color: "#5F85B8" }}>até</label>
               <Input
                 type="number"
                 min={periodoInicio}

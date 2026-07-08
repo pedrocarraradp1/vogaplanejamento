@@ -467,6 +467,56 @@ export function calcularProjecao(
   return resultado
 }
 
+/** Rendas de referência para as 3 estratégias de retirada (perpetuidade e anuidade). */
+export function calcularRendasReferenciaEstrategia(
+  patrimonioRealInicio: number,
+  taxaNominalAnualPct: number,
+  inflacaoAnualPct: number,
+  horizonteAnos: number,
+  idadeApos: number,
+  objetivos: Objetivo[] = [],
+  opts: RendaGeradaOptions = {},
+): { rendaGeradaMensal: number; rendaSustentavelMensal: number; taxaReal: number } {
+  const r = Math.max(0, taxaNominalAnualPct) / 100
+  const inf = Math.max(0, inflacaoAnualPct) / 100
+  const taxaReal = (1 + r) / (1 + inf) - 1
+  const objEq = totalObjetivosEternosAnuais(objetivos, taxaReal)
+  const horizonte = horizonteRendaSustentavelAnos(idadeApos, idadeApos, horizonteAnos)
+  const rendaGeradaMensal = rendaMensalGeradaReal(patrimonioRealInicio, r, inf, {
+    objetivosAnuaisReal: objEq,
+    ...opts,
+  })
+  const rendaSustentavelMensal = pmtDeAnuidade(patrimonioRealInicio, taxaReal, horizonte) / 12
+  return { rendaGeradaMensal, rendaSustentavelMensal, taxaReal }
+}
+
+/**
+ * Projeção completa com retirada mensal desejada (poder de compra de hoje),
+ * fatiada do início da aposentadoria até o fim do horizonte.
+ * Reutiliza `calcularProjecao` — mesma lógica da Simulação em tempo real.
+ */
+export function projecaoEstrategiaRetirada(
+  premissas: Premissas,
+  objetivos: Objetivo[],
+  passivos: Passivo[] = [],
+  retiradaMensalRealHoje: number,
+  displayMode: DisplayModeProjecao = "nominal",
+): ProjecaoAno[] {
+  const idadeApos = Number(premissas.idadeApos) || 0
+  const horizonte = Math.max(1, Number(premissas.horizonteAposentadoria) || 35)
+  const rendaApos = Number(premissas.rendaAposentadoria) || 0
+  const proj = calcularProjecao(
+    {
+      ...premissas,
+      retiradaMensal: Math.max(0, retiradaMensalRealHoje) + rendaApos,
+    },
+    objetivos,
+    passivos,
+    displayMode,
+  )
+  return proj.filter((p) => p.idade >= idadeApos && p.idade <= idadeApos + horizonte)
+}
+
 // ─── Fluxo anual (gráficos de projeção) ───────────────────────────────────────
 
 export interface FluxoAnualRow {

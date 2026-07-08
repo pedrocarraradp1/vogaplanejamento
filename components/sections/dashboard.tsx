@@ -457,8 +457,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
   const kpiStyle = (cor: string) => ({
     blue:    { bg: "bg-[rgba(30,92,230,0.08)]",  border: "border-primary/30",             valor: "text-primary"  },
-    green:   { bg: "bg-[rgba(34,199,135,0.08)]", border: "border-[#22C787]/30",             valor: "text-[#22C787]"  },
-    yellow:  { bg: "bg-secondary",               border: "border-border", valor: "text-[#F5A623]"  },
+    green:   { bg: "bg-[rgba(16,102,218,0.08)]", border: "border-[#1066DA]/30",             valor: "text-[#1066DA]"  },
+    yellow:  { bg: "bg-secondary",               border: "border-border", valor: "text-[#1066DA]"  },
     neutral: { bg: "bg-secondary",               border: "border-border", valor: "text-foreground" },
   }[cor] ?? { bg: "bg-secondary", border: "border-border", valor: "text-foreground" })
 
@@ -655,14 +655,14 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
                 <XAxis
                   dataKey="idade"
-                  stroke="#4A5268"
-                  tick={{ fill: "#4A5268", fontSize: 12 }}
+                  stroke="#5F85B8"
+                  tick={{ fill: "#5F85B8", fontSize: 12 }}
                   tickLine={false}
                   axisLine={{ stroke: "rgba(255,255,255,0.04)" }}
                   interval="preserveStartEnd"
                   tickCount={15}
                 />
-                <YAxis stroke="#4A5268" tick={{ fill: "#4A5268", fontSize: 12 }} tickLine={false} axisLine={false} tickFormatter={fmt} />
+                <YAxis stroke="#5F85B8" tick={{ fill: "#5F85B8", fontSize: 12 }} tickLine={false} axisLine={false} tickFormatter={fmt} />
                 <Tooltip
                   {...CHART_TOOLTIP_PROPS}
                   formatter={(value: number, _name: string, props: any) => {
@@ -691,8 +691,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                   }}
                   labelFormatter={l => `Idade: ${l} anos`}
                 />
-                <ReferenceLine x={premissas.idadeApos} stroke="#F5A623" strokeDasharray="5 5"
-                  label={{ value: "Aposentadoria", position: "top", fill: "#F5A623", fontSize: 12 }} />
+                <ReferenceLine x={premissas.idadeApos} stroke="#1066DA" strokeDasharray="5 5"
+                  label={{ value: "Aposentadoria", position: "top", fill: "#1066DA", fontSize: 12 }} />
                 <Bar dataKey="valor" radius={[2, 2, 0, 0]}>
                   {dadosGraficoPatrimonio.map((entry: any, i: number) => (
                     <Cell key={`cell-${i}`} fill={entry.valor >= 0 ? "rgba(30,92,230,0.45)" : "rgba(240,75,75,0.35)"} />
@@ -802,7 +802,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 </div>
                 <div className="flex justify-between gap-4 py-3">
                   <span className="text-sm text-muted-foreground">Custo Total Previsto</span>
-                  <span className="text-sm font-bold text-[#EF4444] text-right tabular-nums">{fmtFull(inventario.custoTotal)}</span>
+                  <span className="text-sm font-bold text-[#B33A3A] text-right tabular-nums">{fmtFull(inventario.custoTotal)}</span>
                 </div>
                 <div className="pt-1">
                   <span className="inline-flex rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground">
@@ -847,11 +847,11 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 {projecaoDetalhada.map(row => (
                   <tr key={row.idade} className="border-b border-border hover:bg-[rgba(255,255,255,0.02)]">
                     <td className="py-3 px-4"><span className="text-lg font-semibold text-foreground">{row.idade}</span></td>
-                    <td className={`py-3 px-4 text-right text-sm font-medium ${row.saldoNominal >= 0 ? "text-[#22C787]" : "text-[#EF4444]"}`}>{fmtFull(row.saldoNominal)}</td>
-                    <td className={`py-3 px-4 text-right text-sm font-medium ${row.saldoReal >= 0 ? "text-[#22C787]" : "text-[#EF4444]"}`}>{fmtFull(row.saldoReal)}</td>
+                    <td className={`py-3 px-4 text-right text-sm font-medium ${row.saldoNominal >= 0 ? "text-[#1066DA]" : "text-[#B33A3A]"}`}>{fmtFull(row.saldoNominal)}</td>
+                    <td className={`py-3 px-4 text-right text-sm font-medium ${row.saldoReal >= 0 ? "text-[#1066DA]" : "text-[#B33A3A]"}`}>{fmtFull(row.saldoReal)}</td>
                     <td className="py-3 px-4 text-right text-sm text-muted-foreground">{row.rendaMensalReal > 0 ? fmtFull(row.rendaMensalReal) : "—"}</td>
                     <td className="py-3 px-4 text-center">
-                      <span className={`px-3 py-1 text-xs font-medium rounded-full ${row.isAposentado ? "bg-[#F5A623]/20 text-[#F5A623]" : "bg-[#22C787]/20 text-[#22C787]"}`}>
+                      <span className={`px-3 py-1 text-xs font-medium rounded-full ${row.isAposentado ? "bg-[#1066DA]/20 text-[#1066DA]" : "bg-[#1066DA]/20 text-[#1066DA]"}`}>
                         {row.isAposentado ? "Aposentadoria" : "Acumulação"}
                       </span>
                     </td>

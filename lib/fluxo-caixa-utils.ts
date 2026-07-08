@@ -1,4 +1,5 @@
 import type { DadoFluxoGrafico } from "@/lib/projecao-graficos-dados"
+import { CORES_FLUXO_CAIXA as CORES_FLUXO_CAIXA_VOGA, VOGA } from "@/lib/voga-tokens"
 
 export interface FluxoMesRealizado {
   rentabilidade: number
@@ -22,32 +23,9 @@ export const MESES_LABELS_COMPLETOS = [
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
 ] as const
 
-/** Paleta oficial Voga — hex exatos para Fluxo de Caixa */
-export const VOGA_PALETA = {
-  navy: "#1B2A4A",
-  dourado: "#C9A84C",
-  verde: "#10B981",
-  vermelho: "#EF4444",
-  laranja: "#F97316",
-  cinza: "#64748B",
-  diffVerde: "#065f46",
-  diffVermelho: "#991B1B",
-} as const
-
-export const CORES_FLUXO_CAIXA = {
-  rentabilidade: VOGA_PALETA.dourado,
-  receita: VOGA_PALETA.verde,
-  despesa: VOGA_PALETA.vermelho,
-  saldoAcumulado: VOGA_PALETA.navy,
-  orcado: VOGA_PALETA.navy,
-  realizado: VOGA_PALETA.verde,
-  aportes: VOGA_PALETA.verde,
-  passivos: VOGA_PALETA.vermelho,
-  objetivos: VOGA_PALETA.laranja,
-  outros: VOGA_PALETA.cinza,
-  diffPositiva: VOGA_PALETA.diffVerde,
-  diffNegativa: VOGA_PALETA.diffVermelho,
-} as const
+/** Paleta oficial Voga — reexportada de voga-tokens */
+export const VOGA_PALETA = VOGA
+export { CORES_FLUXO_CAIXA_VOGA as CORES_FLUXO_CAIXA }
 
 export function mesVazio(): FluxoMesRealizado {
   return { rentabilidade: 0, receita: 0, despesa: 0 }

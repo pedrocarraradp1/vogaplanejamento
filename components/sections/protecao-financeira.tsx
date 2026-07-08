@@ -101,9 +101,9 @@ function BeneficioFiscalPrevidenciaCard() {
             </div>
           </div>
 
-        <div className="bg-[rgba(34,199,135,0.10)] border border-[#22C787]/30 rounded-xl p-5">
-          <p className="text-xs font-medium text-[#22C787] uppercase tracking-wide mb-2">ECONOMIA FISCAL ESTIMADA</p>
-          <p className="text-3xl font-bold text-[#22C787]">{fmtFull(calcs.economia)}</p>
+        <div className="bg-[rgba(16,102,218,0.10)] border border-[#1066DA]/30 rounded-xl p-5">
+          <p className="text-xs font-medium text-[#1066DA] uppercase tracking-wide mb-2">ECONOMIA FISCAL ESTIMADA</p>
+          <p className="text-3xl font-bold text-[#1066DA]">{fmtFull(calcs.economia)}</p>
           <p className="text-xs text-muted-foreground mt-1">
             Equivalente a {calcs.economiaPctRenda.toFixed(1).replace(".", ",")}% da renda bruta anual
           </p>
@@ -124,8 +124,8 @@ function BeneficioFiscalPrevidenciaCard() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-[#22C787]/30 bg-secondary p-5">
-            <p className="text-xs font-semibold text-[#22C787] uppercase tracking-wide mb-4">COM PGBL</p>
+          <div className="rounded-xl border border-[#1066DA]/30 bg-secondary p-5">
+            <p className="text-xs font-semibold text-[#1066DA] uppercase tracking-wide mb-4">COM PGBL</p>
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-4">
                 <span className="text-sm text-muted-foreground">Base de Cálculo</span>
@@ -133,7 +133,7 @@ function BeneficioFiscalPrevidenciaCard() {
               </div>
               <div className="flex items-center justify-between gap-4">
                 <span className="text-sm text-muted-foreground">Imposto Devido 27,5%</span>
-                <span className="text-sm font-semibold text-[#22C787] tabular-nums">{fmtFull(calcs.irCom)}</span>
+                <span className="text-sm font-semibold text-[#1066DA] tabular-nums">{fmtFull(calcs.irCom)}</span>
               </div>
             </div>
           </div>
@@ -152,7 +152,7 @@ function BeneficioFiscalPrevidenciaCard() {
               "Planejamento Sucessório: Previdência privada não entra em inventário",
             ].map((t) => (
               <li key={t} className="flex items-start gap-2">
-                <CheckCircle className="w-4 h-4 text-[#22C787] mt-0.5 flex-shrink-0" />
+                <CheckCircle className="w-4 h-4 text-[#1066DA] mt-0.5 flex-shrink-0" />
                 <span>{t}</span>
               </li>
             ))}
@@ -329,7 +329,7 @@ export function ProtecaoFinanceira({ onNavigate }: ProtecaoFinanceiraProps) {
               <Bar dataKey="value" radius={[0, 4, 4, 0]} name="Patrimônio Final">
                 {chartData.map((entry, index) => (
                   <Cell key={`cell-${index}`}
-                    fill={index === 0 ? "rgba(34,199,135,0.3)" : entry.value >= 0 ? "var(--accent)" : "#EF4444"} />
+                    fill={index === 0 ? "rgba(16,102,218,0.3)" : entry.value >= 0 ? "var(--accent)" : "#B33A3A"} />
                 ))}
               </Bar>
             </BarChart>

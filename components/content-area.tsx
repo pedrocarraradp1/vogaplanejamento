@@ -7,6 +7,7 @@ import { FluxoDeCaixa } from "./sections/fluxo-de-caixa"
 import { DiagnosticoFinanceiro } from "./sections/diagnostico-financeiro"
 import { Projecao } from "./sections/projecao"
 import { Cenarios } from "./sections/cenarios"
+import { PlanoFinanceiroCompleto } from "./sections/plano-financeiro-completo"
 import { Sucessorio } from "./sections/sucessorio"
 import { ProtecaoFinanceira } from "./sections/protecao-financeira"
 import { SimuladorSeguros } from "./sections/simulador-seguros"
@@ -36,6 +37,8 @@ export function ContentArea({ activeSection, onNavigate }: ContentAreaProps) {
         return <Projecao onNavigate={onNavigate} />
       case "cenarios":
         return <Cenarios onNavigate={onNavigate} />
+      case "plano-financeiro-completo":
+        return <PlanoFinanceiroCompleto onNavigate={onNavigate} />
       case "sucessorio":
         return <Sucessorio onNavigate={onNavigate} />
       case "protecao":

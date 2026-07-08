@@ -25,15 +25,16 @@ import {
   totalObjetivosEternosAnuais,
   type ProjecaoAno,
 } from "@/lib/engine"
+import { VOGA } from "@/lib/voga-tokens"
 import { buildDadosFluxoGrafico, buildDadosRendaGrafico } from "@/lib/projecao-graficos-dados"
 import { CHART_TOOLTIP_PROPS } from "@/lib/chart-tooltip"
 import { CenariosInvestimento } from "@/components/ui/cenarios-investimento"
 import { FluxoAnualChart, RendaCarteiraChart } from "@/components/charts/projecao-extra-charts"
 import { IndependenciaChart, type PontoIndependencia } from "@/components/charts/independencia-chart"
 
-const GOLD = "#C9A84C"
-const GREEN = "#10B981"
-const RED = "#EF4444"
+const GOLD = VOGA.brasilia
+const GREEN = VOGA.brasilia
+const RED = VOGA.alerta
 
 interface ProjecaoProps {
   onNavigate: (section: string) => void
@@ -299,6 +300,31 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
     idadeAtualCalculada,
     objetivosEternosAnuais,
   ])
+
+  const pontoAposentadoria = useMemo(() => {
+    return (
+      dadosGrafico.find((d) => d.idade === (Number(premissas.idadeApos) || 0)) ??
+      dadosGrafico[dadosGrafico.length - 1]
+    )
+  }, [dadosGrafico, premissas.idadeApos])
+
+  const rendaGeradaApos = useMemo(() => {
+    if (!pontoAposentadoria) return 0
+    return displayMode === "nominal"
+      ? Number(pontoAposentadoria.rendaGeradaNominal) || 0
+      : Number(pontoAposentadoria.rendaGeradaReal) || 0
+  }, [pontoAposentadoria, displayMode])
+
+  const rendaConsumoApos = useMemo(() => {
+    if (!pontoAposentadoria) return { valor: 0, valorHoje: 0 }
+    return {
+      valor:
+        displayMode === "nominal"
+          ? Number(pontoAposentadoria.rendaSustentavelNominal) || 0
+          : Number(pontoAposentadoria.rendaSustentavelReal) || 0,
+      valorHoje: Number(pontoAposentadoria.rendaSustentavelReal) || 0,
+    }
+  }, [pontoAposentadoria, displayMode])
 
   // ── Independência financeira (anuidade, sem taxa de retirada fixa) ─────────
   const anoBase = new Date().getFullYear()
@@ -763,7 +789,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
         </CardHeader>
         <CardContent className="space-y-6">
           {/* KPIs */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
             <div className="bg-[rgba(30,92,230,0.08)] border border-primary/30 rounded-xl p-4">
               <div className="flex items-start justify-between">
                 <div>
@@ -774,47 +800,44 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
                 <TrendingUp className="w-5 h-5 text-primary" />
               </div>
             </div>
-            <div className="bg-[rgba(34,199,135,0.08)] border border-[#22C787]/30 rounded-xl p-4">
+            <div className="bg-[rgba(16,102,218,0.08)] border border-[#1066DA]/30 rounded-xl p-4">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="field-label">Renda Mensal Sustentável</p>
-                  {(() => {
-                    // Mesma fonte do tooltip: ponto da série na idade de aposentadoria.
-                    const pontoApos =
-                      dadosGrafico.find((d) => d.idade === (Number(premissas.idadeApos) || 0)) ??
-                      dadosGrafico[dadosGrafico.length - 1]
-                    const rendaSustRealApos = Number(pontoApos?.rendaSustentavelReal) || 0
-                    const rendaSustNominalApos = Number(pontoApos?.rendaSustentavelNominal) || 0
-
-                    if (displayMode === "nominal") {
-                      return (
-                        <>
-                          <p className="text-2xl font-bold text-[#22C787] mt-1">{formatarMoedaCompleta(rendaSustNominalApos)}</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            ({formatarMoedaCompleta(rendaSustRealApos)} hoje · anuidade por {horizonte} anos)
-                          </p>
-                        </>
-                      )
-                    }
-
-                    return (
-                      <>
-                        <p className="text-2xl font-bold text-[#22C787] mt-1">{formatarMoedaCompleta(rendaSustRealApos)}</p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Anuidade por {horizonte} anos
-                        </p>
-                      </>
-                    )
-                  })()}
+                  <p className="field-label font-semibold text-foreground">Renda mensal gerada</p>
+                  <p className="text-2xl font-bold text-[#1066DA] mt-1">{formatarMoedaCompleta(rendaGeradaApos)}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Perpetuidade {displayMode === "nominal" ? `· (${formatarMoedaCompleta(Number(pontoAposentadoria?.rendaGeradaReal) || 0)} hoje)` : ""}
+                  </p>
                 </div>
-                <DollarSign className="w-5 h-5 text-[#22C787]" />
+                <DollarSign className="w-5 h-5 text-[#1066DA]" />
+              </div>
+            </div>
+            <div className="bg-[rgba(75,117,155,0.10)] border border-[var(--voga-nuvem)]/30 rounded-xl p-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="field-label font-semibold text-foreground">Renda de consumo do patrimônio</p>
+                  <p className="text-2xl font-bold mt-1" style={{ color: "var(--voga-nuvem)" }}>
+                    {formatarMoedaCompleta(rendaConsumoApos.valor)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {displayMode === "nominal"
+                      ? `(${formatarMoedaCompleta(rendaConsumoApos.valorHoje)} hoje · anuidade por ${horizonte} anos)`
+                      : `Zera aos ${(Number(premissas.idadeApos) || 0) + horizonte} anos`}
+                  </p>
+                  {displayMode === "nominal" && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Zera aos {(Number(premissas.idadeApos) || 0) + horizonte} anos
+                    </p>
+                  )}
+                </div>
+                <DollarSign className="w-5 h-5" style={{ color: "var(--voga-nuvem)" }} />
               </div>
             </div>
             <div className="bg-secondary border border-border rounded-xl p-4">
               <div className="flex items-start justify-between">
                 <div>
                   <p className="field-label">Liberdade Financeira</p>
-                  <p className="text-2xl font-bold text-[#F5A623] mt-1">
+                  <p className="text-2xl font-bold text-[#1066DA] mt-1">
                     {kpis.idadeLF ? `${kpis.idadeLF} anos` : "—"}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -828,9 +851,28 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
                     </p>
                   </div>
                 </div>
-                <Clock className="w-5 h-5 text-[#F5A623]" />
+                <Clock className="w-5 h-5 text-[#1066DA]" />
               </div>
             </div>
+          </div>
+
+          <div
+            className="rounded-xl"
+            style={{
+              background: "var(--surface-1)",
+              padding: "12px 16px",
+              color: "var(--text-secondary)",
+              fontSize: "12px",
+              fontFamily: "var(--font-body)",
+            }}
+          >
+            <span style={{ color: "var(--text-primary)", fontWeight: 700 }}>
+              Renda de consumo do patrimônio
+            </span>{" "}
+            e o valor mensal que, se retirado todo mês pelo restante do horizonte simulado, esgota exatamente o
+            patrimônio no último ano da simulação - diferente da renda mensal gerada, que preserva o patrimônio
+            para sempre. É uma renda maior, mas o principal se consome ao longo do caminho, não sobra herança nem
+            reserva além do horizonte considerado.
           </div>
 
           {/* Gráfico */}
@@ -838,10 +880,10 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dadosGrafico} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
-                <XAxis dataKey="idade" stroke="#4A5268"
-                  tick={{ fill: "#4A5268", fontSize: 12 }} tickLine={false}
+                <XAxis dataKey="idade" stroke="#5F85B8"
+                  tick={{ fill: "#5F85B8", fontSize: 12 }} tickLine={false}
                   axisLine={{ stroke: "rgba(255,255,255,0.04)" }} interval="preserveStartEnd" />
-                <YAxis stroke="#4A5268" tick={{ fill: "#4A5268", fontSize: 12 }}
+                <YAxis stroke="#5F85B8" tick={{ fill: "#5F85B8", fontSize: 12 }}
                   tickLine={false} axisLine={false} tickFormatter={formatarMoeda} />
                 <Tooltip
                   {...CHART_TOOLTIP_PROPS}
@@ -875,8 +917,8 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
                   }}
                   labelFormatter={(label) => `Idade: ${label} anos`}
                 />
-                <ReferenceLine x={premissas.idadeApos} stroke="#F5A623" strokeDasharray="5 5"
-                  label={{ value: "Aposentadoria", position: "top", fill: "#F5A623", fontSize: 12 }} />
+                <ReferenceLine x={premissas.idadeApos} stroke="#1066DA" strokeDasharray="5 5"
+                  label={{ value: "Aposentadoria", position: "top", fill: "#1066DA", fontSize: 12 }} />
                 <Bar dataKey="valor" radius={[2, 2, 0, 0]}>
                   {dadosGrafico.map((entry: ProjecaoAno & { valor: number }, index: number) => (
                     <Cell key={`cell-${index}`}

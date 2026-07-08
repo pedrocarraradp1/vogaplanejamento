@@ -54,18 +54,13 @@ export const LOCALIZACAO_ATIVO = [
 
 export type LocalizacaoAtivo = (typeof LOCALIZACAO_ATIVO)[number]["value"]
 
-export const CORES_SUBCATEGORIA: Record<string, string> = {
-  pre_fixado: "#012137",
-  pos_fixado: "#4B759B",
-  inflacao: "#1A9E6B",
-  acoes: "#C8A44A",
-  fundos_imobiliarios: "#7B4F9E",
-  alternativos: "#C0392B",
-  cambial: "#2E9BB5",
-  multimercado: "#E07B2A",
-  exterior: "#2C6E49",
-  criptoativos: "#8B5E3C",
-}
+import {
+  CORES_SUBCATEGORIA,
+  VOGA_CHART_COLORS,
+  CORES_GRUPOS_ATIVO,
+} from "@/lib/voga-tokens"
+
+export { CORES_SUBCATEGORIA, VOGA_CHART_COLORS, CORES_GRUPOS_ATIVO }
 
 export function labelSubcategoriaLiquido(value: string): string {
   return SUBCATEGORIAS_LIQUIDO.find((s) => s.value === value)?.label ?? value
@@ -330,29 +325,7 @@ export const TOOLTIP_CUSTO_JUROS_PROJETADO =
 export const TOOLTIP_INDICE_ALAVANCAGEM =
   "Cálculo: (Total de Passivos ÷ Ativos Totais) × 100.\n\nEsperado: quanto menor o percentual, menor a dependência de endividamento no patrimônio."
 
-/** Paleta Voga com diferenciação visual — azul dominante + complementares. */
-export const VOGA_CHART_COLORS = [
-  "#012137",
-  "#4B759B",
-  "#1A9E6B",
-  "#C8A44A",
-  "#7B4F9E",
-  "#C0392B",
-  "#2E9BB5",
-  "#E07B2A",
-  "#5B8FA8",
-  "#2C6E49",
-] as const
-
-/** Cores fixas por grupo de ativo — consistentes em toda a plataforma. */
-export const CORES_GRUPOS_ATIVO: Record<string, string> = {
-  imobilizado: "#012137",
-  previdencia: "#4B759B",
-  ativo_liquido: "#1A9E6B",
-  participacao_societaria: "#C8A44A",
-}
-
-/** @deprecated Use VOGA_CHART_COLORS */
+/** @deprecated Use VOGA_CHART_COLORS from voga-tokens */
 export const CORES_GRAFICO_VOGA = VOGA_CHART_COLORS
 
 export const COR_GRAFICO_LIQUIDOS = CORES_GRUPOS_ATIVO.ativo_liquido

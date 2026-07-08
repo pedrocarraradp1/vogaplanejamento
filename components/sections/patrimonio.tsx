@@ -66,6 +66,7 @@ import {
   type SecaoAtivoConfig,
   type TipoAtivoSlug,
 } from "@/lib/patrimonio-utils"
+import { VOGA } from "@/lib/voga-tokens"
 import {
   CHART_TOOLTIP_LABEL_STYLE,
   CHART_TOOLTIP_ITEM_STYLE,
@@ -144,9 +145,9 @@ type AddModalState =
 type SemaphoreLevel = "green" | "yellow" | "red"
 
 const SEMAPHORE_BORDER: Record<SemaphoreLevel, string> = {
-  green: "#00954F",
-  yellow: "#EF9F27",
-  red: "#C0392B",
+  green: VOGA.brasilia,
+  yellow: VOGA.onda,
+  red: VOGA.alerta,
 }
 
 function InstituicaoFinanceiraField({
@@ -214,13 +215,13 @@ function InfoTooltip({ text }: { text: string }) {
           height: 14,
           borderRadius: "50%",
           background: "#F0F2F5",
-          border: "0.5px solid #D9D9D9",
+          border: "0.5px solid #E2E2E2",
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
           cursor: "help",
           fontSize: 9,
-          color: "#9A9B9B",
+          color: "#5F85B8",
           flexShrink: 0,
         }}
       >
@@ -237,7 +238,7 @@ function InfoTooltip({ text }: { text: string }) {
             borderRadius: 6,
             padding: "8px 10px",
             fontSize: 11,
-            color: "#52514e",
+            color: "#393939",
             width: 260,
             maxWidth: "min(280px, 70vw)",
             zIndex: 50,
@@ -277,7 +278,7 @@ function DonutComLegenda({
 
   if (total <= 0) {
     return (
-      <p style={{ fontSize: 12, color: "#9A9B9B", textAlign: "center", padding: "40px 0" }}>
+      <p style={{ fontSize: 12, color: "#5F85B8", textAlign: "center", padding: "40px 0" }}>
         Sem dados para exibir
       </p>
     )
@@ -353,7 +354,7 @@ function DonutComLegenda({
                 <div style={{ fontSize: 12, fontWeight: 500, color: "#1a1a1a" }}>
                   {formatCurrency(item.value)}
                 </div>
-                <div style={{ fontSize: 10, color: "#9A9B9B" }}>{pct}%</div>
+                <div style={{ fontSize: 10, color: "#5F85B8" }}>{pct}%</div>
               </div>
             </li>
           )
@@ -420,7 +421,7 @@ function AtivosLiquidosComposicao({
       slices.push({
         name: sub.label,
         value: valor,
-        fill: CORES_SUBCATEGORIA[sub.value] ?? "#9A9B9B",
+        fill: CORES_SUBCATEGORIA[sub.value] ?? "#5F85B8",
       })
     }
     const semSub = ativosFiltrados.filter((a) => !(a.subcategoria ?? "").trim())
@@ -481,7 +482,7 @@ function AtivosLiquidosComposicao({
           ))}
         </select>
       </div>
-      <div style={{ fontSize: 11, color: "#9A9B9B", marginBottom: 8 }}>
+      <div style={{ fontSize: 11, color: "#5F85B8", marginBottom: 8 }}>
         {ativosFiltrados.length} ativos · {formatCurrency(totalFiltrado)} · {pctDoTotal}% do total
       </div>
       <DonutComLegenda data={dataDonut} formatCurrency={formatCurrency} />
@@ -493,7 +494,7 @@ function KpiCard({
   label,
   value,
   hint,
-  valueColor = "#1A1A1A",
+  valueColor = "#393939",
   tooltip,
 }: {
   label: string
@@ -509,7 +510,7 @@ function KpiCard({
           fontSize: 10,
           textTransform: "uppercase",
           letterSpacing: ".06em",
-          color: "#9A9B9B",
+          color: "#5F85B8",
           marginBottom: 5,
         }}
       >
@@ -517,7 +518,7 @@ function KpiCard({
       </div>
       <div style={{ fontSize: 18, fontWeight: 500, color: valueColor }}>{value}</div>
       {hint ? (
-        <div style={{ fontSize: 10, color: "#9A9B9B", marginTop: 2 }}>{hint}</div>
+        <div style={{ fontSize: 10, color: "#5F85B8", marginTop: 2 }}>{hint}</div>
       ) : null}
     </div>
   )
@@ -547,11 +548,11 @@ function IndicadorSaude({
         borderLeft: `3px solid ${borderColor}`,
       }}
     >
-      <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".06em", color: "#9A9B9B", marginBottom: 5 }}>
+      <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".06em", color: "#5F85B8", marginBottom: 5 }}>
         <LabelComTooltip label={label} tooltip={tooltip} />
       </div>
-      <div style={{ fontSize: 16, fontWeight: 500, color: "#1A1A1A", marginBottom: 8 }}>{valor}</div>
-      <div style={{ height: 4, borderRadius: 2, background: "#D9D9D9", overflow: "hidden" }}>
+      <div style={{ fontSize: 16, fontWeight: 500, color: "#393939", marginBottom: 8 }}>{valor}</div>
+      <div style={{ height: 4, borderRadius: 2, background: "#E2E2E2", overflow: "hidden" }}>
         <div style={{ height: "100%", width: `${pct}%`, background: borderColor, borderRadius: 2 }} />
       </div>
     </div>
@@ -672,7 +673,7 @@ function BalancoAtivoAccordion({
               <span
                 style={{
                   fontSize: 10,
-                  color: "#9A9B9B",
+                  color: "#5F85B8",
                   transform: expandidas.has(inst) ? "rotate(90deg)" : "rotate(0deg)",
                   transition: "transform .15s",
                   display: "inline-block",
@@ -683,7 +684,7 @@ function BalancoAtivoAccordion({
               </span>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 12, color: "#1a1a1a", fontWeight: 500 }}>{inst}</div>
-                <div style={{ fontSize: 10, color: "#9A9B9B" }}>
+                <div style={{ fontSize: 10, color: "#5F85B8" }}>
                   {porInstituicao[inst].length}{" "}
                   {porInstituicao[inst].length === 1 ? "ativo" : "ativos"}
                 </div>
@@ -693,7 +694,7 @@ function BalancoAtivoAccordion({
               <div style={{ fontSize: 12, fontWeight: 500, color: "#1a1a1a" }}>
                 {formatCurrency(totalInst(inst))}
               </div>
-              <div style={{ fontSize: 10, color: "#9A9B9B" }}>
+              <div style={{ fontSize: 10, color: "#5F85B8" }}>
                 {pct(totalInst(inst))}% dos {variant === "liquido" ? "líquidos" : "participações"}
               </div>
             </div>
@@ -722,7 +723,7 @@ function BalancoAtivoAccordion({
                       <div
                         style={{
                           fontSize: 10,
-                          color: "#9A9B9B",
+                          color: "#5F85B8",
                           display: "flex",
                           gap: 8,
                           flexWrap: "wrap",
@@ -733,7 +734,7 @@ function BalancoAtivoAccordion({
                           <span
                             style={{
                               background: loc === "nacional" ? "#E6F0F8" : "#E8F5EE",
-                              color: loc === "nacional" ? "#4B759B" : "#00954F",
+                              color: loc === "nacional" ? "#4B759B" : "#1066DA",
                               padding: "1px 6px",
                               borderRadius: 10,
                               fontSize: 9,
@@ -750,7 +751,7 @@ function BalancoAtivoAccordion({
                     <div style={{ fontSize: 11, fontWeight: 500, color: "#1a1a1a" }}>
                       {formatCurrency(Number(ativo.valor) || 0)}
                     </div>
-                    <div style={{ fontSize: 10, color: "#9A9B9B" }}>
+                    <div style={{ fontSize: 10, color: "#5F85B8" }}>
                       {pct(Number(ativo.valor) || 0)}% dos{" "}
                       {variant === "liquido" ? "líquidos" : "participações"}
                     </div>
@@ -771,7 +772,7 @@ function AtivoListaBarRow({
   totalSecao,
   barColor,
   formatCurrency,
-  valueColor = "#1A1A1A",
+  valueColor = "#393939",
   onValueCommit,
   onRemove,
 }: {
@@ -806,9 +807,9 @@ function AtivoListaBarRow({
     <div style={{ padding: "12px 0", borderBottom: "1px solid var(--border)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <span style={{ fontSize: 13, color: "#1A1A1A", display: "block" }}>{label}</span>
+          <span style={{ fontSize: 13, color: "#393939", display: "block" }}>{label}</span>
           {sublabel ? (
-            <span style={{ fontSize: 11, color: "#9A9B9B", display: "block", marginTop: 2 }}>
+            <span style={{ fontSize: 11, color: "#5F85B8", display: "block", marginTop: 2 }}>
               {sublabel}
             </span>
           ) : null}
@@ -825,7 +826,7 @@ function AtivoListaBarRow({
                 background: "none",
                 border: "none",
                 cursor: "pointer",
-                color: "#9A9B9B",
+                color: "#5F85B8",
                 padding: 4,
                 display: "flex",
                 alignItems: "center",
@@ -843,7 +844,7 @@ function AtivoListaBarRow({
                 background: "none",
                 border: "none",
                 cursor: "pointer",
-                color: "#C0392B",
+                color: "#B33A3A",
                 padding: 4,
                 display: "flex",
                 alignItems: "center",
@@ -897,7 +898,7 @@ function AtivoListaBarRow({
             flex: 1,
             height: 6,
             borderRadius: 3,
-            background: "#D9D9D9",
+            background: "#E2E2E2",
             overflow: "hidden",
           }}
         >
@@ -911,7 +912,7 @@ function AtivoListaBarRow({
             }}
           />
         </div>
-        <span style={{ fontSize: 11, color: "#9A9B9B", width: 32, textAlign: "right", flexShrink: 0 }}>
+        <span style={{ fontSize: 11, color: "#5F85B8", width: 32, textAlign: "right", flexShrink: 0 }}>
           {pct}%
         </span>
       </div>
@@ -937,7 +938,7 @@ function PassivoRowActions({
           background: "none",
           border: "none",
           cursor: "pointer",
-          color: "#9A9B9B",
+          color: "#5F85B8",
           padding: 4,
           display: "flex",
           alignItems: "center",
@@ -954,7 +955,7 @@ function PassivoRowActions({
           background: "none",
           border: "none",
           cursor: "pointer",
-          color: "#C0392B",
+          color: "#B33A3A",
           padding: 4,
           display: "flex",
           alignItems: "center",
@@ -1485,7 +1486,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
           <h1 style={{ fontSize: 24, fontWeight: 400, color: "#1a1a1a", margin: 0 }}>
             Balanço <span style={{ color: "var(--accent)" }}>Patrimonial</span>
           </h1>
-          <p style={{ fontSize: 12, color: "#9A9B9B", marginTop: 3 }}>
+          <p style={{ fontSize: 12, color: "#5F85B8", marginTop: 3 }}>
             {dadosPessoais.nome || "Cliente"} · {idadeAtual} anos · Atualizado hoje
           </p>
         </div>
@@ -1496,11 +1497,11 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
             onClick={abrirModalPassivo}
             style={{
               background: "none",
-              border: "1px solid #C0392B",
+              border: "1px solid #B33A3A",
               borderRadius: 5,
               padding: "6px 13px",
               fontSize: 12,
-              color: "#C0392B",
+              color: "#B33A3A",
               cursor: "pointer",
               display: "flex",
               alignItems: "center",
@@ -1534,7 +1535,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
             onClick={exportarPDF}
             disabled={exportandoPdf}
             style={{
-              background: "#012137",
+              background: "#01121E",
               border: "none",
               borderRadius: 6,
               padding: "6px 13px",
@@ -1550,7 +1551,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
             <svg width="13" height="14" viewBox="0 0 13 14" fill="none" aria-hidden>
               <rect x="1" y="1" width="11" height="12" rx="2" stroke="white" strokeWidth="1.2" />
               <path d="M4 5h5M4 7h5M4 9h3" stroke="white" strokeWidth="1.2" strokeLinecap="round" />
-              <path d="M9 11l1.5 1.5L12 11" stroke="#EF9F27" strokeWidth="1.2" strokeLinecap="round" />
+              <path d="M9 11l1.5 1.5L12 11" stroke="#1066DA" strokeWidth="1.2" strokeLinecap="round" />
             </svg>
             {exportandoPdf ? "Gerando PDF…" : "Exportar PDF"}
           </button>
@@ -1574,7 +1575,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
           label="Patrimônio líquido"
           value={formatCurrency(patrimonioLiquidoResumo)}
           hint="Ativos − Passivos"
-          valueColor="#00954F"
+          valueColor="#1066DA"
           tooltip={TOOLTIP_PATRIMONIO_LIQUIDO}
         />
         <KpiCard
@@ -1585,7 +1586,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
         <KpiCard
           label="Passivos totais"
           value={formatCurrency(totalPassivos)}
-          valueColor="#C0392B"
+          valueColor="#B33A3A"
           tooltip={TOOLTIP_PASSIVOS_TOTAIS}
         />
         <KpiCard
@@ -1611,13 +1612,13 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
             style={{
               fontSize: 13,
               fontWeight: 600,
-              color: "#1A1A1A",
+              color: "#393939",
               marginBottom: 4,
             }}
           >
             Gap de patrimônio · reserva de emergência
           </p>
-          <p style={{ fontSize: 12, color: "#6B7280", marginBottom: 16, lineHeight: 1.45 }}>
+          <p style={{ fontSize: 12, color: "#5F85B8", marginBottom: 16, lineHeight: 1.45 }}>
             {subtituloGapReserva}
           </p>
 
@@ -1656,7 +1657,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                   ? formatCurrency(gapReserva.valorGapOuExcedente)
                   : "—"
               }
-              valueColor={gapReserva.temExcedente ? "#065f46" : "#991B1B"}
+              valueColor={gapReserva.temExcedente ? "#1066DA" : "#7A2828"}
               hint={
                 gapReserva.necessidadeLiquidez > 0
                   ? gapReserva.temExcedente
@@ -1677,14 +1678,14 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                 gap: 12,
               }}
             >
-              <span style={{ fontSize: 12, fontWeight: 500, color: "#1A1A1A" }}>
+              <span style={{ fontSize: 12, fontWeight: 500, color: "#393939" }}>
                 Percentual da meta atingido
               </span>
               <span
                 style={{
                   fontSize: 14,
                   fontWeight: 600,
-                  color: gapReserva.temExcedente ? "#065f46" : "#991B1B",
+                  color: gapReserva.temExcedente ? "#1066DA" : "#7A2828",
                   fontVariantNumeric: "tabular-nums",
                 }}
               >
@@ -1709,20 +1710,20 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                   height: "100%",
                   width: `${Math.min(100, gapReserva.percentualMeta)}%`,
                   borderRadius: 5,
-                  background: gapReserva.temExcedente ? "#10B981" : "#EF4444",
+                  background: gapReserva.temExcedente ? "#1066DA" : "#B33A3A",
                   transition: "width 0.3s ease",
                 }}
               />
             </div>
           </div>
 
-          <p style={{ fontSize: 12, color: "#52514e", lineHeight: 1.5, margin: 0 }}>
+          <p style={{ fontSize: 12, color: "#393939", lineHeight: 1.5, margin: 0 }}>
             {gapReserva.necessidadeLiquidez <= 0 ? (
               "Cadastre a despesa mensal em Dados Pessoais para calcular o gap de reserva de emergência."
             ) : gapReserva.temExcedente ? (
               <>
                 Meta de <strong>{gapReserva.metaMeses} meses</strong> já atingida, com excedente de{" "}
-                <strong style={{ color: "#065f46" }}>
+                <strong style={{ color: "#1066DA" }}>
                   {formatCurrency(gapReserva.valorGapOuExcedente)}
                 </strong>
                 .
@@ -1730,7 +1731,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
             ) : (
               <>
                 Faltam{" "}
-                <strong style={{ color: "#991B1B" }}>
+                <strong style={{ color: "#7A2828" }}>
                   {formatCurrency(gapReserva.valorGapOuExcedente)}
                 </strong>{" "}
                 para atingir <strong>{gapReserva.metaMeses} meses</strong> de liquidez.
@@ -1752,13 +1753,13 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
         }}
       >
         <div className="pdf-section-card" style={{ background: "var(--surface)", borderRadius: 8, padding: 16 }}>
-          <p style={{ fontSize: 13, color: "#1A1A1A", marginBottom: 12, fontWeight: 500 }}>
+          <p style={{ fontSize: 13, color: "#393939", marginBottom: 12, fontWeight: 500 }}>
             Composição total de ativos
           </p>
           <DonutComLegenda data={dataDonutGrupos} formatCurrency={formatCurrency} />
         </div>
         <div className="pdf-section-card" style={{ background: "var(--surface)", borderRadius: 8, padding: 16 }}>
-          <p style={{ fontSize: 13, color: "#1A1A1A", marginBottom: 12, fontWeight: 500 }}>
+          <p style={{ fontSize: 13, color: "#393939", marginBottom: 12, fontWeight: 500 }}>
             Composição dos ativos líquidos
           </p>
           <AtivosLiquidosComposicao
@@ -1766,10 +1767,10 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
             totalAtivoLiquido={ativosLiquidos}
             formatCurrency={formatCurrency}
           />
-          <p style={{ fontSize: 11, color: "#9A9B9B", marginTop: 12 }}>
+          <p style={{ fontSize: 11, color: "#5F85B8", marginTop: 12 }}>
             <LabelComTooltip label="Reserva de emergência" tooltip={tooltipReserva} />
             {": "}
-            <strong style={{ color: "#1A1A1A" }}>
+            <strong style={{ color: "#393939" }}>
               {despesaMensal > 0 ? `${reservaEmergenciaMeses.toFixed(1)} meses` : "—"}
             </strong>
           </p>
@@ -1789,11 +1790,11 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
         }}
       >
         <div className="pdf-section-card" style={{ background: "var(--surface)", borderRadius: 8, padding: 16 }}>
-          <p style={{ fontSize: 13, color: "#1A1A1A", marginBottom: 12, fontWeight: 500 }}>
+          <p style={{ fontSize: 13, color: "#393939", marginBottom: 12, fontWeight: 500 }}>
             Ativos por grupo
           </p>
           {barrasGrupos.filter((g) => g.value > 0).length === 0 ? (
-            <p style={{ fontSize: 12, color: "#9A9B9B", textAlign: "center", padding: "24px 0" }}>
+            <p style={{ fontSize: 12, color: "#5F85B8", textAlign: "center", padding: "24px 0" }}>
               Nenhum ativo cadastrado
             </p>
           ) : (
@@ -1813,13 +1814,13 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                         marginBottom: 6,
                       }}
                     >
-                      <span style={{ color: "#1A1A1A" }}>{grupo.name}</span>
-                      <span style={{ color: "#52514e" }}>
+                      <span style={{ color: "#393939" }}>{grupo.name}</span>
+                      <span style={{ color: "#393939" }}>
                         {formatCurrency(grupo.value)}{" "}
-                        <span style={{ color: "#9A9B9B" }}>({pct.toFixed(1)}%)</span>
+                        <span style={{ color: "#5F85B8" }}>({pct.toFixed(1)}%)</span>
                       </span>
                     </div>
-                    <div style={{ height: 8, borderRadius: 4, background: "#D9D9D9", overflow: "hidden" }}>
+                    <div style={{ height: 8, borderRadius: 4, background: "#E2E2E2", overflow: "hidden" }}>
                       <div
                         style={{
                           height: "100%",
@@ -1836,11 +1837,11 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
         </div>
 
         <div className="pdf-section-card" style={{ background: "var(--surface)", borderRadius: 8, padding: 16 }}>
-          <p style={{ fontSize: 13, color: "#1A1A1A", marginBottom: 12, fontWeight: 500 }}>
+          <p style={{ fontSize: 13, color: "#393939", marginBottom: 12, fontWeight: 500 }}>
             Passivos e dívidas
           </p>
           {passivosDetalhe.length === 0 ? (
-            <p style={{ fontSize: 12, color: "#9A9B9B", textAlign: "center", padding: "24px 0" }}>
+            <p style={{ fontSize: 12, color: "#5F85B8", textAlign: "center", padding: "24px 0" }}>
               Nenhum passivo cadastrado
             </p>
           ) : (
@@ -1857,20 +1858,20 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                   }}
                 >
                   <div style={{ minWidth: 0 }}>
-                    <p style={{ fontSize: 12, color: "#1A1A1A", margin: 0 }}>
+                    <p style={{ fontSize: 12, color: "#393939", margin: 0 }}>
                       {passivo.descricao?.trim() || resolvePassivoCategoria(passivo)}
                     </p>
                     {subtitulo ? (
-                      <p style={{ fontSize: 10, color: "#9A9B9B", margin: "2px 0 0" }}>{subtitulo}</p>
+                      <p style={{ fontSize: 10, color: "#5F85B8", margin: "2px 0 0" }}>{subtitulo}</p>
                     ) : null}
                   </div>
                   <div style={{ display: "flex", alignItems: "flex-start", gap: 8, flexShrink: 0 }}>
                     <div style={{ textAlign: "right" }}>
-                      <p style={{ fontSize: 12, fontWeight: 500, color: "#C0392B", margin: 0 }}>
+                      <p style={{ fontSize: 12, fontWeight: 500, color: "#B33A3A", margin: 0 }}>
                         {formatCurrency(saldo)}
                       </p>
                       {parcela > 0 ? (
-                        <p style={{ fontSize: 10, color: "#9A9B9B", margin: "2px 0 0" }}>
+                        <p style={{ fontSize: 10, color: "#5F85B8", margin: "2px 0 0" }}>
                           {formatCurrency(parcela)}/mês
                         </p>
                       ) : null}
@@ -1891,11 +1892,11 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
             style={{
               marginTop: 12,
               background: "none",
-              border: "1px dashed #C0392B",
+              border: "1px dashed #B33A3A",
               borderRadius: 4,
               padding: "6px 12px",
               fontSize: 12,
-              color: "#C0392B",
+              color: "#B33A3A",
               cursor: "pointer",
               width: "100%",
             }}
@@ -1908,7 +1909,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
               paddingTop: 12,
               borderTop: "1px solid var(--border)",
               fontSize: 11,
-              color: "#52514e",
+              color: "#393939",
               display: "flex",
               flexDirection: "column",
               gap: 4,
@@ -2007,7 +2008,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                       justifyContent: "space-between",
                       fontSize: 11,
                       fontWeight: 500,
-                      color: "#52514e",
+                      color: "#393939",
                     }}
                   >
                     <span>{grupo.titulo}</span>
@@ -2015,7 +2016,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                   </div>
                   {grupo.tipo === "accordion" ? (
                     grupo.ativos.length === 0 ? (
-                      <p style={{ fontSize: 11, color: "#9A9B9B", padding: "8px 12px", margin: 0 }}>
+                      <p style={{ fontSize: 11, color: "#5F85B8", padding: "8px 12px", margin: 0 }}>
                         Nenhum item
                       </p>
                     ) : (
@@ -2027,7 +2028,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                       />
                     )
                   ) : grupo.itens.length === 0 ? (
-                    <p style={{ fontSize: 11, color: "#9A9B9B", padding: "8px 12px", margin: 0 }}>
+                    <p style={{ fontSize: 11, color: "#5F85B8", padding: "8px 12px", margin: 0 }}>
                       Nenhum item
                     </p>
                   ) : (
@@ -2045,16 +2046,16 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                       >
                         <div style={{ minWidth: 0, flex: 1 }}>
                           <div style={{ display: "flex", alignItems: "center" }}>
-                            <span style={{ fontSize: 12, color: "#1A1A1A" }}>{item.nome}</span>
+                            <span style={{ fontSize: 12, color: "#393939" }}>{item.nome}</span>
                             <InfoTooltip text={item.infoTooltip} />
                           </div>
                           {item.subtitulo ? (
-                            <p style={{ fontSize: 10, color: "#9A9B9B", margin: "2px 0 0" }}>
+                            <p style={{ fontSize: 10, color: "#5F85B8", margin: "2px 0 0" }}>
                               {item.subtitulo}
                             </p>
                           ) : null}
                         </div>
-                        <span style={{ fontSize: 12, fontWeight: 500, color: "#1A1A1A", flexShrink: 0 }}>
+                        <span style={{ fontSize: 12, fontWeight: 500, color: "#393939", flexShrink: 0 }}>
                           {formatCurrency(item.valor)}
                         </span>
                       </div>
@@ -2070,7 +2071,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                   justifyContent: "space-between",
                   fontSize: 13,
                   fontWeight: 600,
-                  color: "#1A1A1A",
+                  color: "#393939",
                 }}
               >
                 <span>Total Ativo</span>
@@ -2083,7 +2084,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
           <div>
             <div
               style={{
-                background: "#C0392B",
+                background: "#B33A3A",
                 color: "white",
                 padding: "8px 12px",
                 borderRadius: "6px 6px 0 0",
@@ -2095,7 +2096,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
             </div>
             <div style={{ background: "white", borderRadius: "0 0 6px 6px", overflow: "hidden" }}>
               {passivosDetalhe.length === 0 ? (
-                <p style={{ fontSize: 11, color: "#9A9B9B", padding: "8px 12px", margin: 0 }}>
+                <p style={{ fontSize: 11, color: "#5F85B8", padding: "8px 12px", margin: 0 }}>
                   Nenhum passivo cadastrado
                 </p>
               ) : (
@@ -2112,20 +2113,20 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                     }}
                   >
                     <div style={{ minWidth: 0 }}>
-                      <p style={{ fontSize: 12, color: "#1A1A1A", margin: 0 }}>
+                      <p style={{ fontSize: 12, color: "#393939", margin: 0 }}>
                         {passivo.descricao?.trim() || resolvePassivoCategoria(passivo)}
                       </p>
                       {subtitulo ? (
-                        <p style={{ fontSize: 10, color: "#9A9B9B", margin: "2px 0 0" }}>{subtitulo}</p>
+                        <p style={{ fontSize: 10, color: "#5F85B8", margin: "2px 0 0" }}>{subtitulo}</p>
                       ) : null}
                       {parcela > 0 ? (
-                        <p style={{ fontSize: 10, color: "#C0392B", margin: "2px 0 0" }}>
+                        <p style={{ fontSize: 10, color: "#B33A3A", margin: "2px 0 0" }}>
                           {formatCurrency(parcela)}/mês
                         </p>
                       ) : null}
                     </div>
                     <div style={{ display: "flex", alignItems: "flex-start", gap: 8, flexShrink: 0 }}>
-                      <span style={{ fontSize: 12, fontWeight: 500, color: "#C0392B" }}>
+                      <span style={{ fontSize: 12, fontWeight: 500, color: "#B33A3A" }}>
                         {formatCurrency(saldo)}
                       </span>
                       <PassivoRowActions
@@ -2139,12 +2140,12 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
               <div
                 style={{
                   padding: "10px 12px",
-                  borderTop: "2px solid #C0392B",
+                  borderTop: "2px solid #B33A3A",
                   display: "flex",
                   justifyContent: "space-between",
                   fontSize: 13,
                   fontWeight: 600,
-                  color: "#C0392B",
+                  color: "#B33A3A",
                 }}
               >
                 <span>Total Passivo</span>
@@ -2155,7 +2156,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
             <div
               style={{
                 marginTop: 12,
-                background: "#00954F",
+                background: "#1066DA",
                 color: "white",
                 borderRadius: 6,
                 padding: "12px 14px",
@@ -2170,9 +2171,9 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
               </span>
             </div>
 
-            <p style={{ fontSize: 11, color: "#9A9B9B", marginTop: 10, textAlign: "center" }}>
+            <p style={{ fontSize: 11, color: "#5F85B8", marginTop: 10, textAlign: "center" }}>
               Ativo = Passivo + PL{" "}
-              <span style={{ color: "#00954F" }}>
+              <span style={{ color: "#1066DA" }}>
                 {Math.abs(patrimonioTotal - totalPassivos - patrimonioLiquidoResumo) < 1 ? "✓" : "—"}
               </span>
             </p>
@@ -2211,7 +2212,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                   borderBottom: "1px solid var(--border)",
                 }}
               >
-                <h3 style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", margin: 0 }}>
+                <h3 style={{ fontSize: 14, fontWeight: 600, color: "#393939", margin: 0 }}>
                   {secao.title}
                 </h3>
                 <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
@@ -2233,7 +2234,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                 <p
                   style={{
                     fontSize: 13,
-                    color: "#9A9B9B",
+                    color: "#5F85B8",
                     textAlign: "center",
                     padding: "28px 0",
                     margin: 0,
@@ -2256,7 +2257,7 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
                         totalSecao={total}
                         barColor={secao.cor}
                         formatCurrency={formatCurrency}
-                        valueColor="#1A1A1A"
+                        valueColor="#393939"
                         onValueCommit={(v) => updateAtivoValor(linha.id, v)}
                         onRemove={() => removerAtivo(linha.id)}
                       />
@@ -2637,13 +2638,13 @@ export function Patrimonio({ onNavigate }: PatrimonioProps) {
           gap: 10,
           marginTop: 20,
           paddingTop: 16,
-          borderTop: "1px solid #E8EAEB",
+          borderTop: "1px solid #E2E2E2",
         }}
       >
         <button
           type="button"
           onClick={voltarSecao}
-          style={{ background: "none", border: "none", color: "#9A9B9B", fontSize: 12, cursor: "pointer" }}
+          style={{ background: "none", border: "none", color: "#5F85B8", fontSize: 12, cursor: "pointer" }}
         >
           ‹ Voltar
         </button>

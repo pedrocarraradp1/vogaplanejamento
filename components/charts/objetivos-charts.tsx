@@ -38,7 +38,7 @@ export function GraficoCapitalPorAno({
             id: o.id,
             nome: (o.descricao || "Objetivo").trim(),
             valor: capitalPorObjetivoMap.get(hoveredAno)?.get(o.id) ?? 0,
-            cor: coresPorObjetivoId.get(o.id) ?? { fill: "#C9A84C", text: "#1A1A1A" },
+            cor: coresPorObjetivoId.get(o.id) ?? { fill: "#1066DA", text: "#393939" },
           }))
           .filter((item) => item.valor > 0)
       : []
@@ -50,7 +50,7 @@ export function GraficoCapitalPorAno({
       .map((o) => ({
         id: o.id,
         valor: porObj.get(o.id) ?? 0,
-        cor: coresPorObjetivoId.get(o.id) ?? { fill: "#C9A84C", text: "#1A1A1A" },
+        cor: coresPorObjetivoId.get(o.id) ?? { fill: "#1066DA", text: "#393939" },
       }))
       .filter((s) => s.valor > 0)
   }
@@ -141,7 +141,7 @@ export function GraficoCapitalPorAno({
                     width: "100%",
                     height: 4,
                     borderRadius: 2,
-                    background: "var(--border, #D9D9D9)",
+                    background: "var(--border, #E2E2E2)",
                     pointerEvents: "none",
                   }}
                 />
@@ -150,7 +150,7 @@ export function GraficoCapitalPorAno({
                 style={{
                   marginTop: 8,
                   fontSize: 10,
-                  color: "#6B7280",
+                  color: "#5F85B8",
                   visibility: mostrarAno ? "visible" : "hidden",
                   height: 14,
                   lineHeight: "14px",

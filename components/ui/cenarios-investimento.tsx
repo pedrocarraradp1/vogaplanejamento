@@ -21,6 +21,7 @@ import {
   Legend,
 } from "recharts"
 import { CHART_TOOLTIP_PROPS } from "@/lib/chart-tooltip"
+import { EstrategiaRetiradaAposentadoria } from "@/components/ui/estrategia-retirada-aposentadoria"
 
 type DisplayMode = "nominal" | "real"
 
@@ -245,9 +246,9 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
         "Conservador",
         "Maior previsibilidade",
         "Baixa",
-        "#22C787",
-        "bg-[rgba(34,199,135,0.06)]",
-        "border-[#22C787]/25",
+        "#1066DA",
+        "bg-[rgba(16,102,218,0.06)]",
+        "border-[#1066DA]/25",
         cenarioConservador,
         pCon,
         projecaoConservadora,
@@ -269,9 +270,9 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
         "Agressivo",
         "Maior retorno esperado",
         "Alta",
-        "#F5A623",
+        "#1066DA",
         "bg-[rgba(245,166,35,0.06)]",
-        "border-[#F5A623]/25",
+        "border-[#1066DA]/25",
         cenarioAgressivo,
         pAgr,
         projecaoAgressiva,
@@ -423,6 +424,20 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
             ))}
           </div>
 
+          <EstrategiaRetiradaAposentadoria
+            premissasCompletas={premissasCompletas}
+            objetivosEngine={objetivosEngine}
+            passivos={passivos}
+            rentabilidadeLiquidaPct={rentabilidadeLiquidaDeBruta(cenarioModerado)}
+            displayMode={displayMode}
+            inflacaoGlobal={inflacaoGlobal}
+            idadeAtualCalculada={idadeAtualCalculada}
+            projecaoModerada={projecaoModerada}
+            aliquotaIR={aliquotaIR}
+            fmtFull={fmtFull}
+            formatarMoeda={formatarMoeda}
+          />
+
           <div className="rounded-xl border border-border bg-secondary overflow-hidden">
             <div className="px-5 py-4 border-b border-border">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Comparação de Resultados</p>
@@ -488,15 +503,15 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
                   <XAxis
                     dataKey="idade"
-                    stroke="#4A5268"
-                    tick={{ fill: "#4A5268", fontSize: 12 }}
+                    stroke="#5F85B8"
+                    tick={{ fill: "#5F85B8", fontSize: 12 }}
                     tickLine={false}
                     axisLine={{ stroke: "rgba(255,255,255,0.04)" }}
                     interval="preserveStartEnd"
                   />
                   <YAxis
-                    stroke="#4A5268"
-                    tick={{ fill: "#4A5268", fontSize: 12 }}
+                    stroke="#5F85B8"
+                    tick={{ fill: "#5F85B8", fontSize: 12 }}
                     tickLine={false}
                     axisLine={false}
                     tickFormatter={formatarMoeda}
@@ -515,9 +530,9 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
                       return String(value)
                     }}
                   />
-                  <Line type="monotone" dataKey="conservador" name="conservador" stroke="#22C787" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="conservador" name="conservador" stroke="#1066DA" strokeWidth={2} dot={false} />
                   <Line type="monotone" dataKey="moderado" name="moderado" stroke="var(--accent)" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="agressivo" name="agressivo" stroke="#F5A623" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="agressivo" name="agressivo" stroke="#1066DA" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             </div>

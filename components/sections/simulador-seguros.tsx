@@ -1040,12 +1040,12 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
               />
               <Legend />
               <Line type="monotone" dataKey="cenA" name="Cenário A" stroke="var(--accent)" strokeWidth={2} dot={false} isAnimationActive={false} />
-              <Line type="monotone" dataKey="cenBvivo" name="Cenário B — sobrevivência" stroke="#22C787" strokeWidth={2} dot={false} isAnimationActive={false} />
+              <Line type="monotone" dataKey="cenBvivo" name="Cenário B — sobrevivência" stroke="#1066DA" strokeWidth={2} dot={false} isAnimationActive={false} />
               <Line
                 type="monotone"
                 dataKey="cenBmorte"
                 name="Cenário B — + CS"
-                stroke="#22C787"
+                stroke="#1066DA"
                 strokeWidth={2}
                 strokeDasharray="6 6"
                 dot={false}
@@ -1122,17 +1122,17 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
               />
               <ReferenceLine
                 y={totalPagoSeguro}
-                stroke="#F59E0B"
+                stroke="#173C6E"
                 strokeDasharray="6 4"
                 strokeWidth={1.5}
                 label={{
                   value: `Total: ${fmtShort(totalPagoSeguro, moeda)}`,
                   position: "right",
-                  fill: "#F59E0B",
+                  fill: "#173C6E",
                   fontSize: 11,
                 }}
               />
-              <Bar dataKey="custoAnual" name="Prêmio anual" fill="#F59E0B" radius={[3, 3, 0, 0]} />
+              <Bar dataKey="custoAnual" name="Prêmio anual" fill="#173C6E" radius={[3, 3, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>

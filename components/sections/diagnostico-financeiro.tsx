@@ -25,15 +25,17 @@ import type {
   Responsavel,
 } from "@/types/diagnostico"
 
+import { VOGA } from "@/lib/voga-tokens"
+
 const STATUS_CORES: Record<StatusDiagnostico, { bg: string; text: string }> = {
-  "Saudável": { bg: "#E6F7F1", text: "#065f46" },
-  "Atenção": { bg: "#FEF3E2", text: "#8A6E35" },
-  "Crítico": { bg: "#FCEAEA", text: "#991B1B" },
+  "Saudável": { bg: VOGA.verdeQuadrado, text: VOGA.brasilia },
+  "Atenção": { bg: VOGA.amareloExplanada, text: VOGA.petroleo },
+  "Crítico": { bg: "#F5E0E0", text: VOGA.alertaTexto },
 }
 const PRIORIDADE_CORES: Record<Prioridade, string> = {
-  Alta: "#EF4444",
-  Média: "#F59E0B",
-  Baixa: "#64748B",
+  Alta: VOGA.alerta,
+  Média: VOGA.onda,
+  Baixa: VOGA.nota,
 }
 const AREAS_TOTAIS = 6
 const PAINEL_BG = "#F5F5F5"

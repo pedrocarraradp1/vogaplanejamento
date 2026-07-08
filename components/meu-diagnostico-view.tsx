@@ -51,14 +51,14 @@ export function MeuDiagnosticoView({ state }: MeuDiagnosticoViewProps) {
               <p className="text-xs text-muted-foreground mt-1">{fmtK(kpis.patrimonioAposReal)} em valor real</p>
             </CardContent>
           </Card>
-          <Card className="border-[#22C787]/30 bg-[rgba(34,199,135,0.08)]">
+          <Card className="border-[#1066DA]/30 bg-[rgba(16,102,218,0.08)]">
             <CardHeader className="pb-2">
               <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                 Renda mensal real
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold text-[#22C787]">{fmtCurrency(kpis.rendaMensalReal)}</p>
+              <p className="text-2xl font-bold text-[#1066DA]">{fmtCurrency(kpis.rendaMensalReal)}</p>
               <p className="text-xs text-muted-foreground mt-1">Com {premissas.rendimento}% a.a.</p>
             </CardContent>
           </Card>

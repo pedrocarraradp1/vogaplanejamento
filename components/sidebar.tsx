@@ -25,7 +25,7 @@ const navGroups: NavGroup[] = [
       { id: "projecao", label: "Projeções / Aposentadoria" },
       { id: "cenarios", label: "Cenários" },
       { id: "fluxo-de-caixa", label: "Fluxo de Caixa" },
-      { id: "diagnostico-financeiro", label: "Diagnóstico e Plano de Ação" },
+      { id: "plano-financeiro-completo", label: "Plano Financeiro Completo" },
     ],
   },
   {
@@ -48,7 +48,10 @@ const navGroups: NavGroup[] = [
   },
   {
     title: "Diagnóstico",
-    items: [{ id: "dashboard", label: "Dashboard" }],
+    items: [
+      { id: "dashboard", label: "Dashboard" },
+      { id: "diagnostico-financeiro", label: "Diagnóstico e Plano de Ação" },
+    ],
   },
 ]
 

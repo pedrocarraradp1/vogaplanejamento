@@ -47,9 +47,9 @@ export function DashboardPDF({
   const white = "#E8EBF2"
   const muted = "#8E96AC"
   const blue  = "var(--accent)"
-  const green = "#22C787"
-  const amber = "#F5A623"
-  const red   = "#EF4444"
+  const green = "#1066DA"
+  const amber = "#1066DA"
+  const red   = "#B33A3A"
   const border = "1px solid rgba(255,255,255,0.08)"
 
   const card = (children: React.ReactNode, extra?: React.CSSProperties) => (
@@ -106,7 +106,7 @@ export function DashboardPDF({
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>
         {[
           { l: "PATRIMÔNIO NA APOSENTADORIA", v: fk(moeda, kpis.patrimonioApos), sub: `${fk(moeda, kpis.patrimonioAposReal)} em valor real`, c: blue, bg: "rgba(30,92,230,0.08)", b: "1px solid rgba(30,92,230,0.3)" },
-          { l: "RENDA MENSAL REAL",            v: f(moeda, kpis.rendaMensalReal),  sub: `Com ${premissas.rendimento}% a.a.`,              c: green, bg: "rgba(34,199,135,0.08)", b: "1px solid rgba(34,199,135,0.3)" },
+          { l: "RENDA MENSAL REAL",            v: f(moeda, kpis.rendaMensalReal),  sub: `Com ${premissas.rendimento}% a.a.`,              c: green, bg: "rgba(16,102,218,0.08)", b: "1px solid rgba(16,102,218,0.3)" },
           { l: "LIBERDADE FINANCEIRA",         v: kpis.idadeLF ? `${kpis.idadeLF} anos` : "—", sub: kpis.idadeLF ? `Em ${kpis.idadeLF - idadeAtual} anos` : "—", c: amber, bg: bg2, b: border },
           { l: "TAXA DE POUPANÇA",             v: `${kpis.taxaPoupanca}%`,  sub: `${f(moeda, aporteM)} / mês`,                            c: white, bg: bg2, b: border },
         ].map(kpi => (
@@ -168,7 +168,7 @@ export function DashboardPDF({
             {rowItem("Custo Total", f(moeda, inventario.custoTotal), red)}
             <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0" }}>
               <span style={{ fontSize: 12, color: muted }}>% do Patrimônio</span>
-              <span style={{ fontSize: 11, fontWeight: 600, backgroundColor: "rgba(245,165,36,0.15)", color: amber, padding: "2px 8px", borderRadius: 4 }}>{inventario.percentualCusto}%</span>
+              <span style={{ fontSize: 11, fontWeight: 600, backgroundColor: "rgba(16,102,218,0.12)", color: amber, padding: "2px 8px", borderRadius: 4 }}>{inventario.percentualCusto}%</span>
             </div>
           </div>
         </div>
@@ -200,7 +200,7 @@ export function DashboardPDF({
                 <td style={{ padding: "8px 10px", textAlign: "right", fontSize: 12, fontWeight: 600, color: r.saldoReal >= 0 ? green : red }}>{f(moeda, r.saldoReal)}</td>
                 <td style={{ padding: "8px 10px", textAlign: "right", fontSize: 12, color: muted }}>{r.rendaMensalReal > 0 ? f(moeda, r.rendaMensalReal) : "—"}</td>
                 <td style={{ padding: "8px 10px", textAlign: "center" }}>
-                  <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 20, backgroundColor: r.isAposentado ? "rgba(245,165,36,0.15)" : "rgba(34,199,135,0.15)", color: r.isAposentado ? amber : green }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 20, backgroundColor: r.isAposentado ? "rgba(16,102,218,0.12)" : "rgba(16,102,218,0.15)", color: r.isAposentado ? amber : green }}>
                     {r.isAposentado ? "Aposentadoria" : "Acumulação"}
                   </span>
                 </td>
