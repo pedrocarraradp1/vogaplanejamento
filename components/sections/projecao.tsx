@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, ArrowRight, TrendingUp, DollarSign, Clock, Info, Check, AlertTriangle } from "lucide-react"
+import { ArrowLeft, ArrowRight, TrendingUp, DollarSign, Clock, Info } from "lucide-react"
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, Cell, Line,
@@ -18,12 +18,12 @@ import {
   calcularKPIs,
   calcularFluxoAnual,
   encontrarAporteNecessario,
+  encontrarAporteNecessarioConsumo,
   encontrarIdadeLiberdadeFinanceira,
   encontrarRendaDeConsumoMensalReal,
   encontrarRendaDePreservacaoMensalReal,
   rodarMonteCarlo,
   VOLATILIDADE_MONTE_CARLO_ANUAL,
-  pvAnuidade,
   pmtDeAnuidade,
   horizonteRendaSustentavelAnos,
   horizontePosAposentadoriaAnos,
@@ -44,6 +44,7 @@ import { IndependenciaChart, type PontoIndependencia } from "@/components/charts
 import { MonteCarloChart } from "@/components/charts/monte-carlo-chart"
 import { EstrategiaRetiradaAposentadoria } from "@/components/ui/estrategia-retirada-aposentadoria"
 import { ControlesSimulacao } from "@/components/ui/controles-simulacao"
+import { BlocoAporteNecessario } from "@/components/ui/bloco-aporte-necessario"
 
 const GOLD = VOGA.brasilia
 const GREEN = VOGA.brasilia
@@ -548,7 +549,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
   const patrimonioNecessario = kpis.patrimonioNecessarioLF
 
   // ── Bloco 2: aporte necessário (preservação / fluxo-zero na retirada) ──────
-  const b2Resultado = useMemo(() => {
+  const b2PreservacaoResultado = useMemo(() => {
     const alvo = patrimonioNecessario
     const idadeApos = Number(premissasCompletas.idadeApos) || 0
     if (idadeApos <= idadeAtualCalculada) {
@@ -584,18 +585,48 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
     saldoInicialCalculado,
   ])
 
-  const gapAporte = aporteMensal - b2Resultado.aporteNecessario
-  const maiorAporteComparativo = Math.max(aporteMensal, b2Resultado.aporteNecessario, 1)
+  const b2ConsumoResultado = useMemo(() => {
+    const idadeApos = Number(premissasCompletas.idadeApos) || 0
+    if (idadeApos <= idadeAtualCalculada) {
+      return {
+        alvo: 0,
+        aporteNecessario: 0,
+        escala: 0,
+        aportePorAnoNominal: [] as number[],
+        patrimonioProjetado: 0,
+        invalido: true,
+      }
+    }
+    const resultado = encontrarAporteNecessarioConsumo({
+      premissas: premissasCompletas,
+      objetivos: objetivosEngine,
+      passivos: state.passivos,
+    })
+    return {
+      alvo: 0,
+      aporteNecessario: resultado.aporteMensalEquivalente,
+      escala: resultado.escala,
+      aportePorAnoNominal: resultado.aportePorAnoNominal,
+      patrimonioProjetado: resultado.patrimonioNoFimDoHorizonte,
+      invalido: false,
+    }
+  }, [
+    premissasCompletas,
+    objetivosEngine,
+    state.passivos,
+    premissasCompletas.idadeApos,
+    idadeAtualCalculada,
+  ])
 
   const [ritmoIndependencia, setRitmoIndependencia] = useState<"atual" | "necessario">("atual")
 
   const projecaoIndependencia = useMemo(() => {
-    if (ritmoIndependencia === "atual" || b2Resultado.invalido) return projecao
+    if (ritmoIndependencia === "atual" || b2PreservacaoResultado.invalido) return projecao
     return calcularProjecao(
       {
         ...premissasCompletas,
-        aporteM: b2Resultado.aporteNecessario,
-        aportePorAnoNominal: b2Resultado.aportePorAnoNominal,
+        aporteM: b2PreservacaoResultado.aporteNecessario,
+        aportePorAnoNominal: b2PreservacaoResultado.aportePorAnoNominal,
       },
       objetivosEngine,
       state.passivos,
@@ -603,7 +634,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
     )
   }, [
     ritmoIndependencia,
-    b2Resultado,
+    b2PreservacaoResultado,
     projecao,
     premissasCompletas,
     objetivosEngine,
@@ -1152,25 +1183,6 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
             </KpiCardComTooltip>
           </div>
 
-          <div
-            className="rounded-xl"
-            style={{
-              background: "var(--surface-1)",
-              padding: "12px 16px",
-              color: "var(--text-secondary)",
-              fontSize: "12px",
-              fontFamily: "var(--font-body)",
-            }}
-          >
-            <span style={{ color: "var(--text-primary)", fontWeight: 700 }}>
-              Renda de consumo do patrimônio
-            </span>{" "}
-            e o valor mensal que, se retirado todo mês pelo restante do horizonte simulado, esgota exatamente o
-            patrimônio no último ano da simulação - diferente da renda mensal gerada, que preserva o patrimônio
-            para sempre. É uma renda maior, mas o principal se consome ao longo do caminho, não sobra herança nem
-            reserva além do horizonte considerado.
-          </div>
-
           {/* Gráfico */}
           {controlesTempoReal}
           <div className="h-80">
@@ -1191,18 +1203,12 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
                       saldoNominal?: number
                       idade?: number
                       isAposentado?: boolean
-                      rendaGeradaReal?: number
-                      rendaGeradaNominal?: number
                       retiradaAplicadaMensal?: number
                       retiradaAplicadaMensalReal?: number
                       deltaPatrimonioReal?: number
                     }
                     const idade = Number(entry?.idade) || Number(label) || 0
                     const patrimonio = Number(entry?.valor) || 0
-                    const rendaGerada =
-                      displayMode === "nominal"
-                        ? Number(entry?.rendaGeradaNominal) || 0
-                        : Number(entry?.rendaGeradaReal) || 0
                     const retiradaAplicada = Number(entry?.retiradaAplicadaMensal) || 0
                     const deltaReal = Number(entry?.deltaPatrimonioReal) || 0
                     const sinalDelta = deltaReal > 0 ? "+" : ""
@@ -1225,10 +1231,6 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
                         <p>
                           Variação real vs. ano anterior: {sinalDelta}
                           {formatarMoedaCompleta(deltaReal)}
-                        </p>
-                        <p className="text-muted-foreground border-t border-border pt-1 mt-1">
-                          Renda mensal gerada (hipótese se parasse aqui):{" "}
-                          {formatarMoedaCompleta(rendaGerada)}/mês
                         </p>
                       </div>
                     )
@@ -1344,9 +1346,8 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
                 Tempo até a independência financeira
               </CardTitle>
               <p className="text-sm text-muted-foreground mt-1">
-                Patrimônio necessário calculado pelo valor presente de uma anuidade sobre a necessidade
-                total (renda desejada + objetivos eternos) e o horizonte de aposentadoria ({horizonte} anos)
-                — sem taxa de retirada fixa.
+                Patrimônio que gera a necessidade total via rendimento real, para sempre
+                (perpetuidade) — renda desejada + objetivos eternos, sem taxa de retirada fixa.
               </p>
             </div>
             <div className="inline-flex rounded-lg bg-card p-1 shrink-0">
@@ -1355,7 +1356,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
                   key={modo}
                   type="button"
                   onClick={() => setRitmoIndependencia(modo)}
-                  disabled={modo === "necessario" && b2Resultado.invalido}
+                  disabled={modo === "necessario" && b2PreservacaoResultado.invalido}
                   className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
                     ritmoIndependencia === modo
                       ? "bg-primary text-primary-foreground"
@@ -1387,7 +1388,7 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
                 {formatarMoedaCompleta(patrimonioNecessario)}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Valor presente de {horizonte} anos de necessidade total
+                Patrimônio que gera a necessidade total via rendimento real, para sempre (perpetuidade)
               </p>
               <div className="text-xs text-muted-foreground mt-2 space-y-0.5">
                 <p>Renda: {formatarMoedaCompleta(rendaMensalDesejada)}/mês</p>
@@ -1417,118 +1418,47 @@ export function Projecao({ onNavigate }: ProjecaoProps) {
             />
             <p className="text-xs text-muted-foreground mt-2">
               {ritmoIndependencia === "atual"
-                ? "Barras: mesma série da Simulação em tempo real (calcularProjecao com retirada pós-aposentadoria). Linha dourada: patrimônio necessário (anuidade)."
-                : `Barras: simulação com o aporte necessário (${formatarMoedaCompleta(b2Resultado.aporteNecessario)}/mês equivalente hoje). Após a aposentadoria, a curva deve ficar praticamente reta (patrimônio constante).`}
+                ? "Barras: mesma série da Simulação em tempo real (calcularProjecao com retirada pós-aposentadoria). Linha dourada: patrimônio necessário (perpetuidade)."
+                : `Barras: simulação com o aporte necessário (${formatarMoedaCompleta(b2PreservacaoResultado.aporteNecessario)}/mês equivalente hoje). Após a aposentadoria, a curva deve ficar praticamente reta (patrimônio constante).`}
             </p>
           </div>
         </CardContent>
       </Card>
 
-      {/* Bloco 2 — Aporte necessário */}
-      <Card className="form-card">
-        <CardHeader className="pb-4">
-          <CardTitle className="text-base font-medium text-foreground">
-            Aporte necessário
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Menor aporte mensal que mantém o patrimônio constante na aposentadoria (preservação /
-            fluxo-zero), sustentando a renda desejada sem consumir nem acumular o principal
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div style={{ background: PAINEL_BG, borderRadius: 12, padding: "16px" }}>
-              <p className="text-xs text-muted-foreground mb-1">Aporte necessário</p>
-              <p className="text-[30px] leading-none font-bold" style={{ color: "#1066DA" }}>
-                {b2Resultado.invalido ? "—" : formatarMoedaCompleta(b2Resultado.aporteNecessario)}
-              </p>
-            </div>
-            <div style={{ background: PAINEL_BG, borderRadius: 12, padding: "16px" }}>
-              <p className="text-xs text-muted-foreground mb-1">Aporte atual</p>
-              <p className="text-[30px] leading-none font-bold text-foreground">
-                {formatarMoedaCompleta(aporteMensal)}
-              </p>
-            </div>
-          </div>
+      <BlocoAporteNecessario
+        titulo="Aporte necessário para preservação"
+        subtitulo="Menor aporte mensal que mantém o patrimônio CONSTANTE na aposentadoria (fluxo-zero), sustentando a renda desejada para sempre, sem consumir nem acumular o principal."
+        corDestaque="#1066DA"
+        dados={{
+          invalido: b2PreservacaoResultado.invalido,
+          aporteNecessario: b2PreservacaoResultado.aporteNecessario,
+          alvo: b2PreservacaoResultado.alvo,
+          alvoInvalidoMsg: "idade de aposentadoria deve ser maior que a idade atual",
+        }}
+        aporteAtual={aporteMensal}
+        formatarMoedaCompleta={formatarMoedaCompleta}
+        textoFolga="O ritmo atual de aportes já é suficiente para preservar o patrimônio na aposentadoria (fluxo-zero), sustentando a renda desejada para sempre."
+        textoFalta="O ritmo atual de aportes não sustenta a estratégia de preservação — o patrimônio não permaneceria constante na aposentadoria com a renda desejada."
+        corFolgaTexto="#0C447C"
+      />
 
-          <div style={{ background: PAINEL_BG, borderRadius: 12, padding: "16px" }}>
-            <p className="text-xs text-muted-foreground mb-4">Comparativo mensal</p>
-            <div className="space-y-4">
-              <div>
-                <div className="flex items-center justify-between gap-3 mb-2">
-                  <span className="text-sm font-medium text-foreground">Necessário</span>
-                  <span className="text-sm tabular-nums text-foreground">
-                    {b2Resultado.invalido ? "—" : formatarMoedaCompleta(b2Resultado.aporteNecessario)}
-                  </span>
-                </div>
-                <div className="h-3 rounded-full bg-white/80 overflow-hidden">
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      width: `${(b2Resultado.aporteNecessario / maiorAporteComparativo) * 100}%`,
-                      background: "#1066DA",
-                    }}
-                  />
-                </div>
-              </div>
-              <div>
-                <div className="flex items-center justify-between gap-3 mb-2">
-                  <span className="text-sm font-medium text-foreground">Atual</span>
-                  <span className="text-sm tabular-nums text-foreground">
-                    {formatarMoedaCompleta(aporteMensal)}
-                  </span>
-                </div>
-                <div className="h-3 rounded-full bg-white/80 overflow-hidden">
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      width: `${(aporteMensal / maiorAporteComparativo) * 100}%`,
-                      background: "#01121E",
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground mt-4">
-              Alvo: {formatarMoedaCompleta(b2Resultado.alvo)}
-              {b2Resultado.invalido ? " · idade de aposentadoria deve ser maior que a idade atual" : ""}
-            </p>
-          </div>
-
-          <div
-            style={{
-              borderRadius: 12,
-              padding: "16px",
-              background: gapAporte >= 0 ? "#D0E0F0" : "#FBEAEA",
-              color: gapAporte >= 0 ? "#0C447C" : "var(--voga-alerta-texto)",
-            }}
-          >
-            <div className="flex items-start gap-4">
-              <div
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
-                style={{
-                  background: gapAporte >= 0 ? "#1066DA" : "var(--voga-alerta)",
-                  color: "#FFFFFF",
-                }}
-              >
-                {gapAporte >= 0 ? <Check className="h-5 w-5" /> : <AlertTriangle className="h-5 w-5" />}
-              </div>
-              <div className="min-w-0">
-                <p className="text-[26px] leading-tight font-bold">
-                  {gapAporte >= 0
-                    ? `+${formatarMoedaCompleta(gapAporte)}/mês de folga`
-                    : `Faltam ${formatarMoedaCompleta(Math.abs(gapAporte))}/mês`}
-                </p>
-                <p className="text-sm mt-2 opacity-90">
-                  {gapAporte >= 0
-                    ? "O aporte atual já supera o necessário — dá pra manter o ritmo ou redirecionar o excedente pra outro objetivo."
-                    : "O aporte atual não é suficiente para atingir a renda desejada na idade de aposentadoria planejada."}
-                </p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <BlocoAporteNecessario
+        titulo="Aporte necessário para consumo"
+        subtitulo="Menor aporte mensal que sustenta a renda desejada até o fim do horizonte simulado, consumindo o principal ao longo do caminho — o patrimônio esgota (não sobra herança), mas o aporte necessário é MENOR que o de preservação, já que não precisa durar para sempre."
+        corDestaque="#4B759B"
+        dados={{
+          invalido: b2ConsumoResultado.invalido,
+          aporteNecessario: b2ConsumoResultado.aporteNecessario,
+          alvo: b2ConsumoResultado.alvo,
+          alvoInvalidoMsg: "idade de aposentadoria deve ser maior que a idade atual",
+        }}
+        aporteAtual={aporteMensal}
+        formatarMoedaCompleta={formatarMoedaCompleta}
+        textoFolga="O ritmo atual de aportes já é suficiente para sustentar a renda desejada até o fim do horizonte com consumo do principal."
+        textoFalta="O ritmo atual de aportes não sustenta a estratégia de consumo — o patrimônio não chegaria a zero no fim do horizonte simulado com a renda desejada."
+        corFolgaFundo="rgba(75, 117, 155, 0.15)"
+        corFolgaTexto="#4B759B"
+      />
 
       <Card className="form-card">
         <CardHeader className="pb-4">

@@ -48,6 +48,12 @@ export function pvAnuidade(pmtAnual: number, r: number, n: number): number {
   return (pmtAnual * (1 - Math.pow(1 + r, -n))) / r
 }
 
+/** Patrimônio necessário para sustentar `necessidadeAnual` em perpetuidade (rendimento real). */
+export function patrimonioPerpetuidade(necessidadeAnual: number, taxaReal: number): number {
+  if (taxaReal <= 0) return 0
+  return necessidadeAnual / taxaReal
+}
+
 /** Pagamento anual sustentável a partir de um patrimônio `pv` por `n` anos. */
 export function pmtDeAnuidade(pv: number, r: number, n: number): number {
   if (r === 0) return pv / n
@@ -231,7 +237,7 @@ export interface KPIs {
   objetivosEternosAnuais: number
   /** Renda anual desejada + objetivos eternos (real, poder de compra de hoje). */
   necessidadeAnualTotal: number
-  /** Patrimônio necessário para LF (anuidade sobre necessidade total). */
+  /** Patrimônio necessário para LF (perpetuidade sobre necessidade total). */
   patrimonioNecessarioLF: number
 }
 
@@ -601,6 +607,19 @@ function aporteMensalEquivalenteDaEscala(premissas: Premissas, escala: number): 
  * principal, deixa o patrimônio REAL praticamente constante na fase de retirada
  * (drift fim − aposentadoria ≈ 0) — mesmo critério de Preservação / fluxo-zero.
  */
+export function encontrarAporteNecessarioPreservacao(
+  params: {
+    premissas: Premissas
+    objetivos: Objetivo[]
+    passivos?: Passivo[]
+    tolerancia?: number
+    maxIter?: number
+  },
+): ResultadoAporteNecessario {
+  return encontrarAporteNecessario(params)
+}
+
+/** @deprecated Use `encontrarAporteNecessarioPreservacao` */
 export function encontrarAporteNecessario(
   params: {
     premissas: Premissas
@@ -661,6 +680,97 @@ export function encontrarAporteNecessario(
     const drift = driftEm(mid)
     if (Math.abs(drift) < toleranciaDrift) return build(mid)
     if (drift < 0) baixo = mid
+    else alto = mid
+  }
+
+  return build((baixo + alto) / 2)
+}
+
+/** Saldo REAL no último ano do horizonte com escala sobre a série de aportes. */
+export function saldoRealFinalHorizonteComEscala(
+  premissas: Premissas,
+  objetivos: Objetivo[],
+  passivos: Passivo[],
+  escala: number,
+): number {
+  const proj = calcularProjecao(
+    premissasComEscalaAporte(premissas, escala),
+    objetivos,
+    passivos,
+    "real",
+  )
+  return Number(proj[proj.length - 1]?.saldoReal) || 0
+}
+
+export interface ResultadoAporteNecessarioConsumo {
+  escala: number
+  aporteMensalEquivalente: number
+  aportePorAnoNominal: number[]
+  patrimonioNoFimDoHorizonte: number
+}
+
+/**
+ * Menor escala sobre `aportePorAnoNominal` que, na mesma `calcularProjecao` do gráfico
+ * principal, zera o patrimônio REAL no fim do horizonte simulado (consumo do principal).
+ */
+export function encontrarAporteNecessarioConsumo(
+  params: {
+    premissas: Premissas
+    objetivos: Objetivo[]
+    passivos?: Passivo[]
+    tolerancia?: number
+    maxIter?: number
+  },
+): ResultadoAporteNecessarioConsumo {
+  const {
+    premissas,
+    objetivos,
+    passivos = [],
+    tolerancia = 500,
+    maxIter = 60,
+  } = params
+
+  const idadeAtual = Number(premissas.idadeAtual) || 0
+  const idadeApos = Number(premissas.idadeApos) || 0
+  const anosAteApos = idadeApos - idadeAtual
+
+  const build = (escala: number): ResultadoAporteNecessarioConsumo => ({
+    escala,
+    aporteMensalEquivalente: aporteMensalEquivalenteDaEscala(premissas, escala),
+    aportePorAnoNominal: seriesAportePorEscala(premissas, escala),
+    patrimonioNoFimDoHorizonte: saldoRealFinalHorizonteComEscala(
+      premissas,
+      objetivos,
+      passivos,
+      escala,
+    ),
+  })
+
+  if (anosAteApos <= 0) return build(0)
+
+  const saldoFinal = (escala: number) =>
+    saldoRealFinalHorizonteComEscala(premissas, objetivos, passivos, escala)
+
+  const finalSemAporte = saldoFinal(0)
+  if (Math.abs(finalSemAporte) < tolerancia) return build(0)
+  if (finalSemAporte > tolerancia) return build(0)
+
+  let baixo = 0
+  let alto = 1
+
+  if (saldoFinal(alto) < 0) {
+    for (let i = 0; i < 40; i++) {
+      if (saldoFinal(alto) >= 0) break
+      alto *= 2
+      if (alto > 100_000) break
+    }
+  }
+
+  for (let i = 0; i < maxIter; i++) {
+    const mid = (baixo + alto) / 2
+    const patrimonioFinal = saldoFinal(mid)
+    if (Math.abs(patrimonioFinal) < tolerancia) return build(mid)
+    if (patrimonioFinal < 0) baixo = mid
     else alto = mid
   }
 
@@ -1126,11 +1236,10 @@ export function calcularKPIs(
   const r   = premissas.rendimento / 100
   const inf = premissas.inflacao   / 100
   const taxaReal             = (1 + r) / (1 + inf) - 1
-  const horizonte            = horizontePosAposentadoriaAnos(premissas)
   const objetivosEternosAnuais = totalObjetivosEternosAnuais(objetivos, taxaReal)
   const rendaAnualDesejada = Math.max(0, premissas.retiradaMensal) * 12
   const necessidadeAnualTotal = rendaAnualDesejada + objetivosEternosAnuais
-  const patrimonioNecessario = pvAnuidade(necessidadeAnualTotal, taxaReal, horizonte)
+  const patrimonioNecessario = patrimonioPerpetuidade(necessidadeAnualTotal, taxaReal)
 
   const idadeLF = encontrarIdadeLiberdadeFinanceira(
     projecao,
