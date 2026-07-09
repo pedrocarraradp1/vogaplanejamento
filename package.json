@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "node --experimental-strip-types --import ./scripts/test-register.mjs --test lib/projecao-calculos.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

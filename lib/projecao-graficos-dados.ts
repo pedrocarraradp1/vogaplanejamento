@@ -38,7 +38,7 @@ export interface BuildDadosRendaOptions {
   taxaNominalAnual: number
   inflacaoAnual: number
   horizonteAnos: number
-  /** Renda mensal desejada nas premissas (poder de compra de hoje). */
+  /** Renda mensal líquida do patrimônio nas premissas (poder de compra de hoje). */
   metaMensal: number
   idadeAposentadoria: number
   saldoInicial: number

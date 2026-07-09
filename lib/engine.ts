@@ -237,13 +237,83 @@ export interface KPIs {
   patrimonioAposReal: number
   rendaMensalReal: number
   idadeLF: number | null
+  /** Idade LF antes do teto na aposentadoria (se aplicável). */
+  idadeLFCalculada?: number | null
+  lfTravadaNaAposentadoria?: boolean
+  lfAviso?: string | null
   taxaPoupanca: number
+  /** Retirada líquida mensal do patrimônio (desejada − renda garantida na aposentadoria). */
+  retiradaLiquidaMensal: number
   /** Equivalente anual (real) reservado para objetivos recorrentes eternos. */
   objetivosEternosAnuais: number
-  /** Renda anual desejada + objetivos eternos (real, poder de compra de hoje). */
+  /** Retirada líquida anual + objetivos eternos (real, poder de compra de hoje). */
   necessidadeAnualTotal: number
   /** Patrimônio necessário para LF (perpetuidade sobre necessidade total). */
   patrimonioNecessarioLF: number
+}
+
+/** Retirada mensal que o patrimônio precisa cobrir (exclui INSS, previdência, aluguéis etc.). */
+export function retiradaLiquidaDoPatrimonio(premissas: {
+  retiradaMensal?: number
+  rendaAposentadoria?: number
+}): number {
+  return Math.max(
+    0,
+    (Number(premissas.retiradaMensal) || 0) - (Number(premissas.rendaAposentadoria) || 0),
+  )
+}
+
+export interface ResultadoLiberdadeFinanceira {
+  idade: number | null
+  idadeCalculada: number | null
+  travadaNaAposentadoria: boolean
+  aviso: string | null
+}
+
+const AVISO_LF_APOS_APOSENTADORIA =
+  "Patrimônio atinge sustentabilidade plena após o início dos saques."
+
+/**
+ * Idade de liberdade financeira para exibição: nunca acima da idade de aposentadoria.
+ */
+export function resolverIdadeLiberdadeFinanceira(
+  projecao: ProjecaoAno[],
+  premissas: Premissas,
+  objetivos: Objetivo[] = [],
+  opts?: {
+    taxaRealNoAno?: (t: number) => number
+    rendimentoLiquidoPct?: number
+    inflacaoPct?: number
+  },
+): ResultadoLiberdadeFinanceira {
+  const idadeApos = Number(premissas.idadeApos) || 0
+  const retiradaLiquida = retiradaLiquidaDoPatrimonio(premissas)
+  const idadeCalculada = encontrarIdadeLiberdadeFinanceira(
+    projecao,
+    opts?.rendimentoLiquidoPct ?? premissas.rendimento,
+    opts?.inflacaoPct ?? premissas.inflacao,
+    retiradaLiquida,
+    objetivos,
+    opts?.taxaRealNoAno ? { taxaRealNoAno: opts.taxaRealNoAno } : undefined,
+  )
+
+  if (idadeCalculada == null) {
+    return { idade: null, idadeCalculada: null, travadaNaAposentadoria: false, aviso: null }
+  }
+  if (idadeApos > 0 && idadeCalculada > idadeApos) {
+    return {
+      idade: idadeApos,
+      idadeCalculada,
+      travadaNaAposentadoria: true,
+      aviso: AVISO_LF_APOS_APOSENTADORIA,
+    }
+  }
+  return {
+    idade: idadeCalculada,
+    idadeCalculada,
+    travadaNaAposentadoria: false,
+    aviso: null,
+  }
 }
 
 export interface InventarioResult {
@@ -1153,17 +1223,17 @@ export function calcularFluxoAnual(
 
 /**
  * Liberdade financeira (perpetuidade / fluxo-zero): primeira idade em que o
- * rendimento REAL anual do patrimônio cobre a necessidade anual (renda desejada
- * + objetivos eternos equivalentes), sem consumir o principal.
+ * rendimento REAL anual do patrimônio cobre a necessidade anual (retirada
+ * líquida do patrimônio + objetivos eternos equivalentes), sem consumir o principal.
  *
- * Fonte única para o KPI "Liberdade Financeira" e a linha "Independência
- * Financeira" da tabela de cenários.
+ * Passe `retiradaMensalLiquidaPatrimonio` (não a retirada bruta desejada).
+ * Para exibição com teto na aposentadoria, use `resolverIdadeLiberdadeFinanceira`.
  */
 export function encontrarIdadeLiberdadeFinanceira(
   projecao: ProjecaoAno[],
   rendimentoLiquidoPct: number,
   inflacaoPct: number,
-  retiradaMensalDesejada: number,
+  retiradaMensalLiquidaPatrimonio: number,
   objetivos: Objetivo[] = [],
   opts?: { taxaRealNoAno?: (t: number) => number },
 ): number | null {
@@ -1175,7 +1245,7 @@ export function encontrarIdadeLiberdadeFinanceira(
     const taxaReal = opts?.taxaRealNoAno ? opts.taxaRealNoAno(ano.t) : taxaRealFixa
     const objetivosEternosAnuais = totalObjetivosEternosAnuais(objetivos, taxaReal)
     const necessidadeAnualTotal =
-      Math.max(0, Number(retiradaMensalDesejada) || 0) * 12 + objetivosEternosAnuais
+      Math.max(0, Number(retiradaMensalLiquidaPatrimonio) || 0) * 12 + objetivosEternosAnuais
     const patrimonioReal = Number(ano.saldoReal) || 0
     const rendimentoRealAno = patrimonioReal * taxaReal
     if (rendimentoRealAno >= necessidadeAnualTotal) {
@@ -1203,18 +1273,12 @@ export function calcularKPIs(
   const anosAteApos = Math.max(0, idadeApos - idadeAtual)
   const taxaRealApos = taxaRealNoAno(anosAteApos)
   const objetivosEternosAnuais = totalObjetivosEternosAnuais(objetivos, taxaRealApos)
-  const rendaAnualDesejada = Math.max(0, premissas.retiradaMensal) * 12
-  const necessidadeAnualTotal = rendaAnualDesejada + objetivosEternosAnuais
+  const retiradaLiquidaMensal = retiradaLiquidaDoPatrimonio(premissas)
+  const rendaAnualLiquida = retiradaLiquidaMensal * 12
+  const necessidadeAnualTotal = rendaAnualLiquida + objetivosEternosAnuais
   const patrimonioNecessario = patrimonioPerpetuidade(necessidadeAnualTotal, taxaRealApos)
 
-  const idadeLF = encontrarIdadeLiberdadeFinanceira(
-    projecao,
-    premissas.rendimento,
-    premissas.inflacao,
-    premissas.retiradaMensal,
-    objetivos,
-    { taxaRealNoAno },
-  )
+  const lf = resolverIdadeLiberdadeFinanceira(projecao, premissas, objetivos, { taxaRealNoAno })
 
   const taxaPoupanca = renda > 0 ? ((renda - despesa) / renda) * 100 : 0
 
@@ -1222,8 +1286,12 @@ export function calcularKPIs(
     patrimonioApos,
     patrimonioAposReal,
     rendaMensalReal,
-    idadeLF,
+    idadeLF: lf.idade,
+    idadeLFCalculada: lf.idadeCalculada,
+    lfTravadaNaAposentadoria: lf.travadaNaAposentadoria,
+    lfAviso: lf.aviso,
     taxaPoupanca: Math.round(taxaPoupanca),
+    retiradaLiquidaMensal,
     objetivosEternosAnuais,
     necessidadeAnualTotal,
     patrimonioNecessarioLF: patrimonioNecessario,

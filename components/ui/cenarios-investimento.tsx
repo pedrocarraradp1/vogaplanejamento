@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { usePlano } from "@/lib/plano-context"
-import { calcularProjecao, encontrarIdadeLiberdadeFinanceira } from "@/lib/engine"
+import { calcularProjecao, resolverIdadeLiberdadeFinanceira } from "@/lib/engine"
 import {
   ResponsiveContainer,
   LineChart,
@@ -127,13 +127,10 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
         patrimonioApos: patrimonio.nominal,
         patrimonioAposReal: patrimonio.real,
         rendaMensalAposReal: rendaMensalRealNaApos(patrimonio.real, taxaLiquida),
-        idadeIF: encontrarIdadeLiberdadeFinanceira(
-          projecaoLocal,
-          taxaLiquida,
-          inflacaoGlobal,
-          retiradaDesejada,
-          objetivosEngine,
-        ),
+        idadeIF: resolverIdadeLiberdadeFinanceira(projecaoLocal, premissas, objetivosEngine, {
+          rendimentoLiquidoPct: taxaLiquida,
+          inflacaoPct: inflacaoGlobal,
+        }).idade,
       }
     }
 

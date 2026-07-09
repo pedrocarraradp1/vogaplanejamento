@@ -265,9 +265,11 @@ export function resolveAporteParaPremissas(
     const manualReal = periodos[b.i]
     if (manualReal === undefined || manualReal === null) continue
     const real = Number(manualReal) || 0
-    const nominalNoInicio = real * Math.pow(1 + inf, b.inicio)
     const fimEfetivo = Math.min(b.fim, anosAcum)
-    for (let t = b.inicio; t < fimEfetivo; t++) byYear[t] = nominalNoInicio
+    // anosDecorridos = t desde o ano 0 da simulação (nunca reinicia no bloco)
+    for (let t = b.inicio; t < fimEfetivo; t++) {
+      byYear[t] = real * Math.pow(1 + inf, t)
+    }
   }
 
   for (let t = anosAcum; t <= prazo; t++) byYear[t] = 0

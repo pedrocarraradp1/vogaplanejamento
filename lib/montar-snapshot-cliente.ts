@@ -13,7 +13,7 @@ import {
   resolveAporteParaPremissas,
 } from "@/lib/renda-utils"
 import { getDespesas } from "@/lib/despesa-utils"
-import { calcularProjecao, encontrarAporteNecessario, encontrarIdadeLiberdadeFinanceira } from "@/lib/engine"
+import { calcularProjecao, encontrarAporteNecessario, resolverIdadeLiberdadeFinanceira } from "@/lib/engine"
 import { calcularRealizadoMensal } from "@/lib/fluxo-caixa-utils"
 
 function idadePorNascimento(nascimento: string): number {
@@ -107,13 +107,11 @@ export function montarSnapshotCliente(state: PlanoState): SnapshotCliente {
       passivos,
     )
 
-    const idadeIndep = encontrarIdadeLiberdadeFinanceira(
+    const idadeIndep = resolverIdadeLiberdadeFinanceira(
       projecao,
-      premissas.rendimento,
-      premissas.inflacao,
-      rendaDesejada,
+      { ...premissas, saldoInicial, aporteM, idadeAtual, aportePorAnoNominal },
       objetivos,
-    )
+    ).idade
     const anosParaIndependencia =
       idadeIndep != null ? Math.max(0, idadeIndep - idadeAtual) : Math.max(0, idadeApos - idadeAtual)
 

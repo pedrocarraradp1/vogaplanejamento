@@ -232,7 +232,7 @@ export function RendaCarteiraChart({
 
   return (
     <div className="mt-8 w-full min-w-0 space-y-2">
-      <h3 className="text-sm font-medium text-foreground">Renda gerada vs. renda desejada</h3>
+      <h3 className="text-sm font-medium text-foreground">Renda gerada vs. retirada líquida do patrimônio</h3>
       <div className="w-full min-w-0" style={{ height: CHART_HEIGHT, minHeight: CHART_HEIGHT }}>
         <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
           <ComposedChart data={dados} margin={{ top: 16, right: 24, left: 8, bottom: 4 }}>
@@ -273,7 +273,7 @@ export function RendaCarteiraChart({
                       Renda mensal gerada: {formatarMoedaCompleta(p.rendaGeradaReal)}
                     </p>
                     <p style={{ ...CHART_TOOLTIP_ITEM_STYLE, opacity: 0.85 }}>
-                      Renda mensal desejada: {formatarMoedaCompleta(p.meta)}
+                      Retirada líquida do patrimônio: {formatarMoedaCompleta(p.meta)}
                     </p>
                     <p
                       style={{
@@ -302,7 +302,7 @@ export function RendaCarteiraChart({
             <Line
               type="monotone"
               dataKey="meta"
-              name="Renda mensal desejada"
+              name="Retirada líquida do patrimônio"
               stroke="var(--voga-alerta)"
               strokeWidth={1.5}
               strokeDasharray="4 4"
