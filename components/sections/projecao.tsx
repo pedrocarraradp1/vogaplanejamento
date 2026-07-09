@@ -53,6 +53,7 @@ import { MonteCarloChart } from "@/components/charts/monte-carlo-chart"
 import { CenariosRetiradaSection } from "@/components/ui/cenarios-retirada-section"
 import { ControlesSimulacao } from "@/components/ui/controles-simulacao"
 import { BlocoAporteNecessario } from "@/components/ui/bloco-aporte-necessario"
+import { CenariosInvestimento } from "@/components/ui/cenarios-investimento"
 import { isPlanoCompleto, type PlanoSecaoVariant } from "@/lib/plano-secoes"
 
 const GOLD = VOGA.brasilia

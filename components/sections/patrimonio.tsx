@@ -30,6 +30,7 @@ import {
   normalizeAtivoDescricao,
   normalizePassivo,
   normalizeAtivoTipo,
+  normalizeAtivoRecord,
   resolveDescricaoAtivo,
   resolvePassivoCategoria,
   resolveTipoAtivoSlug,
