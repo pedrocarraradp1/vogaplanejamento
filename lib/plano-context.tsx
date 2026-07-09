@@ -595,7 +595,7 @@ export function PlanoProvider({
     const { aporteM, aportePorAnoNominal } = resolveAporteParaPremissas(
       fontes,
       state.dadosPessoais.despesa,
-      state.premissas,
+      { ...state.premissas, idadeAtual },
     )
 
     const projecao = calcularProjecao(
@@ -619,7 +619,7 @@ export function PlanoProvider({
     const { aporteM, aportePorAnoNominal } = resolveAporteParaPremissas(
       fontes,
       state.dadosPessoais.despesa,
-      state.premissas,
+      { ...state.premissas, idadeAtual },
     )
 
     const premissasCompletas = {

@@ -181,6 +181,26 @@ export interface BlocoAporte {
   fim: number
 }
 
+export const BLOCO_APORTE_ANOS = 5
+
+/** Anos de acumulação (índices 0..n-1) — aporte só até antes da aposentadoria. */
+export function anosAcumulacaoAporte(idadeAtual: number, idadeApos: number): number {
+  return Math.max(0, (Number(idadeApos) || 0) - Math.max(0, Number(idadeAtual) || 0))
+}
+
+/** Blocos de aporte personalizado (ex.: 5 anos), limitados à fase de acumulação. */
+export function buildBlocosAporte(prazoAcumulacao: number, tamanhoBloco = BLOCO_APORTE_ANOS): BlocoAporte[] {
+  const prazo = Math.max(0, Number(prazoAcumulacao) || 0)
+  if (prazo === 0) return []
+
+  const blocos = Math.ceil(prazo / tamanhoBloco)
+  return Array.from({ length: blocos }, (_, i) => {
+    const inicio = i * tamanhoBloco
+    const fim = Math.min((i + 1) * tamanhoBloco, prazo)
+    return { i, inicio, fim }
+  })
+}
+
 /** Resolve aporteM e série anual nominal a partir das fontes de renda (e overrides manuais). */
 export function resolveAporteParaPremissas(
   fontes: FonteRenda[],
@@ -190,6 +210,8 @@ export function resolveAporteParaPremissas(
     inflacao: number
     aporteModo: "fixo" | "periodos"
     aportePeriodosReal: number[]
+    idadeApos?: number
+    idadeAtual?: number
   },
   blocosAporte?: BlocoAporte[],
   anoBase = new Date().getFullYear(),
@@ -198,7 +220,12 @@ export function resolveAporteParaPremissas(
   const prazo = Math.max(0, Number(premissas.prazo) || 0)
   const fromFontes = buildAportePorAnoNominal(fontes, despesa, prazo, premissas.inflacao, anoBase)
 
-  if (premissas.aporteModo !== "periodos" || !blocosAporte?.length) {
+  const anosAcum = anosAcumulacaoAporte(premissas.idadeAtual ?? 0, premissas.idadeApos ?? 0)
+  const blocosEfetivos =
+    blocosAporte ??
+    (premissas.aporteModo === "periodos" ? buildBlocosAporte(anosAcum) : undefined)
+
+  if (premissas.aporteModo !== "periodos" || !blocosEfetivos?.length) {
     return { aporteM, aportePorAnoNominal: fromFontes }
   }
 
@@ -206,14 +233,21 @@ export function resolveAporteParaPremissas(
   const periodos = premissas.aportePeriodosReal ?? []
   const byYear = [...fromFontes]
 
-  for (const b of blocosAporte) {
+  for (const b of blocosEfetivos) {
+    if (b.inicio >= anosAcum) continue
     const manualReal = periodos[b.i]
     if (manualReal === undefined || manualReal === null) continue
     const real = Number(manualReal) || 0
     const nominalNoInicio = real * Math.pow(1 + inf, b.inicio)
-    for (let t = b.inicio; t < b.fim; t++) byYear[t] = nominalNoInicio
+    const fimEfetivo = Math.min(b.fim, anosAcum)
+    for (let t = b.inicio; t < fimEfetivo; t++) byYear[t] = nominalNoInicio
   }
-  if (prazo > 0 && byYear[prazo] === 0) byYear[prazo] = byYear[prazo - 1] ?? 0
+
+  for (let t = anosAcum; t <= prazo; t++) byYear[t] = 0
+
+  if (prazo > 0 && prazo < anosAcum && byYear[prazo] === 0) {
+    byYear[prazo] = byYear[prazo - 1] ?? 0
+  }
 
   return { aporteM, aportePorAnoNominal: byYear }
 }

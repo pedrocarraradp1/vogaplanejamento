@@ -2,7 +2,7 @@
 
 import { useMemo } from "react"
 import { usePlano } from "@/lib/plano-context"
-import { getFontesRenda, resolveAporteParaPremissas } from "@/lib/renda-utils"
+import { getFontesRenda, resolveAporteParaPremissas, buildBlocosAporte, anosAcumulacaoAporte } from "@/lib/renda-utils"
 import { calcularProjecao, type ProjecaoAno } from "@/lib/engine"
 
 export function useDadosCenarios() {
@@ -36,19 +36,20 @@ export function useDadosCenarios() {
   }, [dadosPessoais.nascimento])
 
   const fontesRenda = useMemo(() => getFontesRenda(dadosPessoais), [dadosPessoais])
-  const blocosAporte = useMemo(() => {
-    const prazo = Math.max(0, Number(premissas.prazo) || 0)
-    const blocos = Math.max(1, Math.ceil(prazo / 5))
-    return Array.from({ length: blocos }, (_, i) => {
-      const inicio = i * 5
-      const fim = Math.min((i + 1) * 5, prazo)
-      return { i, inicio, fim }
-    })
-  }, [premissas.prazo])
+  const blocosAporte = useMemo(
+    () => buildBlocosAporte(anosAcumulacaoAporte(idadeAtualCalculada, Number(premissas.idadeApos) || 0)),
+    [idadeAtualCalculada, premissas.idadeApos],
+  )
 
   const { aporteM: aporteMensal, aportePorAnoNominal } = useMemo(
-    () => resolveAporteParaPremissas(fontesRenda, dadosPessoais.despesa, premissas, blocosAporte),
-    [fontesRenda, dadosPessoais.despesa, premissas, blocosAporte],
+    () =>
+      resolveAporteParaPremissas(
+        fontesRenda,
+        dadosPessoais.despesa,
+        { ...premissas, idadeAtual: idadeAtualCalculada },
+        blocosAporte,
+      ),
+    [fontesRenda, dadosPessoais.despesa, premissas, blocosAporte, idadeAtualCalculada],
   )
 
   const premissasCompletas = useMemo(

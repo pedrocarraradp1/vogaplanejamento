@@ -6,13 +6,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, ArrowRight, TrendingUp, DollarSign, Clock, Info } from "lucide-react"
+import { ArrowLeft, ArrowRight, Info } from "lucide-react"
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, Cell, Line,
 } from "recharts"
 import { usePlano } from "@/lib/plano-context"
-import { getFontesRenda, receitaMensalAtual, resolveAporteParaPremissas } from "@/lib/renda-utils"
+import { getFontesRenda, receitaMensalAtual, resolveAporteParaPremissas, buildBlocosAporte, anosAcumulacaoAporte } from "@/lib/renda-utils"
 import {
   calcularProjecao,
   calcularKPIs,
@@ -126,34 +126,43 @@ export function Projecao({ onNavigate, variant = "full" }: ProjecaoProps) {
   const rendaMensalAtual = useMemo(() => receitaMensalAtual(fontesRenda), [fontesRenda])
 
   const aporteModo = premissas.aporteModo ?? "fixo"
-  const blocosAporte = useMemo(() => {
-    const prazo = Math.max(0, Number(premissas.prazo) || 0)
-    const blocos = Math.max(1, Math.ceil(prazo / 5))
-    return Array.from({ length: blocos }, (_, i) => {
-      const inicio = i * 5
-      const fim = Math.min((i + 1) * 5, prazo)
-      return { i, inicio, fim }
-    })
-  }, [premissas.prazo])
+  const anosAcumulacaoAporteVal = useMemo(
+    () => anosAcumulacaoAporte(idadeAtualCalculada, Number(premissas.idadeApos) || 0),
+    [idadeAtualCalculada, premissas.idadeApos],
+  )
+  const blocosAporte = useMemo(
+    () => buildBlocosAporte(anosAcumulacaoAporteVal),
+    [anosAcumulacaoAporteVal],
+  )
+
+  const premissasComAporte = useMemo(
+    () => ({ ...premissas, idadeAtual: idadeAtualCalculada }),
+    [premissas, idadeAtualCalculada],
+  )
 
   // Mantém o array de aportes por bloco alinhado ao prazo (preserva valores existentes)
   const aporteBase = useMemo(
-    () => resolveAporteParaPremissas(fontesRenda, dadosPessoais.despesa, premissas, blocosAporte).aporteM,
-    [fontesRenda, dadosPessoais.despesa, premissas, blocosAporte],
+    () =>
+      resolveAporteParaPremissas(fontesRenda, dadosPessoais.despesa, premissasComAporte, blocosAporte).aporteM,
+    [fontesRenda, dadosPessoais.despesa, premissasComAporte, blocosAporte],
   )
 
   useEffect(() => {
     if (aporteModo !== "periodos") return
     const desired = blocosAporte.length
     const cur = premissas.aportePeriodosReal ?? []
+    if (desired === 0) {
+      if (cur.length !== 0) setPremissas({ aportePeriodosReal: [] })
+      return
+    }
     if (cur.length === desired) return
     const next = Array.from({ length: desired }, (_, i) => (cur[i] ?? aporteBase))
     setPremissas({ aportePeriodosReal: next })
   }, [aporteModo, blocosAporte.length, aporteBase, premissas.aportePeriodosReal, setPremissas])
 
   const { aporteM: aporteMensal, aportePorAnoNominal } = useMemo(
-    () => resolveAporteParaPremissas(fontesRenda, dadosPessoais.despesa, premissas, blocosAporte),
-    [fontesRenda, dadosPessoais.despesa, premissas, blocosAporte],
+    () => resolveAporteParaPremissas(fontesRenda, dadosPessoais.despesa, premissasComAporte, blocosAporte),
+    [fontesRenda, dadosPessoais.despesa, premissasComAporte, blocosAporte],
   )
 
   // Premissas completas — junta os campos editáveis com os derivados
@@ -1072,7 +1081,12 @@ export function Projecao({ onNavigate, variant = "full" }: ProjecaoProps) {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {blocosAporte.map((b) => {
+                {blocosAporte.length === 0 ? (
+                  <p className="text-sm text-muted-foreground md:col-span-2">
+                    Não há fase de acumulação até a aposentadoria com as idades configuradas.
+                  </p>
+                ) : (
+                blocosAporte.map((b) => {
                   const real = Number((premissas.aportePeriodosReal ?? [])[b.i] ?? aporteMensal) || 0
                   const inf = (Number(premissas.inflacao) || 0) / 100
                   const nominalNoInicio = real * Math.pow(1 + inf, b.inicio)
@@ -1102,7 +1116,8 @@ export function Projecao({ onNavigate, variant = "full" }: ProjecaoProps) {
                       </div>
                     </div>
                   )
-                })}
+                })
+                )}
               </div>
             </div>
           )}
@@ -1266,17 +1281,14 @@ export function Projecao({ onNavigate, variant = "full" }: ProjecaoProps) {
               tooltip="Patrimônio projetado no ano em que a idade de aposentadoria é atingida, considerando aportes e rentabilidade até lá."
             >
               <div className="bg-[rgba(30,92,230,0.08)] border border-primary/30 rounded-xl p-4">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="field-label">Patrimônio na Aposentadoria</p>
-                    <p className="text-2xl font-bold mt-1" style={{ color: "var(--voga-brasilia)" }}>
-                      {formatarMoeda(kpis.patrimonioAposReal)}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {formatarMoeda(kpis.patrimonioApos)} nominal
-                    </p>
-                  </div>
-                  <TrendingUp className="w-5 h-5 text-primary" />
+                <div>
+                  <p className="field-label">Patrimônio na Aposentadoria</p>
+                  <p className="text-2xl font-bold mt-1" style={{ color: "var(--voga-brasilia)" }}>
+                    {formatarMoeda(kpis.patrimonioAposReal)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {formatarMoeda(kpis.patrimonioApos)} nominal
+                  </p>
                 </div>
               </div>
             </KpiCardComTooltip>
@@ -1285,15 +1297,12 @@ export function Projecao({ onNavigate, variant = "full" }: ProjecaoProps) {
               tooltip="Retirada mensal que o patrimônio sustenta para sempre, sem consumir o principal — é o rendimento real anual dividido por 12."
             >
               <div className="bg-[rgba(16,102,218,0.08)] border border-[#1066DA]/30 rounded-xl p-4">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="field-label font-semibold text-foreground">Renda mensal gerada</p>
-                    <p className="text-2xl font-bold text-[#1066DA] mt-1">{formatarMoedaCompleta(rendaGeradaApos.valor)}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Perpetuidade {displayMode === "nominal" ? `· (${formatarMoedaCompleta(rendaGeradaApos.valorHoje)} hoje)` : ""}
-                    </p>
-                  </div>
-                  <DollarSign className="w-5 h-5 text-[#1066DA]" />
+                <div>
+                  <p className="field-label font-semibold text-foreground">Renda mensal gerada</p>
+                  <p className="text-2xl font-bold text-[#1066DA] mt-1">{formatarMoedaCompleta(rendaGeradaApos.valor)}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Perpetuidade {displayMode === "nominal" ? `· (${formatarMoedaCompleta(rendaGeradaApos.valorHoje)} hoje)` : ""}
+                  </p>
                 </div>
               </div>
             </KpiCardComTooltip>
@@ -1302,24 +1311,21 @@ export function Projecao({ onNavigate, variant = "full" }: ProjecaoProps) {
               tooltip="Retirada mensal que esgota exatamente o patrimônio no último ano do horizonte simulado — mais alta que a renda gerada, mas consome o principal ao longo do caminho."
             >
               <div className="bg-[rgba(75,117,155,0.10)] border border-[var(--voga-nuvem)]/30 rounded-xl p-4">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="field-label font-semibold text-foreground">Renda de consumo do patrimônio</p>
-                    <p className="text-2xl font-bold mt-1" style={{ color: "var(--voga-nuvem)" }}>
-                      {formatarMoedaCompleta(rendaConsumoApos.valor)}
-                    </p>
+                <div>
+                  <p className="field-label font-semibold text-foreground">Renda de consumo do patrimônio</p>
+                  <p className="text-2xl font-bold mt-1" style={{ color: "var(--voga-nuvem)" }}>
+                    {formatarMoedaCompleta(rendaConsumoApos.valor)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {displayMode === "nominal"
+                      ? `(${formatarMoedaCompleta(rendaConsumoApos.valorHoje)} hoje · anuidade por ${horizonte} anos)`
+                      : `Zera aos ${idadeFimSimulacao} anos`}
+                  </p>
+                  {displayMode === "nominal" && (
                     <p className="text-xs text-muted-foreground mt-1">
-                      {displayMode === "nominal"
-                        ? `(${formatarMoedaCompleta(rendaConsumoApos.valorHoje)} hoje · anuidade por ${horizonte} anos)`
-                        : `Zera aos ${idadeFimSimulacao} anos`}
+                      Zera aos {idadeFimSimulacao} anos
                     </p>
-                    {displayMode === "nominal" && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Zera aos {idadeFimSimulacao} anos
-                      </p>
-                    )}
-                  </div>
-                  <DollarSign className="w-5 h-5" style={{ color: "var(--voga-nuvem)" }} />
+                  )}
                 </div>
               </div>
             </KpiCardComTooltip>
@@ -1328,24 +1334,21 @@ export function Projecao({ onNavigate, variant = "full" }: ProjecaoProps) {
               tooltip="Idade em que o rendimento real do patrimônio já cobre a renda desejada e os objetivos eternos, para sempre — o patrimônio pode ser sacado indefinidamente sem esgotar."
             >
               <div className="bg-secondary border border-border rounded-xl p-4">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="field-label">Liberdade Financeira</p>
-                    <p className="text-2xl font-bold text-[#1066DA] mt-1">
-                      {kpis.idadeLF ? `${kpis.idadeLF} anos` : "—"}
+                <div>
+                  <p className="field-label">Liberdade Financeira</p>
+                  <p className="text-2xl font-bold text-[#1066DA] mt-1">
+                    {kpis.idadeLF ? `${kpis.idadeLF} anos` : "—"}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {kpis.idadeLF ? `Em ${kpis.idadeLF - idadeAtualCalculada} anos` : "Ajuste as premissas"}
+                  </p>
+                  <div className="text-xs text-muted-foreground mt-2 space-y-0.5 border-t border-border/50 pt-2">
+                    <p>Renda desejada: {formatarMoedaCompleta(rendaMensalDesejada)}/mês</p>
+                    <p>Objetivos eternos (equiv.): {formatarMoedaCompleta(objetivosEternosMensal)}/mês</p>
+                    <p className="text-foreground font-medium">
+                      Necessidade total: {formatarMoedaCompleta(necessidadeMensalTotal)}/mês
                     </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {kpis.idadeLF ? `Em ${kpis.idadeLF - idadeAtualCalculada} anos` : "Ajuste as premissas"}
-                    </p>
-                    <div className="text-xs text-muted-foreground mt-2 space-y-0.5 border-t border-border/50 pt-2">
-                      <p>Renda desejada: {formatarMoedaCompleta(rendaMensalDesejada)}/mês</p>
-                      <p>Objetivos eternos (equiv.): {formatarMoedaCompleta(objetivosEternosMensal)}/mês</p>
-                      <p className="text-foreground font-medium">
-                        Necessidade total: {formatarMoedaCompleta(necessidadeMensalTotal)}/mês
-                      </p>
-                    </div>
                   </div>
-                  <Clock className="w-5 h-5 text-[#1066DA]" />
                 </div>
               </div>
             </KpiCardComTooltip>
