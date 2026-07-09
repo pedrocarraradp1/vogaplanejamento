@@ -73,6 +73,59 @@ export function labelSubcategoriaLiquido(value: string): string {
   return SUBCATEGORIAS_LIQUIDO.find((s) => s.value === value)?.label ?? value
 }
 
+/** Resolve subcategoria de ativo líquido (slug), inclusive por rótulo legado na descrição. */
+export function resolveSubcategoriaLiquido(
+  ativo: Pick<Ativo, "subcategoria" | "descricao">,
+): SubcategoriaLiquido | undefined {
+  const sub = (ativo.subcategoria ?? "").trim()
+  if (sub && SUBCATEGORIAS_LIQUIDO.some((s) => s.value === sub)) {
+    return sub as SubcategoriaLiquido
+  }
+  const desc = normalizeAtivoDescricao(ativo.descricao ?? "").trim()
+  if (!desc) return undefined
+  const byLabel = SUBCATEGORIAS_LIQUIDO.find((s) => s.label === desc)
+  if (byLabel) return byLabel.value
+  const byValue = SUBCATEGORIAS_LIQUIDO.find((s) => s.value === desc)
+  return byValue?.value
+}
+
+/** Converte string monetária (máscara ou decimal pt-BR) preservando centavos. */
+export function parseValorMoeda(value: string): number {
+  const trimmed = (value ?? "").trim()
+  if (!trimmed) return 0
+
+  if (trimmed.includes(",")) {
+    const normalized = trimmed
+      .replace(/[^\d,.-]/g, "")
+      .replace(/\./g, "")
+      .replace(",", ".")
+    const n = parseFloat(normalized)
+    return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0
+  }
+
+  if (trimmed.includes(".")) {
+    const normalized = trimmed.replace(/[^\d.-]/g, "")
+    const n = parseFloat(normalized)
+    return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0
+  }
+
+  const digits = trimmed.replace(/\D/g, "")
+  if (!digits) return 0
+  return Math.round(parseFloat(digits)) / 100
+}
+
+export function formatValorMoeda(
+  value: number,
+  moeda: "BRL" | "USD" = "BRL",
+  fractionDigits = 2,
+): string {
+  if (!value) return ""
+  return new Intl.NumberFormat(moeda === "USD" ? "en-US" : "pt-BR", {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  }).format(value)
+}
+
 export function labelLocalizacaoAtivo(value: string): string {
   return LOCALIZACAO_ATIVO.find((l) => l.value === value)?.label ?? value
 }
@@ -133,14 +186,18 @@ export function labelTipoAtivo(tipo: string, descricao?: string): string {
 
 export function normalizeAtivoRecord(ativo: Ativo): Ativo {
   const tipo = normalizeAtivoTipo(ativo.tipo, ativo.descricao)
-  const subcategoria = (ativo.subcategoria ?? "").trim() || undefined
+  const subcategoriaResolvida =
+    tipo === "ativo_liquido" ? resolveSubcategoriaLiquido(ativo) : undefined
+  const subcategoria = subcategoriaResolvida ?? ((ativo.subcategoria ?? "").trim() || undefined)
   const localizacao = (ativo.localizacao ?? "").trim() || undefined
   const observacao = (ativo.observacao ?? "").trim() || undefined
   const instituicao = (ativo.instituicao ?? "").trim()
   let descricao = (ativo.descricao ?? "").trim()
   if (tipo === "ativo_liquido" && subcategoria) {
     descricao = labelSubcategoriaLiquido(subcategoria)
-  } else {
+  } else if (tipo !== "ativo_liquido") {
+    descricao = resolveDescricaoAtivo(tipo, descricao)
+  } else if (!descricao) {
     descricao = resolveDescricaoAtivo(tipo, descricao)
   }
   return {
@@ -151,6 +208,7 @@ export function normalizeAtivoRecord(ativo: Ativo): Ativo {
     localizacao,
     observacao,
     instituicao,
+    valor: Math.round((Number(ativo.valor) || 0) * 100) / 100,
     reservaLiquidez:
       tipo === "ativo_liquido" ? ativo.reservaLiquidez !== false : undefined,
   }

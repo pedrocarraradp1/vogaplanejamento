@@ -63,6 +63,9 @@ import {
   CORES_SUBCATEGORIA,
   labelSubcategoriaLiquido,
   labelLocalizacaoAtivo,
+  resolveSubcategoriaLiquido,
+  parseValorMoeda,
+  formatValorMoeda,
   type LocalizacaoAtivo,
   type SubcategoriaLiquido,
   type SecaoAtivoConfig,
@@ -424,7 +427,7 @@ function AtivosLiquidosComposicao({
     const slices: DonutSlice[] = []
     for (const sub of SUBCATEGORIAS_LIQUIDO) {
       const valor = ativosFiltrados
-        .filter((a) => (a.subcategoria ?? "") === sub.value)
+        .filter((a) => resolveSubcategoriaLiquido(a) === sub.value)
         .reduce((s, a) => s + (Number(a.valor) || 0), 0)
       if (valor <= 0) continue
       slices.push({
@@ -433,7 +436,7 @@ function AtivosLiquidosComposicao({
         fill: CORES_SUBCATEGORIA[sub.value] ?? "#5F85B8",
       })
     }
-    const semSub = ativosFiltrados.filter((a) => !(a.subcategoria ?? "").trim())
+    const semSub = ativosFiltrados.filter((a) => !resolveSubcategoriaLiquido(a))
     if (semSub.length > 0) {
       const valor = semSub.reduce((s, a) => s + (Number(a.valor) || 0), 0)
       if (valor > 0) {
@@ -640,7 +643,7 @@ function BalancoAtivoAccordion({
 
   const labelAtivo = (ativo: Ativo) => {
     if (variant === "liquido") {
-      const sub = (ativo.subcategoria ?? "").trim()
+      const sub = resolveSubcategoriaLiquido(ativo)
       if (sub) return labelSubcategoriaLiquido(sub)
       return normalizeAtivoDescricao(ativo.descricao) || "Sem descrição"
     }
@@ -823,19 +826,18 @@ function AtivoListaBarRow({
   onOpenEditModal?: () => void
 }) {
   const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState("")
+  const [draft, setDraft] = useState(0)
 
   const pct = totalSecao > 0 ? Math.min(100, Math.round((valor / totalSecao) * 100)) : 0
   const barWidth = totalSecao > 0 ? (valor / totalSecao) * 100 : 0
 
   const startEdit = () => {
-    setDraft(valor > 0 ? formatCurrency(valor) : "")
+    setDraft(valor)
     setEditing(true)
   }
 
-  const commit = (raw: string) => {
-    const cleaned = raw.replace(/[^\d]/g, "")
-    onValueCommit(parseInt(cleaned, 10) || 0)
+  const commit = (raw: number) => {
+    onValueCommit(Math.round(raw * 100) / 100)
     setEditing(false)
   }
 
@@ -919,8 +921,11 @@ function AtivoListaBarRow({
           {editing ? (
             <Input
               autoFocus
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
+              type="number"
+              step="0.01"
+              min="0"
+              value={draft > 0 ? draft : ""}
+              onChange={(e) => setDraft(parseFloat(e.target.value) || 0)}
               onBlur={() => commit(draft)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") commit(draft)
@@ -1042,19 +1047,9 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
 
   const formatCurrency = useCallback(
     (value: number) =>
-      new Intl.NumberFormat(moeda === "USD" ? "en-US" : "pt-BR", {
-        style: "currency",
-        currency: moeda === "USD" ? "USD" : "BRL",
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
-      }).format(value),
+      formatValorMoeda(value, moeda === "USD" ? "USD" : "BRL", 2),
     [moeda],
   )
-
-  const parseCurrency = (value: string) => {
-    const cleaned = value.replace(/[^\d]/g, "")
-    return parseInt(cleaned, 10) || 0
-  }
 
   const appendAtivo = useCallback(
     (form: AddAtivoForm) => {
@@ -1176,7 +1171,7 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
       valor: Number(ativo.valor) || 0,
       instituicao: ativo.instituicao ?? "",
       subcategoria: isLiquido
-        ? ((ativo.subcategoria as SubcategoriaLiquido) || SUBCATEGORIAS_LIQUIDO[0].value)
+        ? (resolveSubcategoriaLiquido(ativo) ?? SUBCATEGORIAS_LIQUIDO[0].value)
         : SUBCATEGORIAS_LIQUIDO[0].value,
       localizacao: isLiquido
         ? ((ativo.localizacao as LocalizacaoAtivo) || "nacional")
@@ -1201,9 +1196,10 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
           const desc = normalizeAtivoDescricao(a.descricao)
           const inst = (a.instituicao ?? "").trim()
           const isLiquido = normalizeAtivoTipo(a.tipo, a.descricao) === "ativo_liquido"
+          const subLiquido = isLiquido ? resolveSubcategoriaLiquido(a) : undefined
           const label =
-            isLiquido && (a.subcategoria ?? "").trim()
-              ? labelSubcategoriaLiquido(a.subcategoria!)
+            isLiquido && subLiquido
+              ? labelSubcategoriaLiquido(subLiquido)
               : desc || "Sem descrição"
           const sublabelParts = [
             isLiquido && (a.localizacao ?? "").trim()
@@ -2530,11 +2526,17 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
                     <div className="space-y-2">
                       <label className="field-label">Valor (R$)</label>
                       <Input
-                        value={addAtivoForm.valor ? formatCurrency(addAtivoForm.valor) : ""}
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={addAtivoForm.valor > 0 ? addAtivoForm.valor : ""}
                         onChange={(e) =>
-                          setAddAtivoForm({ ...addAtivoForm, valor: parseCurrency(e.target.value) })
+                          setAddAtivoForm({
+                            ...addAtivoForm,
+                            valor: Math.round((parseFloat(e.target.value) || 0) * 100) / 100,
+                          })
                         }
-                        placeholder="0"
+                        placeholder="0,00"
                         className="form-card text-foreground tabular-nums"
                       />
                     </div>
@@ -2588,11 +2590,17 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
                   <div className="space-y-2">
                     <label className="field-label">Valor (R$)</label>
                     <Input
-                      value={addAtivoForm.valor ? formatCurrency(addAtivoForm.valor) : ""}
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={addAtivoForm.valor > 0 ? addAtivoForm.valor : ""}
                       onChange={(e) =>
-                        setAddAtivoForm({ ...addAtivoForm, valor: parseCurrency(e.target.value) })
+                        setAddAtivoForm({
+                          ...addAtivoForm,
+                          valor: Math.round((parseFloat(e.target.value) || 0) * 100) / 100,
+                        })
                       }
-                      placeholder="0"
+                      placeholder="0,00"
                       className="form-card text-foreground tabular-nums"
                     />
                   </div>
@@ -2685,14 +2693,17 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
                   Saldo devedor (R$)
                 </label>
                 <Input
-                  value={addPassivoForm.saldoDevedor ? formatCurrency(addPassivoForm.saldoDevedor) : ""}
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={addPassivoForm.saldoDevedor > 0 ? addPassivoForm.saldoDevedor : ""}
                   onChange={(e) =>
                     setAddPassivoForm((prev) => ({
                       ...prev,
-                      saldoDevedor: parseCurrency(e.target.value),
+                      saldoDevedor: Math.round((parseFloat(e.target.value) || 0) * 100) / 100,
                     }))
                   }
-                  placeholder="0"
+                  placeholder="0,00"
                   className="form-card text-foreground tabular-nums"
                 />
               </div>
@@ -2768,17 +2779,18 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
                   ) : null}
                 </label>
                 <Input
-                  value={
-                    parcelaPassivoExibida > 0 ? formatCurrency(parcelaPassivoExibida) : ""
-                  }
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={parcelaPassivoExibida > 0 ? parcelaPassivoExibida : ""}
                   readOnly={passivoAutomatico}
                   onChange={(e) =>
                     setAddPassivoForm((prev) => ({
                       ...prev,
-                      parcelaMensal: parseCurrency(e.target.value),
+                      parcelaMensal: Math.round((parseFloat(e.target.value) || 0) * 100) / 100,
                     }))
                   }
-                  placeholder="0"
+                  placeholder="0,00"
                   className={`form-card text-foreground tabular-nums ${
                     passivoAutomatico ? "cursor-not-allowed opacity-70" : ""
                   }`}
