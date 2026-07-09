@@ -1,6 +1,8 @@
 import { randomBytes } from "crypto"
 import { NextResponse } from "next/server"
+import { jsonApiError, jsonSupabaseError, logAndJsonError } from "@/lib/api-error"
 import { buildShareUrl } from "@/lib/links-compartilhados"
+import { createAdminClient } from "@/lib/supabase-admin"
 import { createServerSupabaseClient } from "@/lib/supabase-server"
 
 export const runtime = "nodejs"
@@ -8,10 +10,12 @@ export const runtime = "nodejs"
 type RouteContext = { params: Promise<{ cenarioId: string }> }
 
 export async function POST(_req: Request, context: RouteContext) {
+  const routeContext = "POST /api/cenarios/[cenarioId]/compartilhar"
+
   try {
     const { cenarioId } = await context.params
     if (!cenarioId) {
-      return NextResponse.json({ error: "Cenário inválido." }, { status: 400 })
+      return jsonApiError("Cenário inválido.", 400)
     }
 
     const supabase = await createServerSupabaseClient()
@@ -20,26 +24,57 @@ export async function POST(_req: Request, context: RouteContext) {
       error: authErr,
     } = await supabase.auth.getUser()
 
-    if (authErr || !user) {
-      return NextResponse.json({ error: "Não autenticado." }, { status: 401 })
+    if (authErr) {
+      console.error(`${routeContext} auth:`, authErr)
+      return jsonSupabaseError(authErr, 401, `${routeContext} auth`)
+    }
+    if (!user) {
+      return jsonApiError("Não autenticado.", 401)
     }
 
     const { data: simulacao, error: simErr } = await supabase
       .from("simulacoes")
-      .select("id")
+      .select("id, advisor_id")
       .eq("id", cenarioId)
       .maybeSingle()
 
-    if (simErr || !simulacao) {
-      return NextResponse.json({ error: "Cenário não encontrado." }, { status: 404 })
+    if (simErr) {
+      return jsonSupabaseError(simErr, 500, `${routeContext} simulacoes.select`)
+    }
+    if (!simulacao) {
+      return jsonApiError("Cenário não encontrado.", 404)
     }
 
-    const { data: existente } = await supabase
+    if (simulacao.advisor_id && simulacao.advisor_id !== user.id) {
+      return jsonApiError("Sem permissão para compartilhar este cenário.", 403, {
+        code: "forbidden",
+        advisorId: simulacao.advisor_id,
+        userId: user.id,
+      })
+    }
+
+    let admin
+    try {
+      admin = createAdminClient()
+    } catch (envErr) {
+      console.error(`${routeContext} admin client:`, envErr)
+      const message =
+        envErr instanceof Error
+          ? envErr.message
+          : "SUPABASE_SERVICE_ROLE_KEY ou NEXT_PUBLIC_SUPABASE_URL ausente."
+      return jsonApiError(message, 500, { code: "missing_service_role" })
+    }
+
+    const { data: existente, error: linkSelectErr } = await admin
       .from("links_compartilhados")
       .select("token")
       .eq("simulacao_id", cenarioId)
       .is("revogado_em", null)
       .maybeSingle()
+
+    if (linkSelectErr) {
+      return jsonSupabaseError(linkSelectErr, 500, `${routeContext} links_compartilhados.select`)
+    }
 
     if (existente?.token) {
       return NextResponse.json({ url: buildShareUrl(existente.token), token: existente.token })
@@ -47,21 +82,18 @@ export async function POST(_req: Request, context: RouteContext) {
 
     const token = randomBytes(16).toString("hex")
 
-    const { error: insertErr } = await supabase.from("links_compartilhados").insert({
+    const { error: insertErr } = await admin.from("links_compartilhados").insert({
       token,
       simulacao_id: cenarioId,
       criado_por: user.id,
     })
 
     if (insertErr) {
-      console.error("Erro ao criar link compartilhado:", insertErr)
-      return NextResponse.json({ error: "Não foi possível gerar o link." }, { status: 500 })
+      return jsonSupabaseError(insertErr, 500, `${routeContext} links_compartilhados.insert`)
     }
 
     return NextResponse.json({ url: buildShareUrl(token), token })
   } catch (err) {
-    console.error("POST /api/cenarios/[cenarioId]/compartilhar:", err)
-    const message = err instanceof Error ? err.message : "Erro interno."
-    return NextResponse.json({ error: message }, { status: 500 })
+    return logAndJsonError(err, routeContext)
   }
 }

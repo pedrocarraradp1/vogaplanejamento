@@ -17,9 +17,11 @@ import { EficienciaTributaria } from "./sections/eficiencia-tributaria"
 interface ContentAreaProps {
   activeSection: string
   onNavigate: (section: string) => void
+  /** Modo somente leitura (link público compartilhado). */
+  readOnly?: boolean
 }
 
-export function ContentArea({ activeSection, onNavigate }: ContentAreaProps) {
+export function ContentArea({ activeSection, onNavigate, readOnly = false }: ContentAreaProps) {
   const renderSection = () => {
     switch (activeSection) {
       case "dados-pessoais":
@@ -37,7 +39,7 @@ export function ContentArea({ activeSection, onNavigate }: ContentAreaProps) {
       case "cenarios":
         return <Cenarios onNavigate={onNavigate} />
       case "plano-financeiro-completo":
-        return <PlanoFinanceiroCompleto onNavigate={onNavigate} />
+        return <PlanoFinanceiroCompleto onNavigate={onNavigate} readOnly={readOnly} />
       case "sucessorio":
         return <Sucessorio onNavigate={onNavigate} />
       case "protecao":
@@ -62,7 +64,11 @@ export function ContentArea({ activeSection, onNavigate }: ContentAreaProps) {
         padding: "40px 48px",
       }}
     >
-      {renderSection()}
+      {readOnly ? (
+        <div className="plano-completo-readonly">{renderSection()}</div>
+      ) : (
+        renderSection()
+      )}
     </main>
   )
 }

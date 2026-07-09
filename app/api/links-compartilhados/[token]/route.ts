@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { jsonApiError, jsonSupabaseError, logAndJsonError } from "@/lib/api-error"
 import { createServerSupabaseClient } from "@/lib/supabase-server"
 
 export const runtime = "nodejs"
@@ -6,10 +7,12 @@ export const runtime = "nodejs"
 type RouteContext = { params: Promise<{ token: string }> }
 
 export async function DELETE(_req: Request, context: RouteContext) {
+  const routeContext = "DELETE /api/links-compartilhados/[token]"
+
   try {
     const { token } = await context.params
     if (!token || !/^[a-f0-9]{32}$/i.test(token)) {
-      return NextResponse.json({ error: "Token inválido." }, { status: 400 })
+      return jsonApiError("Token inválido.", 400)
     }
 
     const supabase = await createServerSupabaseClient()
@@ -18,8 +21,11 @@ export async function DELETE(_req: Request, context: RouteContext) {
       error: authErr,
     } = await supabase.auth.getUser()
 
-    if (authErr || !user) {
-      return NextResponse.json({ error: "Não autenticado." }, { status: 401 })
+    if (authErr) {
+      return jsonSupabaseError(authErr, 401, `${routeContext} auth`)
+    }
+    if (!user) {
+      return jsonApiError("Não autenticado.", 401)
     }
 
     const { data: link, error: linkErr } = await supabase
@@ -28,8 +34,11 @@ export async function DELETE(_req: Request, context: RouteContext) {
       .eq("token", token)
       .maybeSingle()
 
-    if (linkErr || !link) {
-      return NextResponse.json({ error: "Link não encontrado." }, { status: 404 })
+    if (linkErr) {
+      return jsonSupabaseError(linkErr, 500, `${routeContext} links_compartilhados.select`)
+    }
+    if (!link) {
+      return jsonApiError("Link não encontrado.", 404)
     }
 
     if (link.revogado_em) {
@@ -42,14 +51,11 @@ export async function DELETE(_req: Request, context: RouteContext) {
       .eq("token", token)
 
     if (updateErr) {
-      console.error("Erro ao revogar link:", updateErr)
-      return NextResponse.json({ error: "Não foi possível revogar o link." }, { status: 500 })
+      return jsonSupabaseError(updateErr, 500, `${routeContext} links_compartilhados.update`)
     }
 
     return NextResponse.json({ ok: true })
   } catch (err) {
-    console.error("DELETE /api/links-compartilhados/[token]:", err)
-    const message = err instanceof Error ? err.message : "Erro interno."
-    return NextResponse.json({ error: message }, { status: 500 })
+    return logAndJsonError(err, routeContext)
   }
 }

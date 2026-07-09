@@ -36,20 +36,29 @@ export function CompartilharPlanoModal() {
   const [url, setUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [revoking, setRevoking] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
 
   const carregarLink = useCallback(async () => {
     if (!simulacaoId) return
     setLoading(true)
+    setErro(null)
     try {
       const res = await fetch(`/api/cenarios/${simulacaoId}/compartilhar`, { method: "POST" })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? "Não foi possível gerar o link.")
+      if (!res.ok) {
+        const detalhe = [data.error, data.code, data.details, data.hint]
+          .filter(Boolean)
+          .join(" · ")
+        throw new Error(detalhe || "Não foi possível gerar o link.")
+      }
       setUrl(data.url)
     } catch (e) {
+      const message = e instanceof Error ? e.message : "Tente novamente."
+      setErro(message)
       toast({
         variant: "destructive",
         title: "Erro ao compartilhar",
-        description: e instanceof Error ? e.message : "Tente novamente.",
+        description: message,
       })
       setUrl(null)
     } finally {
@@ -63,6 +72,7 @@ export function CompartilharPlanoModal() {
     }
     if (!open) {
       setUrl(null)
+      setErro(null)
     }
   }, [open, simulacaoId, carregarLink])
 
@@ -128,7 +138,8 @@ export function CompartilharPlanoModal() {
         <DialogHeader>
           <DialogTitle>Compartilhar plano</DialogTitle>
           <DialogDescription>
-            Gere um link somente leitura para o cliente visualizar o plano financeiro completo.
+            Gere um link somente leitura para o cliente visualizar todas as abas do planejamento
+            financeiro (dados pessoais, patrimônio, objetivos, fluxo, projeção e cenários).
           </DialogDescription>
         </DialogHeader>
 
@@ -182,7 +193,14 @@ export function CompartilharPlanoModal() {
               </AlertDialog>
             </>
           ) : (
-            <p className="text-sm text-destructive">Não foi possível carregar o link. Tente novamente.</p>
+            <div className="space-y-3">
+              <p className="text-sm text-destructive">
+                {erro ?? "Não foi possível carregar o link."}
+              </p>
+              <Button type="button" variant="outline" className="w-full" onClick={carregarLink}>
+                Tentar novamente
+              </Button>
+            </div>
           )}
         </div>
       </DialogContent>
