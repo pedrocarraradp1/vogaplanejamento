@@ -3,6 +3,7 @@
 import { useMemo } from "react"
 import { usePlano } from "@/lib/plano-context"
 import { getFontesRenda, resolveAporteParaPremissas, buildBlocosAporte, anosAcumulacaoAporte } from "@/lib/renda-utils"
+import { getDespesas } from "@/lib/despesa-utils"
 import { calcularProjecao, type ProjecaoAno } from "@/lib/engine"
 
 export function useDadosCenarios() {
@@ -41,15 +42,17 @@ export function useDadosCenarios() {
     [idadeAtualCalculada, premissas.idadeApos],
   )
 
+  const despesas = useMemo(() => getDespesas(dadosPessoais), [dadosPessoais])
+
   const { aporteM: aporteMensal, aportePorAnoNominal } = useMemo(
     () =>
       resolveAporteParaPremissas(
         fontesRenda,
-        dadosPessoais.despesa,
+        despesas,
         { ...premissas, idadeAtual: idadeAtualCalculada },
         blocosAporte,
       ),
-    [fontesRenda, dadosPessoais.despesa, premissas, blocosAporte, idadeAtualCalculada],
+    [fontesRenda, despesas, premissas, blocosAporte, idadeAtualCalculada],
   )
 
   const premissasCompletas = useMemo(

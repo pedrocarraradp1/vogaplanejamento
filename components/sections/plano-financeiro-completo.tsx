@@ -9,9 +9,11 @@ import { Objetivos } from "@/components/sections/objetivos"
 import { FluxoDeCaixa } from "@/components/sections/fluxo-de-caixa"
 import { Projecao } from "@/components/sections/projecao"
 import { Cenarios } from "@/components/sections/cenarios"
+import { CompartilharPlanoModal } from "@/components/simulacoes/compartilhar-plano-modal"
 
 interface PlanoFinanceiroCompletoProps {
   onNavigate: (section: string) => void
+  readOnly?: boolean
 }
 
 type SecaoId = "patrimonio" | "objetivos" | "fluxo" | "projecao" | "cenarios"
@@ -43,42 +45,46 @@ function SecaoHeader({
   visivel,
   onToggleVisibilidade,
   onVerDetalhes,
+  readOnly,
 }: {
   titulo: string
   visivel: boolean
   onToggleVisibilidade: () => void
   onVerDetalhes: () => void
+  readOnly?: boolean
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <h2 className="text-[16px] font-semibold text-foreground">{titulo}</h2>
-      <div className="flex items-center gap-1">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="text-muted-foreground hover:text-foreground"
-          onClick={onToggleVisibilidade}
-          title={visivel ? "Ocultar seção" : "Mostrar seção"}
-          aria-label={visivel ? `Ocultar ${titulo}` : `Mostrar ${titulo}`}
-        >
-          {visivel ? (
-            <>
-              <EyeOff className="w-4 h-4 mr-1.5" />
-              Ocultar
-            </>
-          ) : (
-            <>
-              <Eye className="w-4 h-4 mr-1.5" />
-              Mostrar
-            </>
-          )}
-        </Button>
-        <Button variant="ghost" size="sm" className="text-primary hover:text-primary/90" onClick={onVerDetalhes}>
-          Ver detalhes
-          <ArrowRight className="w-4 h-4 ml-1.5" />
-        </Button>
-      </div>
+      {!readOnly && (
+        <div className="flex items-center gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground hover:text-foreground"
+            onClick={onToggleVisibilidade}
+            title={visivel ? "Ocultar seção" : "Mostrar seção"}
+            aria-label={visivel ? `Ocultar ${titulo}` : `Mostrar ${titulo}`}
+          >
+            {visivel ? (
+              <>
+                <EyeOff className="w-4 h-4 mr-1.5" />
+                Ocultar
+              </>
+            ) : (
+              <>
+                <Eye className="w-4 h-4 mr-1.5" />
+                Mostrar
+              </>
+            )}
+          </Button>
+          <Button variant="ghost" size="sm" className="text-primary hover:text-primary/90" onClick={onVerDetalhes}>
+            Ver detalhes
+            <ArrowRight className="w-4 h-4 ml-1.5" />
+          </Button>
+        </div>
+      )}
     </div>
   )
 }
@@ -91,20 +97,21 @@ function EstadoVazio({ texto = "Nenhum dado cadastrado ainda" }: { texto?: strin
   )
 }
 
-export function PlanoFinanceiroCompleto({ onNavigate }: PlanoFinanceiroCompletoProps) {
+export function PlanoFinanceiroCompleto({ onNavigate, readOnly = false }: PlanoFinanceiroCompletoProps) {
   const { state, getPatrimonioTotalConsolidado } = usePlano()
   const [ocultas, setOcultas] = useState<Set<SecaoId>>(new Set())
-  const [hydrated, setHydrated] = useState(false)
+  const [hydrated, setHydrated] = useState(readOnly)
 
   useEffect(() => {
+    if (readOnly) return
     setOcultas(lerSecoesOcultas())
     setHydrated(true)
-  }, [])
+  }, [readOnly])
 
   useEffect(() => {
-    if (!hydrated) return
+    if (!hydrated || readOnly) return
     localStorage.setItem(STORAGE_KEY, JSON.stringify([...ocultas]))
-  }, [ocultas, hydrated])
+  }, [ocultas, hydrated, readOnly])
 
   const toggleSecao = useCallback((id: SecaoId) => {
     setOcultas((prev) => {
@@ -166,13 +173,18 @@ export function PlanoFinanceiroCompleto({ onNavigate }: PlanoFinanceiroCompletoP
     <div className="space-y-8">
       <div className="space-y-1">
         <p className="text-sm text-muted-foreground">Planejamento Financeiro</p>
-        <h1 className="page-title text-[24px] text-foreground">
-          Plano financeiro <span className="text-primary">completo</span>
-        </h1>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <h1 className="page-title text-[24px] text-foreground">
+            Plano financeiro <span className="text-primary">completo</span>
+          </h1>
+          {!readOnly && <CompartilharPlanoModal />}
+        </div>
         <p className="text-sm text-muted-foreground">
-          Resumo visual em modo leitura. Use &quot;Ocultar&quot; em cada seção para personalizar o que o cliente vê.
+          {readOnly
+            ? "Resumo visual do seu plano financeiro."
+            : 'Resumo visual em modo leitura. Use "Ocultar" em cada seção para personalizar o que o cliente vê.'}
         </p>
-        {qtdOcultas > 0 && (
+        {!readOnly && qtdOcultas > 0 && (
           <div className="flex flex-wrap items-center gap-3 pt-2">
             <p className="text-xs text-muted-foreground">
               {qtdOcultas} {qtdOcultas === 1 ? "seção oculta" : "seções ocultas"}
@@ -199,8 +211,9 @@ export function PlanoFinanceiroCompleto({ onNavigate }: PlanoFinanceiroCompletoP
               visivel={visivel}
               onToggleVisibilidade={() => toggleSecao(secao.id)}
               onVerDetalhes={() => onNavigate(secao.rota)}
+              readOnly={readOnly}
             />
-            {visivel ? (
+            {visivel || readOnly ? (
               conteudoPorSecao[secao.id]
             ) : (
               <p className="text-sm text-muted-foreground italic py-2">

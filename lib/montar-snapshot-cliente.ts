@@ -5,12 +5,14 @@ import {
   getSaldoDevedorPassivo,
   getPatrimonioTotalConsolidado,
   metaReservaEmergenciaMeses,
+  calcularAtivosLiquidosParaReserva,
 } from "@/lib/patrimonio-utils"
 import {
   getFontesRenda,
   aporteMensalAtual,
   resolveAporteParaPremissas,
 } from "@/lib/renda-utils"
+import { getDespesas } from "@/lib/despesa-utils"
 import { calcularProjecao, encontrarAporteNecessario, encontrarIdadeLiberdadeFinanceira } from "@/lib/engine"
 import { calcularRealizadoMensal } from "@/lib/fluxo-caixa-utils"
 
@@ -42,11 +44,12 @@ export function montarSnapshotCliente(state: PlanoState): SnapshotCliente {
   // ── Balanço patrimonial ────────────────────────────────────────────────────
   if (totais.patrimonioBruto > 0 || passivosTotais > 0) {
     const ativosTotais = totais.patrimonioBruto
+    const liquidezReserva = calcularAtivosLiquidosParaReserva(ativos ?? [])
     snapshot.balancoPatrimonial = {
       patrimonioLiquido: getPatrimonioTotalConsolidado(ativos ?? [], passivos ?? []),
       ativosLiquidos: totais.totalAtivoLiquido,
       passivosTotais,
-      reservaEmergenciaMeses: despesaMensal > 0 ? totais.totalAtivoLiquido / despesaMensal : 0,
+      reservaEmergenciaMeses: despesaMensal > 0 ? liquidezReserva / despesaMensal : 0,
       reservaEmergenciaMetaMeses: metaReservaEmergenciaMeses(
         dadosPessoais.profissao ?? "",
         dadosPessoais.filhos?.length ?? 0,
@@ -91,9 +94,10 @@ export function montarSnapshotCliente(state: PlanoState): SnapshotCliente {
 
   if (idadeAtual > 0 && idadeApos > idadeAtual && rendaDesejada > 0) {
     const fontes = getFontesRenda(dadosPessoais)
+    const despesas = getDespesas(dadosPessoais)
     const { aporteM, aportePorAnoNominal } = resolveAporteParaPremissas(
       fontes,
-      despesaMensal,
+      despesas,
       premissas,
     )
     const saldoInicial = totais.totalAtivosFinanceiros
@@ -124,7 +128,7 @@ export function montarSnapshotCliente(state: PlanoState): SnapshotCliente {
       idadeAtual,
       idadeAposentadoriaDesejada: idadeApos,
       anosParaIndependencia,
-      aporteMensalAtual: aporteMensalAtual(fontes, despesaMensal),
+      aporteMensalAtual: aporteMensalAtual(fontes, despesas),
       aporteMensalNecessario,
     }
   }

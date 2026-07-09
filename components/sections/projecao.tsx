@@ -13,6 +13,12 @@ import {
 } from "recharts"
 import { usePlano } from "@/lib/plano-context"
 import { getFontesRenda, receitaMensalAtual, resolveAporteParaPremissas, buildBlocosAporte, anosAcumulacaoAporte } from "@/lib/renda-utils"
+import { getDespesas, despesaMensalAtual } from "@/lib/despesa-utils"
+import {
+  blocosRentabilidadePorPrazo,
+  resolverTaxaRealPorAno,
+  type ModoRentabilidade,
+} from "@/lib/rentabilidade-utils"
 import {
   calcularProjecao,
   calcularKPIs,
@@ -37,7 +43,8 @@ import { VOGA } from "@/lib/voga-tokens"
 import { buildDadosFluxoGrafico, buildDadosRendaGrafico } from "@/lib/projecao-graficos-dados"
 import { CHART_TOOLTIP_PROPS } from "@/lib/chart-tooltip"
 import { TooltipFlutuante, useTooltipHover } from "@/components/charts/chart-tooltip"
-import { CenariosInvestimento } from "@/components/ui/cenarios-investimento"
+import { ListaEntradasCapitais } from "@/components/ui/lista-entradas-capitais"
+import type { EntradaCapital } from "@/lib/entradas-capitais"
 import { GraficoFluxoAnual } from "@/components/charts/grafico-fluxo-anual"
 import { RendaCarteiraChart } from "@/components/charts/projecao-extra-charts"
 import { IndependenciaChart, type PontoIndependencia } from "@/components/charts/independencia-chart"
@@ -123,6 +130,8 @@ export function Projecao({ onNavigate, variant = "full" }: ProjecaoProps) {
   }, [dadosPessoais.nascimento])
 
   const fontesRenda = useMemo(() => getFontesRenda(dadosPessoais), [dadosPessoais])
+  const despesas = useMemo(() => getDespesas(dadosPessoais), [dadosPessoais])
+  const despesaMensalAtualVal = useMemo(() => despesaMensalAtual(despesas), [despesas])
   const rendaMensalAtual = useMemo(() => receitaMensalAtual(fontesRenda), [fontesRenda])
 
   const aporteModo = premissas.aporteModo ?? "fixo"
@@ -135,6 +144,32 @@ export function Projecao({ onNavigate, variant = "full" }: ProjecaoProps) {
     [anosAcumulacaoAporteVal],
   )
 
+  const modoRentabilidade: ModoRentabilidade = premissas.modoRentabilidade ?? "padrao"
+  const blocosRentabilidade = useMemo(
+    () => blocosRentabilidadePorPrazo(Math.max(0, Number(premissas.prazo) || 0)),
+    [premissas.prazo],
+  )
+  const rendimentoBrutoPadrao = Number(premissas.rendimentoBruto) || 0
+
+  useEffect(() => {
+    if (modoRentabilidade !== "por_periodo") return
+    const desired = blocosRentabilidade.length
+    const cur = premissas.rendimentoPeriodosBruto ?? []
+    if (desired === 0) {
+      if (cur.length !== 0) setPremissas({ rendimentoPeriodosBruto: [] })
+      return
+    }
+    if (cur.length === desired) return
+    const next = Array.from({ length: desired }, (_, i) => cur[i] ?? rendimentoBrutoPadrao)
+    setPremissas({ rendimentoPeriodosBruto: next })
+  }, [
+    modoRentabilidade,
+    blocosRentabilidade.length,
+    rendimentoBrutoPadrao,
+    premissas.rendimentoPeriodosBruto,
+    setPremissas,
+  ])
+
   const premissasComAporte = useMemo(
     () => ({ ...premissas, idadeAtual: idadeAtualCalculada }),
     [premissas, idadeAtualCalculada],
@@ -143,8 +178,8 @@ export function Projecao({ onNavigate, variant = "full" }: ProjecaoProps) {
   // Mantém o array de aportes por bloco alinhado ao prazo (preserva valores existentes)
   const aporteBase = useMemo(
     () =>
-      resolveAporteParaPremissas(fontesRenda, dadosPessoais.despesa, premissasComAporte, blocosAporte).aporteM,
-    [fontesRenda, dadosPessoais.despesa, premissasComAporte, blocosAporte],
+      resolveAporteParaPremissas(fontesRenda, despesas, premissasComAporte, blocosAporte).aporteM,
+    [fontesRenda, despesas, premissasComAporte, blocosAporte],
   )
 
   useEffect(() => {
@@ -161,8 +196,8 @@ export function Projecao({ onNavigate, variant = "full" }: ProjecaoProps) {
   }, [aporteModo, blocosAporte.length, aporteBase, premissas.aportePeriodosReal, setPremissas])
 
   const { aporteM: aporteMensal, aportePorAnoNominal } = useMemo(
-    () => resolveAporteParaPremissas(fontesRenda, dadosPessoais.despesa, premissasComAporte, blocosAporte),
-    [fontesRenda, dadosPessoais.despesa, premissasComAporte, blocosAporte],
+    () => resolveAporteParaPremissas(fontesRenda, despesas, premissasComAporte, blocosAporte),
+    [fontesRenda, despesas, premissasComAporte, blocosAporte],
   )
 
   // Premissas completas — junta os campos editáveis com os derivados
@@ -178,7 +213,7 @@ export function Projecao({ onNavigate, variant = "full" }: ProjecaoProps) {
   const [simulacaoInputs, setSimulacaoInputs] = useState(() => ({
     premissasCompletas: premissasCompletasLive,
     rendaMensalAtual,
-    despesaMensal: Number(dadosPessoais.despesa) || 0,
+    despesaMensal: despesaMensalAtualVal,
   }))
 
   useEffect(() => {
@@ -186,12 +221,12 @@ export function Projecao({ onNavigate, variant = "full" }: ProjecaoProps) {
       setSimulacaoInputs({
         premissasCompletas: premissasCompletasLive,
         rendaMensalAtual,
-        despesaMensal: Number(dadosPessoais.despesa) || 0,
+        despesaMensal: despesaMensalAtualVal,
       })
     }, 120)
 
     return () => window.clearTimeout(timer)
-  }, [premissasCompletasLive, rendaMensalAtual, dadosPessoais.despesa])
+  }, [premissasCompletasLive, rendaMensalAtual, despesaMensalAtualVal])
 
   const premissasCompletas = simulacaoInputs.premissasCompletas
   const rendaMensalAtualSimulacao = simulacaoInputs.rendaMensalAtual
@@ -675,12 +710,11 @@ export function Projecao({ onNavigate, variant = "full" }: ProjecaoProps) {
         premissasCompletas.inflacao,
         premissasCompletas.retiradaMensal,
         objetivosEngine,
+        { taxaRealNoAno: resolverTaxaRealPorAno(premissasCompletas) },
       ),
     [
       projecaoIndependencia,
-      premissasCompletas.rendimento,
-      premissasCompletas.inflacao,
-      premissasCompletas.retiradaMensal,
+      premissasCompletas,
       objetivosEngine,
     ],
   )
@@ -763,7 +797,7 @@ export function Projecao({ onNavigate, variant = "full" }: ProjecaoProps) {
       rentabilidadeBruta={rentabilidadeBrutaPct}
       rentabilidadeRealEquivalente={rentabilidadeRealEquivalentePct}
       inflacaoPct={inflacaoPctPremissas}
-      despesaMensal={Number(dadosPessoais.despesa) || 0}
+      despesaMensal={despesaMensalAtualVal}
       aporteMensal={aporteMensal}
       retiradaMensal={Number(premissas.retiradaMensal) || 0}
       idadeAposentadoria={Number(premissas.idadeApos) || 30}
@@ -946,6 +980,119 @@ export function Projecao({ onNavigate, variant = "full" }: ProjecaoProps) {
           <CardTitle className="text-base font-medium text-foreground">Acumulação</CardTitle>
         </CardHeader>
         <CardContent>
+          <div className="mb-5 space-y-3">
+            <Label className="field-label">Modo de rentabilidade</Label>
+            <div className="inline-flex flex-wrap rounded-lg bg-card border border-border p-1 gap-1">
+              {(
+                [
+                  { id: "padrao", label: "Padrão" },
+                  { id: "por_periodo", label: "Por período" },
+                  { id: "acumulacao_aposentadoria", label: "Acumulação × Aposentadoria" },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setPremissas({ modoRentabilidade: opt.id })}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                    modoRentabilidade === opt.id
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Define como a rentabilidade é aplicada ao longo da simulação patrimonial.
+            </p>
+          </div>
+
+          {modoRentabilidade === "por_periodo" ? (
+            <div className="mb-5 space-y-4">
+              <div className="form-card px-4 py-3">
+                <p className="text-sm text-foreground font-medium">Rentabilidade por período (blocos de 5 anos)</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Taxa bruta anual (% a.a.) para cada faixa do horizonte da simulação.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {blocosRentabilidade.length === 0 ? (
+                  <p className="text-sm text-muted-foreground md:col-span-2">
+                    Ajuste o prazo da simulação para definir os períodos.
+                  </p>
+                ) : (
+                  blocosRentabilidade.map((b) => {
+                    const bruto =
+                      Number((premissas.rendimentoPeriodosBruto ?? [])[b.i] ?? rendimentoBrutoPadrao) || 0
+                    return (
+                      <div key={b.i} className="rounded-xl border border-border bg-secondary p-4">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                          Ano {b.inicio} ao {b.fim}
+                        </p>
+                        <div className="mt-3 space-y-2">
+                          <Label className="field-label">Rentabilidade bruta (% a.a.)</Label>
+                          <Input
+                            type="number"
+                            value={bruto}
+                            onChange={(e) => {
+                              const v = parseFloat(e.target.value) || 0
+                              const cur = premissas.rendimentoPeriodosBruto ?? []
+                              const next = Array.from(
+                                { length: blocosRentabilidade.length },
+                                (_, i) => cur[i] ?? rendimentoBrutoPadrao,
+                              )
+                              next[b.i] = v
+                              setPremissas({
+                                rendimentoPeriodosBruto: next,
+                                modoRentabilidade: "por_periodo",
+                              })
+                            }}
+                            className="form-card text-foreground focus:border-primary"
+                          />
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            </div>
+          ) : null}
+
+          {modoRentabilidade === "acumulacao_aposentadoria" ? (
+            <div className="mb-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="field-label">Rentabilidade na acumulação (% a.a. bruta)</Label>
+                <Input
+                  type="number"
+                  value={premissas.rendimentoAcumulacao ?? rendimentoBrutoPadrao}
+                  onChange={(e) =>
+                    setPremissas({
+                      rendimentoAcumulacao: parseFloat(e.target.value) || 0,
+                      modoRentabilidade: "acumulacao_aposentadoria",
+                    })
+                  }
+                  className="form-card text-foreground focus:border-primary"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="field-label">Rentabilidade na aposentadoria (% a.a. bruta)</Label>
+                <Input
+                  type="number"
+                  value={premissas.rendimentoAposentadoria ?? rendimentoBrutoPadrao}
+                  onChange={(e) =>
+                    setPremissas({
+                      rendimentoAposentadoria: parseFloat(e.target.value) || 0,
+                      modoRentabilidade: "acumulacao_aposentadoria",
+                    })
+                  }
+                  className="form-card text-foreground focus:border-primary"
+                />
+              </div>
+            </div>
+          ) : null}
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label className="field-label">Saldo Inicial Líquido (R$)</Label>
@@ -953,6 +1100,7 @@ export function Projecao({ onNavigate, variant = "full" }: ProjecaoProps) {
                 className="form-card text-foreground cursor-not-allowed opacity-70" />
               <p className="text-xs text-muted-foreground">Calculado automaticamente: Ativos Líquidos + Previdência</p>
             </div>
+            {modoRentabilidade === "padrao" ? (
             <div className="space-y-2">
               <Label className="field-label">Rendimento Anual Bruto (%)</Label>
               <Input
@@ -970,6 +1118,7 @@ export function Projecao({ onNavigate, variant = "full" }: ProjecaoProps) {
                 className="w-full accent-primary"
               />
             </div>
+            ) : null}
 
             <div className="space-y-2">
               <Label className="field-label">
@@ -1068,7 +1217,7 @@ export function Projecao({ onNavigate, variant = "full" }: ProjecaoProps) {
                 className="form-card text-foreground cursor-not-allowed opacity-70"
               />
               <p className="text-xs text-muted-foreground">
-                Calculado automaticamente: Renda ({formatarMoedaCompleta(rendaMensalAtual)}) − Despesa ({formatarMoedaCompleta(dadosPessoais.despesa)})
+                Calculado automaticamente: Renda ({formatarMoedaCompleta(rendaMensalAtual)}) − Despesa ({formatarMoedaCompleta(despesaMensalAtualVal)})
               </p>
             </div>
           ) : (
@@ -1211,59 +1360,26 @@ export function Projecao({ onNavigate, variant = "full" }: ProjecaoProps) {
         </CardContent>
       </Card>
 
-      {/* Card 3 — Nova Entrada */}
+      {/* Card 3 — Entradas pontuais de capital */}
       <Card className="form-card">
         <CardHeader className="pb-4">
           <CardTitle className="text-base font-medium text-foreground">Nova Entrada</CardTitle>
+          <p className="text-sm text-muted-foreground mt-1">
+            Herança, bônus, venda de bem — eventos pontuais somados ao patrimônio na idade prevista.
+          </p>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="field-label">Nova Entrada (R$)</Label>
-              <Input
-                value={premissas.novaEntrada ? formatCurrency(premissas.novaEntrada) : ""}
-                onChange={e => setPremissas({ novaEntrada: parseCurrency(e.target.value) })}
-                placeholder="Ex: 500.000 (herança, venda de imóvel...)"
-                className="form-card text-foreground focus:border-primary" />
-              <input
-                type="range"
-                min={0}
-                max={50000000}
-                step={10000}
-                value={premissas.novaEntrada ?? 0}
-                onChange={(e) => setPremissas({ novaEntrada: parseInt(e.target.value) || 0 })}
-                className="w-full accent-primary"
-              />
-              <p className="text-xs text-muted-foreground">Entrada extraordinária corrigida pela inflação no ano previsto</p>
-            </div>
-            <div className="space-y-2">
-              <Label className="field-label">Idade da Entrada</Label>
-              <Input type="number"
-                value={premissas.idadeEntrada || ""}
-                onChange={e => setPremissas({ idadeEntrada: parseInt(e.target.value) || 0 })}
-                placeholder="Ex: 45"
-                className="form-card text-foreground focus:border-primary" />
-              <input
-                type="range"
-                min={0}
-                max={80}
-                step={1}
-                value={premissas.idadeEntrada ?? 0}
-                onChange={(e) => setPremissas({ idadeEntrada: parseInt(e.target.value) || 0 })}
-                className="w-full accent-primary"
-              />
-              <p className="text-xs text-muted-foreground">Idade em que o valor será recebido. Deixe 0 para não usar.</p>
-            </div>
-          </div>
-          {premissas.novaEntrada > 0 && premissas.idadeEntrada > 0 && (
-            <div className="flex items-center gap-2 p-3 bg-[rgba(30,92,230,0.08)] rounded-lg border border-primary/30">
-              <Info className="w-4 h-4 text-primary" />
-              <span className="text-sm text-foreground">
-                Entrada de <strong className="text-primary">{formatarMoedaCompleta(premissas.novaEntrada)}</strong> prevista
-                aos <strong className="text-primary">{premissas.idadeEntrada} anos</strong> — será somada corrigida pela inflação
-              </span>
-            </div>
-          )}
+        <CardContent>
+          <ListaEntradasCapitais
+            entradas={premissas.entradasCapitais ?? []}
+            formatarMoedaCompleta={formatarMoedaCompleta}
+            onChange={(entradas: EntradaCapital[]) =>
+              setPremissas({
+                entradasCapitais: entradas,
+                novaEntrada: 0,
+                idadeEntrada: 0,
+              })
+            }
+          />
         </CardContent>
       </Card>
 

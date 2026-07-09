@@ -3,6 +3,7 @@
 import { calcularProjecao, type Premissas } from "@/lib/engine"
 import { computeTotaisAtivos } from "@/lib/patrimonio-utils"
 import { getFontesRenda, resolveAporteParaPremissas } from "@/lib/renda-utils"
+import { getDespesas } from "@/lib/despesa-utils"
 
 export type Moeda = "BRL" | "USD"
 
@@ -79,10 +80,10 @@ export function patrimonioProjetadoFromDados(dados: unknown): number {
     const idadeApos = Number(premissas.idadeApos) || 0
     const saldoInicial = computeTotaisAtivos(ativos as any[]).totalAtivosFinanceiros
     const fontes = getFontesRenda(dadosPessoais as any)
-    const despesa = Number(dadosPessoais.despesa) || 0
+    const despesas = getDespesas(dadosPessoais as any)
     const { aporteM, aportePorAnoNominal } = resolveAporteParaPremissas(
       fontes,
-      despesa,
+      despesas,
       premissas,
     )
 

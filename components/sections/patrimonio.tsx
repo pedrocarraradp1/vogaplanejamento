@@ -4,6 +4,7 @@ import { useState, useCallback, useMemo, type ReactNode } from "react"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Dialog,
@@ -41,9 +42,9 @@ import {
   metaReservaEmergenciaMeses,
   descricaoMetaReservaEmergencia,
   subtituloGapReservaEmergencia,
-  calcularGapReservaEmergencia,
   nivelReservaEmergencia,
   tooltipReservaEmergencia,
+  calcularIndicadoresReservaEmergencia,
   TOOLTIP_PATRIMONIO_LIQUIDO,
   TOOLTIP_ATIVOS_TOTAIS,
   TOOLTIP_PASSIVOS_TOTAIS,
@@ -104,6 +105,7 @@ type AddAtivoForm = {
   localizacao: LocalizacaoAtivo
   observacao: string
   bemDeHeranca: BemDeHerancaSelect
+  reservaLiquidez: boolean
 }
 
 type FiltroLocalizacaoLiquido = "todos" | LocalizacaoAtivo
@@ -129,6 +131,7 @@ const EMPTY_ATIVO_FORM = (): AddAtivoForm => ({
   localizacao: "nacional",
   observacao: "",
   bemDeHeranca: "nao",
+  reservaLiquidez: true,
 })
 
 const EMPTY_PASSIVO_FORM = (): AddPassivoForm => ({
@@ -144,7 +147,7 @@ const EMPTY_PASSIVO_FORM = (): AddPassivoForm => ({
 })
 
 type AddModalState =
-  | { kind: "ativo"; tipoInicial?: TipoAtivoSlug }
+  | { kind: "ativo"; tipoInicial?: TipoAtivoSlug; editId?: string }
   | { kind: "passivo"; editId?: string }
   | null
 
@@ -771,6 +774,31 @@ function BalancoAtivoAccordion({
   )
 }
 
+function CampoReservaLiquidez({
+  checked,
+  onCheckedChange,
+}: {
+  checked: boolean
+  onCheckedChange: (checked: boolean) => void
+}) {
+  return (
+    <div className="flex items-center gap-2.5 p-3 bg-[var(--surface-2)] rounded-md">
+      <Checkbox
+        checked={checked}
+        onCheckedChange={(value) => onCheckedChange(value === true)}
+        className="data-[state=checked]:bg-[#1066DA] data-[state=checked]:border-[#1066DA]"
+      />
+      <div>
+        <p className="text-sm font-medium">Reserva de liquidez</p>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Marcado por padrão. Desmarque se esse ativo não deve contar na reserva de emergência
+          (ex: ações de longo prazo, posições com baixa liquidez).
+        </p>
+      </div>
+    </div>
+  )
+}
+
 function AtivoListaBarRow({
   label,
   sublabel,
@@ -781,6 +809,7 @@ function AtivoListaBarRow({
   valueColor = "#393939",
   onValueCommit,
   onRemove,
+  onOpenEditModal,
 }: {
   label: string
   sublabel?: string
@@ -791,6 +820,7 @@ function AtivoListaBarRow({
   valueColor?: string
   onValueCommit: (valor: number) => void
   onRemove: () => void
+  onOpenEditModal?: () => void
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState("")
@@ -822,12 +852,32 @@ function AtivoListaBarRow({
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            {onOpenEditModal ? (
+              <button
+                type="button"
+                className="no-print pdf-hide"
+                onClick={onOpenEditModal}
+                aria-label="Editar ativo"
+                title="Editar cadastro"
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "#1066DA",
+                  padding: 4,
+                  display: "flex",
+                  alignItems: "center",
+                }}
+              >
+                <Pencil size={14} />
+              </button>
+            ) : null}
             <button
               type="button"
               className="no-print pdf-hide"
               onClick={startEdit}
               aria-label="Editar valor"
-              title="Editar"
+              title="Editar valor"
               style={{
                 background: "none",
                 border: "none",
@@ -1031,6 +1081,7 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
           valor: form.valor,
           heranca: bem,
           bemDeHeranca: bem,
+          reservaLiquidez: isLiquido ? form.reservaLiquidez : undefined,
         }),
       )
     },
@@ -1114,6 +1165,27 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
       bemVinculado: passivo.bemVinculado ?? "",
     })
     setAddModal({ kind: "passivo", editId: passivo.id })
+  }, [])
+
+  const abrirModalEditarAtivo = useCallback((ativo: Ativo) => {
+    const tipo = normalizeAtivoTipo(ativo.tipo, ativo.descricao)
+    const isLiquido = tipo === "ativo_liquido"
+    setAddAtivoForm({
+      tipo,
+      descricao: ativo.descricao ?? "",
+      valor: Number(ativo.valor) || 0,
+      instituicao: ativo.instituicao ?? "",
+      subcategoria: isLiquido
+        ? ((ativo.subcategoria as SubcategoriaLiquido) || SUBCATEGORIAS_LIQUIDO[0].value)
+        : SUBCATEGORIAS_LIQUIDO[0].value,
+      localizacao: isLiquido
+        ? ((ativo.localizacao as LocalizacaoAtivo) || "nacional")
+        : "nacional",
+      observacao: ativo.observacao ?? "",
+      bemDeHeranca: ativo.heranca === true || ativo.bemDeHeranca === true ? "sim" : "nao",
+      reservaLiquidez: ativo.reservaLiquidez !== false,
+    })
+    setAddModal({ kind: "ativo", tipoInicial: tipo, editId: ativo.id })
   }, [])
 
   const linhasPorSecao = useMemo(() => {
@@ -1222,11 +1294,12 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
   const hintReservaEmergencia = descricaoMetaReservaEmergencia(dadosPessoais.profissao ?? "", quantidadeFilhos)
   const tooltipReserva = tooltipReservaEmergencia(dadosPessoais.profissao ?? "", quantidadeFilhos)
   const capacidadePoupanca = Math.max(0, rendaMensal - despesaMensal)
-  const reservaEmergenciaMeses = despesaMensal > 0 ? ativosLiquidos / despesaMensal : 0
-  const gapReserva = useMemo(
-    () => calcularGapReservaEmergencia(ativosLiquidos, despesaMensal, metaReservaEmergencia),
-    [ativosLiquidos, despesaMensal, metaReservaEmergencia],
+  const indicadoresReserva = useMemo(
+    () =>
+      calcularIndicadoresReservaEmergencia(ativos, despesaMensal, metaReservaEmergencia),
+    [ativos, despesaMensal, metaReservaEmergencia],
   )
+  const { reservaEmergenciaMeses, gap: gapReserva } = indicadoresReserva
   const subtituloGapReserva = subtituloGapReservaEmergencia(
     dadosPessoais.profissao ?? "",
     quantidadeFilhos,
@@ -1417,6 +1490,7 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
       localizacao: tipo === "ativo_liquido" ? "nacional" : prev.localizacao,
       observacao:
         tipo === "ativo_liquido" || tipo === "imobilizado" ? prev.observacao : "",
+      reservaLiquidez: tipo === "ativo_liquido" ? prev.reservaLiquidez ?? true : true,
     }))
   }
 
@@ -1444,13 +1518,46 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
     if (addModal.kind === "ativo") {
       if (addAtivoForm.valor <= 0) return
       if (!isFormAtivoLiquido && !ativoDescricaoSelect) return
-      appendAtivo({
-        ...addAtivoForm,
+
+      const bem = addAtivoForm.bemDeHeranca === "sim"
+      const instituicao =
+        isFormAtivoLiquido || exibeInstituicaoAtivo(ativoTipoSelect, ativoDescricaoSelect)
+          ? addAtivoForm.instituicao.trim()
+          : ""
+      const observacao =
+        (isFormAtivoLiquido || ativoTipoSelect === "imobilizado") && addAtivoForm.observacao.trim()
+          ? addAtivoForm.observacao.trim()
+          : undefined
+      const descricaoFinal = isFormAtivoLiquido
+        ? labelSubcategoriaLiquido(addAtivoForm.subcategoria)
+        : ativoDescricaoSelect
+      const ativoPayload: Ativo = {
+        id: addModal.editId ?? `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         tipo: ativoTipoSelect,
-        descricao: isFormAtivoLiquido
-          ? labelSubcategoriaLiquido(addAtivoForm.subcategoria)
-          : ativoDescricaoSelect,
-      })
+        descricao: descricaoFinal,
+        instituicao,
+        subcategoria: isFormAtivoLiquido ? addAtivoForm.subcategoria : undefined,
+        localizacao: isFormAtivoLiquido ? addAtivoForm.localizacao : undefined,
+        observacao,
+        valor: addAtivoForm.valor,
+        heranca: bem,
+        bemDeHeranca: bem,
+        reservaLiquidez: isFormAtivoLiquido ? addAtivoForm.reservaLiquidez : undefined,
+      }
+
+      if (addModal.editId) {
+        setAtivos(
+          ativos.map((a) =>
+            a.id === addModal.editId ? normalizeAtivoRecord({ ...a, ...ativoPayload }) : a,
+          ),
+        )
+      } else {
+        appendAtivo({
+          ...addAtivoForm,
+          tipo: ativoTipoSelect,
+          descricao: descricaoFinal,
+        })
+      }
       setAddAtivoForm(EMPTY_ATIVO_FORM())
     } else {
       if (!passivoCategoriaSelect || !addPassivoForm.descricao.trim()) return
@@ -1671,7 +1778,7 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
             <KpiCard
               label="Patrimônio líquido disponível"
               value={formatCurrency(gapReserva.patrimonioDisponivel)}
-              hint="Ativos líquidos (sem previdência)"
+              hint="Ativos líquidos marcados como reserva de liquidez"
               tooltip={tooltipReserva}
             />
             <KpiCard
@@ -2289,6 +2396,14 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
                         valueColor="#393939"
                         onValueCommit={(v) => updateAtivoValor(linha.id, v)}
                         onRemove={() => removerAtivo(linha.id)}
+                        onOpenEditModal={
+                          secao.id === "liquidos"
+                            ? () => {
+                                const ativo = ativos.find((a) => a.id === linha.id)
+                                if (ativo) abrirModalEditarAtivo(ativo)
+                              }
+                            : undefined
+                        }
                       />
                     </div>
                   ))}
@@ -2314,7 +2429,9 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
                 ? addModal.editId
                   ? "Editar dívida"
                   : "Adicionar dívida"
-                : "Adicionar Ativo"}
+                : addModal?.editId
+                  ? "Editar ativo"
+                  : "Adicionar Ativo"}
             </DialogTitle>
             <DialogDescription className="text-muted-foreground">
               {addModal?.kind === "passivo"
@@ -2329,6 +2446,7 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
                 <Select
                   value={ativoTipoSelect}
                   onValueChange={(v) => onAtivoTipoChange(v as TipoAtivoSlug)}
+                  disabled={Boolean(addModal?.kind === "ativo" && addModal.editId)}
                 >
                   <SelectTrigger className="form-card text-foreground">
                     <SelectValue placeholder="Selecione o tipo" />
@@ -2421,6 +2539,12 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
                       />
                     </div>
                   </div>
+                  <CampoReservaLiquidez
+                    checked={addAtivoForm.reservaLiquidez}
+                    onCheckedChange={(reservaLiquidez) =>
+                      setAddAtivoForm((prev) => ({ ...prev, reservaLiquidez }))
+                    }
+                  />
                   <div className="space-y-2">
                     <label className="field-label">Descrição / observação</label>
                     <Textarea

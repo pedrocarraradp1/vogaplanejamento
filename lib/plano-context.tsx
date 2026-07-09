@@ -29,11 +29,21 @@ import {
   aporteMensalAtual,
   resolveAporteParaPremissas,
   getFontesRenda,
+  aporteMensalEm,
 } from "@/lib/renda-utils"
+import {
+  type DespesaItem,
+  normalizarDespesas,
+  despesaMensalAtual,
+  despesaMensalEm,
+  getDespesas,
+} from "@/lib/despesa-utils"
+import { normalizarEntradasCapitais, type EntradaCapital } from "@/lib/entradas-capitais"
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
 export type { FonteRenda, TipoFonteRenda, PrazoFonteRenda } from "@/lib/renda-utils"
+export type { DespesaItem, CategoriaDespesa } from "@/lib/despesa-utils"
 
 export interface DadosPessoais {
   nome: string
@@ -45,7 +55,9 @@ export interface DadosPessoais {
   filhos: Array<{ nome: string; dataNascimento: string }>
   /** Soma das fontes vigentes no mês corrente (derivado). */
   renda: number
+  /** Soma das despesas vigentes no mês 0 (derivado). */
   despesa: number
+  despesas?: DespesaItem[]
   fontesRenda?: FonteRenda[]
   /** Sexo para cotações (ex.: MAG API): M ou F */
   sexo?: "M" | "F" | ""
@@ -67,6 +79,8 @@ export interface Ativo {
   subcategoria?: string
   localizacao?: string
   observacao?: string
+  /** Quando false, o valor não entra no cálculo da reserva de emergência. Padrão: true. */
+  reservaLiquidez?: boolean
   /**
    * Bem de herança — quando true, o valor entra na base de cálculo do ITCMD (aba Sucessório).
    * Persistido como `heranca` no estado; `bemDeHeranca` é alias de leitura/escrita na UI.
@@ -121,8 +135,11 @@ export interface Premissas {
   idadeApos: number
   retiradaMensal: number
   rendaAposentadoria: number
+  /** @deprecated Preferir `entradasCapitais`. */
   novaEntrada: number
+  /** @deprecated Preferir `entradasCapitais`. */
   idadeEntrada: number
+  entradasCapitais: EntradaCapital[]
   /** Horizonte de aposentadoria (anos que o patrimônio precisa durar). Padrão 35. */
   horizonteAposentadoria?: number
   rentabilidadeConservador: number
@@ -134,6 +151,14 @@ export interface Premissas {
   aporteModo: "fixo" | "periodos"
   /** Aporte mensal (em valor real de hoje) para cada bloco de 5 anos. */
   aportePeriodosReal: number[]
+  /** Modo de rentabilidade na simulação patrimonial. */
+  modoRentabilidade: "padrao" | "por_periodo" | "acumulacao_aposentadoria"
+  /** Rentabilidade bruta (% a.a.) por bloco de 5 anos (modo por_periodo). */
+  rendimentoPeriodosBruto: number[]
+  /** Rentabilidade bruta na fase de acumulação (modo acumulacao_aposentadoria). */
+  rendimentoAcumulacao: number
+  /** Rentabilidade bruta na fase de aposentadoria (modo acumulacao_aposentadoria). */
+  rendimentoAposentadoria: number
 }
 
 export interface Protecao {
@@ -143,7 +168,7 @@ export interface Protecao {
   dividasPend: number
 }
 
-export type { FluxoDeCaixaState, FluxoMesRealizado } from "@/lib/fluxo-caixa-utils"
+export type { EntradaCapital } from "@/lib/entradas-capitais"
 
 export interface PatrimonioState {
   ativosLiquidos: number
@@ -193,6 +218,7 @@ interface PlanoContextType {
   setSimulacaoMeta: (meta: Partial<SimulacaoMeta>) => void
   setDadosPessoais: (dados: Partial<DadosPessoais>) => void
   setFontesRenda: (fontes: FonteRenda[]) => void
+  setDespesas: (despesas: DespesaItem[]) => void
   setAtivos: (ativos: Ativo[]) => void
   setPassivos: (passivos: Passivo[]) => void
   setPatrimonio: (patrimonio: Partial<PatrimonioState>) => void
@@ -215,6 +241,8 @@ interface PlanoContextType {
   /** Todos os ativos − passivos (líquidos + imobilizado + participações). */
   getPatrimonioTotalConsolidado: () => number
   getAporteMensal: () => number
+  getDespesaMensalEm: (mesSimulacao: number) => number
+  getAporteMensalEm: (mesSimulacao: number) => number
   getIdadeAtual: () => number
   simulatePreview: () => void
   calcular: () => void
@@ -235,12 +263,17 @@ const emptyPremissas: Premissas = {
   rendaAposentadoria: 0,
   novaEntrada:    0,
   idadeEntrada:   0,
+  entradasCapitais: [],
   horizonteAposentadoria: 35,
   rentabilidadeConservador: 7,
   rentabilidadeModerado: 10,
   rentabilidadeAgressivo: 13,
   aporteModo: "fixo",
   aportePeriodosReal: [],
+  modoRentabilidade: "padrao",
+  rendimentoPeriodosBruto: [],
+  rendimentoAcumulacao: 10,
+  rendimentoAposentadoria: 10,
 }
 
 const defaultPremissas: Premissas = {
@@ -254,12 +287,17 @@ const defaultPremissas: Premissas = {
   rendaAposentadoria: 0,
   novaEntrada: 0,
   idadeEntrada: 0,
+  entradasCapitais: [],
   horizonteAposentadoria: 35,
   rentabilidadeConservador: 7,
   rentabilidadeModerado: 10,
   rentabilidadeAgressivo: 13,
   aporteModo: "fixo",
   aportePeriodosReal: [],
+  modoRentabilidade: "padrao",
+  rendimentoPeriodosBruto: [],
+  rendimentoAcumulacao: 10,
+  rendimentoAposentadoria: 10,
 }
 
 const initialState: PlanoState = {
@@ -378,9 +416,29 @@ export function PlanoProvider({
 
     dp.fontesRenda = normalizarFontesRenda(dp.fontesRenda, dp.renda)
     dp.renda = receitaMensalAtual(dp.fontesRenda)
+    dp.despesas = normalizarDespesas(dp.despesas, dp.despesa)
+    dp.despesa = despesaMensalAtual(dp.despesas)
 
     if (merged.premissas.aporteModo !== "fixo" && merged.premissas.aporteModo !== "periodos") {
       merged.premissas.aporteModo = "fixo"
+    }
+    const modoRent = merged.premissas.modoRentabilidade
+    if (
+      modoRent !== "padrao" &&
+      modoRent !== "por_periodo" &&
+      modoRent !== "acumulacao_aposentadoria"
+    ) {
+      merged.premissas.modoRentabilidade = "padrao"
+    }
+    if (!Array.isArray(merged.premissas.rendimentoPeriodosBruto)) {
+      merged.premissas.rendimentoPeriodosBruto = []
+    }
+    const brutoBase = Number(merged.premissas.rendimentoBruto) || 0
+    if (merged.premissas.rendimentoAcumulacao == null) {
+      merged.premissas.rendimentoAcumulacao = brutoBase
+    }
+    if (merged.premissas.rendimentoAposentadoria == null) {
+      merged.premissas.rendimentoAposentadoria = brutoBase
     }
 
     // Normaliza objetivos (compatibilidade com modelos antigos: prazo/aCada)
@@ -434,6 +492,12 @@ export function PlanoProvider({
     const aliq = Number(merged.premissas.aliquotaImpostoRendimento) || 0
     merged.premissas.rendimento = Math.max(0, bruto * (1 - Math.max(0, Math.min(1, aliq))))
 
+    merged.premissas.entradasCapitais = normalizarEntradasCapitais(merged.premissas)
+    if (merged.premissas.entradasCapitais.length > 0) {
+      merged.premissas.novaEntrada = 0
+      merged.premissas.idadeEntrada = 0
+    }
+
     return merged
   }, [])
 
@@ -468,8 +532,23 @@ export function PlanoProvider({
 
   const getAporteMensal = useCallback(() => {
     const fontes = getFontesRenda(state.dadosPessoais)
-    return aporteMensalAtual(fontes, state.dadosPessoais.despesa)
+    const despesas = getDespesas(state.dadosPessoais)
+    return aporteMensalAtual(fontes, despesas)
   }, [state.dadosPessoais])
+
+  const getDespesaMensalEm = useCallback(
+    (mesSimulacao: number) => despesaMensalEm(getDespesas(state.dadosPessoais), mesSimulacao),
+    [state.dadosPessoais],
+  )
+
+  const getAporteMensalEm = useCallback(
+    (mesSimulacao: number) => {
+      const fontes = getFontesRenda(state.dadosPessoais)
+      const despesas = getDespesas(state.dadosPessoais)
+      return aporteMensalEm(fontes, despesas, mesSimulacao)
+    },
+    [state.dadosPessoais],
+  )
 
   const getIdadeAtual = useCallback(() => {
     const nasc = state.dadosPessoais.nascimento
@@ -495,6 +574,10 @@ export function PlanoProvider({
         next.fontesRenda = dados.fontesRenda
         next.renda = receitaMensalAtual(next.fontesRenda)
       }
+      if (dados.despesas) {
+        next.despesas = dados.despesas
+        next.despesa = despesaMensalAtual(next.despesas)
+      }
       return { ...prev, dadosPessoais: next }
     })
   }, [])
@@ -503,6 +586,13 @@ export function PlanoProvider({
     setDadosPessoais({
       fontesRenda,
       renda: receitaMensalAtual(fontesRenda),
+    })
+  }, [setDadosPessoais])
+
+  const setDespesas = useCallback((despesas: DespesaItem[]) => {
+    setDadosPessoais({
+      despesas,
+      despesa: despesaMensalAtual(despesas),
     })
   }, [setDadosPessoais])
 
@@ -592,9 +682,10 @@ export function PlanoProvider({
     const saldoInicial = getSaldoInicialLiquido()
     const idadeAtual = getIdadeAtual()
     const fontes = getFontesRenda(state.dadosPessoais)
+    const despesas = getDespesas(state.dadosPessoais)
     const { aporteM, aportePorAnoNominal } = resolveAporteParaPremissas(
       fontes,
-      state.dadosPessoais.despesa,
+      despesas,
       { ...state.premissas, idadeAtual },
     )
 
@@ -616,9 +707,10 @@ export function PlanoProvider({
     const saldoInicial = getSaldoInicialLiquido()
     const idadeAtual = getIdadeAtual()
     const fontes = getFontesRenda(state.dadosPessoais)
+    const despesas = getDespesas(state.dadosPessoais)
     const { aporteM, aportePorAnoNominal } = resolveAporteParaPremissas(
       fontes,
-      state.dadosPessoais.despesa,
+      despesas,
       { ...state.premissas, idadeAtual },
     )
 
@@ -704,11 +796,11 @@ export function PlanoProvider({
       simulacaoMeta,
       setMoeda,
       setSimulacaoMeta: setSimulacaoMetaPartial,
-      setDadosPessoais, setFontesRenda, setAtivos, setPassivos, setPatrimonio, setObjetivos,
+      setDadosPessoais, setFontesRenda, setDespesas, setAtivos, setPassivos, setPatrimonio, setObjetivos,
       setPremissas, setSucessao, setProtecao, setFluxoDeCaixa,
       loadState, clearSimulacaoMeta,
       getPatrimonioLiquido, getSaldoInicialLiquido, getAtivosFinanceiros, getAtivosLiquidosImediatos,
-      getPatrimonioTotalConsolidado, getAporteMensal, getIdadeAtual,
+      getPatrimonioTotalConsolidado, getAporteMensal, getDespesaMensalEm, getAporteMensalEm, getIdadeAtual,
       simulatePreview, calcular, salvarPlano,
     }}>
       {children}

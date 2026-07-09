@@ -13,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Switch } from "@/components/ui/switch"
 import {
   ArrowRight,
   Briefcase,
@@ -22,10 +23,16 @@ import {
   Pencil,
   Trash2,
   Plus,
+  Car,
+  UtensilsCrossed,
+  GraduationCap,
+  HeartPulse,
+  Sparkles,
+  Landmark,
   type LucideIcon,
 } from "lucide-react"
 import { usePlano } from "@/lib/plano-context"
-import type { FonteRenda, TipoFonteRenda, PrazoFonteRenda } from "@/lib/plano-context"
+import type { FonteRenda, TipoFonteRenda, PrazoFonteRenda, DespesaItem, CategoriaDespesa } from "@/lib/plano-context"
 import {
   criarFonteRenda,
   getFontesRenda,
@@ -33,6 +40,14 @@ import {
   receitaMensalAtual,
   TIPOS_FONTE_RENDA,
 } from "@/lib/renda-utils"
+import {
+  criarDespesa,
+  getDespesas,
+  despesaMensalAtual,
+  labelDespesa,
+  CATEGORIAS_DESPESA,
+  DESCRICOES_DESPESA_PADRAO,
+} from "@/lib/despesa-utils"
 
 interface DadosPessoaisProps {
   onNavigate: (section: string) => void
@@ -43,6 +58,17 @@ const ICONES_FONTE: Record<TipoFonteRenda, LucideIcon> = {
   aluguel: Home,
   venda_participacao: Handshake,
   outros: CircleDollarSign,
+}
+
+const ICONES_DESPESA: Record<CategoriaDespesa, LucideIcon> = {
+  Moradia: Home,
+  Transporte: Car,
+  Alimentação: UtensilsCrossed,
+  Educação: GraduationCap,
+  Saúde: HeartPulse,
+  Lazer: Sparkles,
+  "Financiamento/Empréstimo": Landmark,
+  Outros: CircleDollarSign,
 }
 
 const MESES = [
@@ -61,16 +87,22 @@ const MESES = [
 ]
 
 export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
-  const { state, setDadosPessoais, setFontesRenda } = usePlano()
+  const { state, setDadosPessoais, setFontesRenda, setDespesas } = usePlano()
   const { dadosPessoais } = state
   const moeda = state.moeda ?? "BRL"
 
   const fontesRenda = useMemo(() => getFontesRenda(dadosPessoais), [dadosPessoais])
+  const despesas = useMemo(() => getDespesas(dadosPessoais), [dadosPessoais])
   const receitaTotal = useMemo(() => receitaMensalAtual(fontesRenda), [fontesRenda])
+  const despesaTotal = useMemo(() => despesaMensalAtual(despesas), [despesas])
 
   const [modalFonteOpen, setModalFonteOpen] = useState(false)
   const [editingFonte, setEditingFonte] = useState<FonteRenda | null>(null)
   const [formFonte, setFormFonte] = useState<FonteRenda>(() => criarFonteRenda())
+
+  const [modalDespesaOpen, setModalDespesaOpen] = useState(false)
+  const [editingDespesa, setEditingDespesa] = useState<DespesaItem | null>(null)
+  const [formDespesa, setFormDespesa] = useState<DespesaItem>(() => criarDespesa())
 
   const abrirNovaFonte = () => {
     setEditingFonte(null)
@@ -94,6 +126,30 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
 
   const removerFonte = (id: string) => {
     setFontesRenda(fontesRenda.filter((f) => f.id !== id))
+  }
+
+  const abrirNovaDespesa = () => {
+    setEditingDespesa(null)
+    setFormDespesa(criarDespesa())
+    setModalDespesaOpen(true)
+  }
+
+  const abrirEditarDespesa = (despesa: DespesaItem) => {
+    setEditingDespesa(despesa)
+    setFormDespesa({ ...despesa })
+    setModalDespesaOpen(true)
+  }
+
+  const salvarDespesa = () => {
+    const next = editingDespesa
+      ? despesas.map((d) => (d.id === editingDespesa.id ? formDespesa : d))
+      : [...despesas, formDespesa]
+    setDespesas(next)
+    setModalDespesaOpen(false)
+  }
+
+  const removerDespesa = (id: string) => {
+    setDespesas(despesas.filter((d) => d.id !== id))
   }
 
   const setPrazoFonte = (prazo: PrazoFonteRenda) => {
@@ -120,10 +176,10 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
   const isCasado = dadosPessoais.estadoCivil === "casado"
 
   const capacidadePoupanca = useMemo(() => {
-    const poupanca = receitaTotal - dadosPessoais.despesa
+    const poupanca = receitaTotal - despesaTotal
     const percentual = receitaTotal > 0 ? (poupanca / receitaTotal) * 100 : 0
     return { valor: poupanca, percentual }
-  }, [receitaTotal, dadosPessoais.despesa])
+  }, [receitaTotal, despesaTotal])
 
   const formatCurrency = (value: number) => {
     if (value === 0) return ""
@@ -547,9 +603,87 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
             <Plus className="h-4 w-4 mr-2" />
             Adicionar fonte de renda
           </Button>
+        </div>
 
+        <span className="field-label">Despesas</span>
+        <div style={cardStyle}>
+          {despesas.length === 0 ? (
+            <p className="text-sm text-muted-foreground mb-3">Nenhuma despesa cadastrada.</p>
+          ) : (
+            <ul className="space-y-2 mb-3">
+              {despesas.map((despesa) => {
+                const Icon = ICONES_DESPESA[despesa.categoria]
+                return (
+                  <li
+                    key={despesa.id}
+                    className="flex items-center gap-3 rounded-lg border border-border/50 bg-background px-3 py-2.5"
+                  >
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                      <Icon className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {(despesa.descricao || despesa.categoria).trim()}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{despesa.categoria}</p>
+                    </div>
+                    <span
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                        despesa.temporaria
+                          ? "bg-amber-100 text-amber-800"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {despesa.temporaria ? "Temporária" : "Contínua"}
+                    </span>
+                    <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">
+                      {moeda === "USD" ? "US$" : "R$"}{" "}
+                      {despesa.valor.toLocaleString(moeda === "USD" ? "en-US" : "pt-BR", {
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 0,
+                      })}
+                    </span>
+                    <div className="flex shrink-0 gap-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => abrirEditarDespesa(despesa)}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        onClick={() => removerDespesa(despesa.id)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full border-dashed"
+            onClick={abrirNovaDespesa}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Adicionar despesa
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div
-            className="flex items-center justify-between mt-4 pt-3 border-t border-border/50"
+            className="rounded-lg border border-border/50 px-4 py-3 flex items-center justify-between"
+            style={{ background: "var(--surface)" }}
           >
             <span className="text-sm font-medium text-foreground">Receita mensal total</span>
             <span className="text-base font-bold tabular-nums text-primary">
@@ -560,29 +694,22 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
               })}
             </span>
           </div>
+          <div
+            className="rounded-lg border border-border/50 px-4 py-3 flex items-center justify-between"
+            style={{ background: "var(--surface)" }}
+          >
+            <span className="text-sm font-medium text-foreground">Despesa mensal total</span>
+            <span className="text-base font-bold tabular-nums text-foreground">
+              {moeda === "USD" ? "US$" : "R$"}{" "}
+              {despesaTotal.toLocaleString(moeda === "USD" ? "en-US" : "pt-BR", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </span>
+          </div>
         </div>
 
-        <span className="field-label">Despesas</span>
-        <div style={cardStyle}>
-          <div className="space-y-2 max-w-md">
-            <Label htmlFor="despesaMensal" className="field-label">
-              Despesa mensal (R$)
-            </Label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
-                R$
-              </span>
-              <Input
-                id="despesaMensal"
-                value={formatCurrency(dadosPessoais.despesa)}
-                onChange={(e) => setDadosPessoais({ despesa: parseCurrency(e.target.value) })}
-                placeholder="0,00"
-                className="form-input pl-10 placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30 tabular-nums"
-              />
-            </div>
-          </div>
-
-          <div className="savings-badge w-full" style={{ marginTop: 12 }}>
+        <div className="savings-badge w-full">
             <p className="text-white text-sm font-medium">
               Capacidade de poupança mensal:{" "}
               <span className="font-semibold">
@@ -793,6 +920,136 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
               Cancelar
             </Button>
             <Button type="button" onClick={salvarFonte} disabled={formFonte.valorMensal <= 0}>
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={modalDespesaOpen} onOpenChange={setModalDespesaOpen}>
+        <DialogContent className="form-card rounded-2xl max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">
+              {editingDespesa ? "Editar despesa" : "Nova despesa"}
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Informe categoria, valor e se a despesa é temporária
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label className="field-label">Categoria</Label>
+              <Select
+                value={formDespesa.categoria}
+                onValueChange={(v) => {
+                  const categoria = v as CategoriaDespesa
+                  setFormDespesa((f) => ({
+                    ...f,
+                    categoria,
+                    descricao:
+                      f.descricao === DESCRICOES_DESPESA_PADRAO[f.categoria]
+                        ? DESCRICOES_DESPESA_PADRAO[categoria]
+                        : f.descricao,
+                  }))
+                }}
+              >
+                <SelectTrigger className="form-input">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORIAS_DESPESA.map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="field-label">Descrição</Label>
+              <Input
+                value={formDespesa.descricao}
+                onChange={(e) => setFormDespesa((f) => ({ ...f, descricao: e.target.value }))}
+                className="form-input"
+                placeholder={DESCRICOES_DESPESA_PADRAO[formDespesa.categoria]}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="field-label">Valor mensal (R$)</Label>
+              <Input
+                value={formatCurrency(formDespesa.valor)}
+                onChange={(e) =>
+                  setFormDespesa((f) => ({ ...f, valor: parseCurrency(e.target.value) }))
+                }
+                className="form-input tabular-nums"
+                placeholder="0,00"
+              />
+            </div>
+
+            <div className="flex items-center justify-between rounded-lg border border-border/50 px-3 py-2.5">
+              <div>
+                <p className="text-sm font-medium text-foreground">Despesa temporária?</p>
+                <p className="text-xs text-muted-foreground">
+                  {formDespesa.temporaria ? labelDespesa(formDespesa) : "Despesa contínua no plano"}
+                </p>
+              </div>
+              <Switch
+                checked={formDespesa.temporaria}
+                onCheckedChange={(checked) =>
+                  setFormDespesa((f) => ({
+                    ...f,
+                    temporaria: checked,
+                    inicioMeses: checked ? (f.inicioMeses ?? 0) : undefined,
+                    duracaoMeses: checked ? (f.duracaoMeses ?? 12) : undefined,
+                  }))
+                }
+              />
+            </div>
+
+            {formDespesa.temporaria ? (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label className="field-label">Começa daqui quantos meses</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={formDespesa.inicioMeses ?? 0}
+                    onChange={(e) =>
+                      setFormDespesa((f) => ({
+                        ...f,
+                        inicioMeses: Math.max(0, Number(e.target.value) || 0),
+                      }))
+                    }
+                    className="form-input"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="field-label">Dura quantos meses</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={formDespesa.duracaoMeses ?? 12}
+                    onChange={(e) =>
+                      setFormDespesa((f) => ({
+                        ...f,
+                        duracaoMeses: Math.max(1, Number(e.target.value) || 1),
+                      }))
+                    }
+                    className="form-input"
+                  />
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="ghost" onClick={() => setModalDespesaOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="button" onClick={salvarDespesa} disabled={formDespesa.valor <= 0}>
               Salvar
             </Button>
           </DialogFooter>

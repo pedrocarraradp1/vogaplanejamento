@@ -11,6 +11,7 @@ import type { FluxoMesRealizado } from "@/lib/plano-context"
 import { calcularProjecao, calcularFluxoAnual, calcularPassivosPorAnoSeries } from "@/lib/engine"
 import { buildDadosFluxoGrafico } from "@/lib/projecao-graficos-dados"
 import { getFontesRenda, resolveAporteParaPremissas } from "@/lib/renda-utils"
+import { getDespesas } from "@/lib/despesa-utils"
 import {
   MESES_LABELS,
   MESES_LABELS_COMPLETOS,
@@ -90,9 +91,10 @@ export function FluxoDeCaixa({ onNavigate, variant = "full" }: FluxoDeCaixaProps
   const idadeAtual = getIdadeAtual()
 
   const fontesRenda = useMemo(() => getFontesRenda(dadosPessoais), [dadosPessoais])
+  const despesas = useMemo(() => getDespesas(dadosPessoais), [dadosPessoais])
   const { aporteM: aporteMensal, aportePorAnoNominal } = useMemo(
-    () => resolveAporteParaPremissas(fontesRenda, dadosPessoais.despesa, premissas),
-    [fontesRenda, dadosPessoais.despesa, premissas],
+    () => resolveAporteParaPremissas(fontesRenda, despesas, premissas),
+    [fontesRenda, despesas, premissas],
   )
 
   const premissasCompletas = useMemo(

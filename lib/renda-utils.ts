@@ -1,3 +1,6 @@
+import type { DespesaItem } from "@/lib/despesa-utils"
+import { despesaMensalEm, despesaMensalAtual } from "@/lib/despesa-utils"
+
 export type TipoFonteRenda = "salario" | "aluguel" | "venda_participacao" | "outros"
 
 export type PrazoFonteRenda =
@@ -121,40 +124,64 @@ export function receitaMensalAtual(fontes: FonteRenda[], ref = new Date()): numb
   return receitaMensalEm(fontes, ref.getFullYear(), ref.getMonth() + 1)
 }
 
+function mesCalendarioAPartirDe(ref: Date, mesSimulacao: number): { ano: number; mes: number } {
+  const d = new Date(ref)
+  d.setDate(1)
+  d.setMonth(d.getMonth() + Math.max(0, Math.floor(mesSimulacao)))
+  return { ano: d.getFullYear(), mes: d.getMonth() + 1 }
+}
+
 export function aporteMensalEm(
   fontes: FonteRenda[],
-  despesa: number,
+  despesas: DespesaItem[],
+  mesSimulacao: number,
+  ref = new Date(),
+): number {
+  const { ano, mes } = mesCalendarioAPartirDe(ref, mesSimulacao)
+  const receita = receitaMensalEm(fontes, ano, mes)
+  const despesa = despesaMensalEm(despesas, mesSimulacao)
+  return Math.max(0, receita - despesa)
+}
+
+/** @deprecated Use `aporteMensalEm(fontes, despesas, mesSimulacao)`. */
+export function aporteMensalEmLegado(
+  fontes: FonteRenda[],
+  despesaFixa: number,
   ano: number,
   mes: number,
 ): number {
-  return Math.max(0, receitaMensalEm(fontes, ano, mes) - (Number(despesa) || 0))
+  return Math.max(0, receitaMensalEm(fontes, ano, mes) - (Number(despesaFixa) || 0))
 }
 
-/** Aporte mensal nominal equivalente por ano de projeção (t=0..prazo). */
 export function buildAportePorAnoNominal(
   fontes: FonteRenda[],
-  despesa: number,
+  despesas: DespesaItem[],
   prazo: number,
   inflacaoPct: number,
   anoBase = new Date().getFullYear(),
+  ref = new Date(),
 ): number[] {
   const inf = (Number(inflacaoPct) || 0) / 100
   const horizonte = Math.max(0, prazo)
 
   return Array.from({ length: horizonte + 1 }, (_, t) => {
-    const ano = anoBase + t
     const fatorInf = Math.pow(1 + inf, t)
     let sumReal = 0
-    for (let mes = 1; mes <= 12; mes++) {
-      sumReal += aporteMensalEm(fontes, despesa, ano, mes)
+    for (let m = 0; m < 12; m++) {
+      const mesSim = t * 12 + m
+      sumReal += aporteMensalEm(fontes, despesas, mesSim, ref)
     }
     const monthlyEquivReal = sumReal / 12
     return monthlyEquivReal * fatorInf
   })
 }
 
-export function aporteMensalAtual(fontes: FonteRenda[], despesa: number, ref = new Date()): number {
-  return aporteMensalEm(fontes, despesa, ref.getFullYear(), ref.getMonth() + 1)
+export function aporteMensalAtual(
+  fontes: FonteRenda[],
+  despesas: DespesaItem[],
+  ref = new Date(),
+): number {
+  return aporteMensalEm(fontes, despesas, 0, ref)
 }
 
 export function labelPrazoFonte(prazo: PrazoFonteRenda): string {
@@ -204,7 +231,7 @@ export function buildBlocosAporte(prazoAcumulacao: number, tamanhoBloco = BLOCO_
 /** Resolve aporteM e série anual nominal a partir das fontes de renda (e overrides manuais). */
 export function resolveAporteParaPremissas(
   fontes: FonteRenda[],
-  despesa: number,
+  despesas: DespesaItem[],
   premissas: {
     prazo: number
     inflacao: number
@@ -216,9 +243,9 @@ export function resolveAporteParaPremissas(
   blocosAporte?: BlocoAporte[],
   anoBase = new Date().getFullYear(),
 ): { aporteM: number; aportePorAnoNominal: number[] } {
-  const aporteM = aporteMensalAtual(fontes, despesa)
+  const aporteM = aporteMensalAtual(fontes, despesas)
   const prazo = Math.max(0, Number(premissas.prazo) || 0)
-  const fromFontes = buildAportePorAnoNominal(fontes, despesa, prazo, premissas.inflacao, anoBase)
+  const fromFontes = buildAportePorAnoNominal(fontes, despesas, prazo, premissas.inflacao, anoBase)
 
   const anosAcum = anosAcumulacaoAporte(premissas.idadeAtual ?? 0, premissas.idadeApos ?? 0)
   const blocosEfetivos =

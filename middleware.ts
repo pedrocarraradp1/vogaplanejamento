@@ -9,6 +9,10 @@ function isLoginPath(path: string) {
   return path === "/login" || path.startsWith("/login/")
 }
 
+function isPublicPlanoPath(path: string) {
+  return path === "/plano" || path.startsWith("/plano/")
+}
+
 export async function middleware(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -53,7 +57,7 @@ export async function middleware(request: NextRequest) {
   const homeForRole = role === "cliente" ? MEU_DIAGNOSTICO : CLIENTES
 
   if (!user) {
-    if (isLoginPath(path)) return supabaseResponse
+    if (isLoginPath(path) || isPublicPlanoPath(path)) return supabaseResponse
     const u = request.nextUrl.clone()
     u.pathname = "/login"
     return NextResponse.redirect(u)

@@ -143,7 +143,17 @@ export function normalizeAtivoRecord(ativo: Ativo): Ativo {
   } else {
     descricao = resolveDescricaoAtivo(tipo, descricao)
   }
-  return { ...ativo, tipo, descricao, subcategoria, localizacao, observacao, instituicao }
+  return {
+    ...ativo,
+    tipo,
+    descricao,
+    subcategoria,
+    localizacao,
+    observacao,
+    instituicao,
+    reservaLiquidez:
+      tipo === "ativo_liquido" ? ativo.reservaLiquidez !== false : undefined,
+  }
 }
 
 export function resolveDescricaoAtivo(
@@ -499,6 +509,43 @@ export function sumAtivoTipo(ativos: Ativo[], tipo: TipoAtivoSlug): number {
   return (ativos ?? [])
     .filter((a) => normalizeAtivoTipo(a.tipo, a.descricao) === tipo)
     .reduce((s, a) => s + (Number(a.valor) || 0), 0)
+}
+
+/** Soma ativos líquidos que contam para reserva de emergência e Gap de Patrimônio. */
+export function calcularAtivosLiquidosParaReserva(ativos: Ativo[]): number {
+  return (ativos ?? [])
+    .filter((a) => normalizeAtivoTipo(a.tipo, a.descricao) === "ativo_liquido")
+    .filter((a) => a.reservaLiquidez !== false)
+    .reduce((s, a) => s + (Number(a.valor) || 0), 0)
+}
+
+/** @deprecated Use `calcularAtivosLiquidosParaReserva`. */
+export const sumAtivoLiquidoReservaEmergencia = calcularAtivosLiquidosParaReserva
+
+export interface IndicadoresReservaEmergencia {
+  ativosLiquidosParaReserva: number
+  reservaEmergenciaMeses: number
+  gap: GapReservaEmergenciaResult
+}
+
+/**
+ * Fonte única para Reserva de Emergência (meses) e Gap de Patrimônio (R$).
+ * Ambos os cards devem consumir o retorno desta função — não recalcular o filtro separadamente.
+ */
+export function calcularIndicadoresReservaEmergencia(
+  ativos: Ativo[],
+  despesaMensal: number,
+  metaMeses: number,
+): IndicadoresReservaEmergencia {
+  const ativosLiquidosParaReserva = calcularAtivosLiquidosParaReserva(ativos)
+  const reservaEmergenciaMeses =
+    despesaMensal > 0 ? ativosLiquidosParaReserva / despesaMensal : 0
+  const gap = calcularGapReservaEmergencia(
+    ativosLiquidosParaReserva,
+    despesaMensal,
+    metaMeses,
+  )
+  return { ativosLiquidosParaReserva, reservaEmergenciaMeses, gap }
 }
 
 export interface TotaisAtivos {

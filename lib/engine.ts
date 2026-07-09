@@ -1,4 +1,10 @@
 import { pagamentoPassivoAno, parcelaDividaNoMes } from "@/lib/amortizacao"
+import { entradaCapitalNominalNoAno, type EntradaCapital } from "@/lib/entradas-capitais"
+import {
+  resolverRendimentoLiquidoNominalPorAno,
+  resolverTaxaRealPorAno,
+  type PremissasRentabilidade,
+} from "@/lib/rentabilidade-utils"
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -14,8 +20,18 @@ export interface Premissas {
   idadeApos: number
   retiradaMensal: number
   rendaAposentadoria: number // renda já existente na aposentadoria (INSS, aluguéis etc.)
-  novaEntrada: number        // valor de entrada extra (herança, venda, etc.)
-  idadeEntrada: number       // idade em que a entrada ocorre (0 = não usar)
+  /** @deprecated Preferir `entradasCapitais`. */
+  novaEntrada: number
+  /** @deprecated Preferir `entradasCapitais`. */
+  idadeEntrada: number
+  /** Entradas pontuais de capital (herança, bônus, venda de bem, etc.). */
+  entradasCapitais?: EntradaCapital[]
+  rendimentoBruto?: number
+  aliquotaImpostoRendimento?: number
+  modoRentabilidade?: PremissasRentabilidade["modoRentabilidade"]
+  rendimentoPeriodosBruto?: number[]
+  rendimentoAcumulacao?: number
+  rendimentoAposentadoria?: number
   /** @deprecated Preferir `horizontePosAposentadoriaAnos` — derivar do prazo de simulação. */
   horizonteAposentadoria?: number
 }
@@ -365,7 +381,7 @@ export function retiradaAnualAposentadoria(
  *
  * Acumulação t>0:
  *   saldo = saldo_prev*(1+r) + fvMensal(aporteM*(1+inf)^t, r) - objetivos_t - dividas_t
- *   + novaEntrada*(1+inf)^t  se idade == idadeEntrada
+ *   + soma(entradasCapitais)*(1+inf)^t  para cada entrada na idade correspondente
  *
  * Aposentadoria t>0 (simulação única):
  *   saldo = saldo_prev*(1+r) - retiradaM*12*(1+inf)^t
@@ -380,21 +396,22 @@ export function calcularProjecao(
   passivos: Passivo[] = [],
   displayMode: DisplayModeProjecao = "nominal",
 ): ProjecaoAno[] {
-  const r   = premissas.rendimento / 100
   const inf = premissas.inflacao   / 100
+  const rendimentoLiquidoNoAno = resolverRendimentoLiquidoNominalPorAno(premissas)
+  const taxaRealNoAno = resolverTaxaRealPorAno(premissas)
   const {
     saldoInicial, aporteM, idadeAtual, prazo,
-    idadeApos, retiradaMensal, rendaAposentadoria, novaEntrada, idadeEntrada,
+    idadeApos, retiradaMensal, rendaAposentadoria,
   } = premissas
   const retiradaEfetiva = Math.max(0, retiradaMensal - (rendaAposentadoria || 0))
-
-  const taxaReal = (1 + r) / (1 + inf) - 1
-  const objetivosEternosEq = totalObjetivosEternosAnuais(objetivos, taxaReal)
 
   const resultado: ProjecaoAno[] = []
   let saldo = saldoInicial
 
   for (let t = 0; t <= prazo; t++) {
+    const r = rendimentoLiquidoNoAno(t)
+    const taxaReal = taxaRealNoAno(t)
+    const objetivosEternosEq = totalObjetivosEternosAnuais(objetivos, taxaReal)
     const idade        = idadeAtual + t
     const fatorInf     = Math.pow(1 + inf, t)
     const isAposentado = idade >= idadeApos
@@ -407,10 +424,7 @@ export function calcularProjecao(
         : aporteM * fatorInf
 
     // Nova entrada: soma corrigida pela inflação no ano em que a idade bate
-    const entradaAno =
-      novaEntrada > 0 && idadeEntrada > 0 && idade === idadeEntrada
-        ? novaEntrada * fatorInf
-        : 0
+    const entradaAno = entradaCapitalNominalNoAno(premissas, idade, fatorInf)
 
     if (t === 0) {
       saldo = saldoInicial + fvMensal(aporteNominalAno, r) - objetivosAno - dividasAno + entradaAno
@@ -777,10 +791,10 @@ export function rodarMonteCarlo(
   volatilidadeAnual = VOLATILIDADE_MONTE_CARLO_ANUAL,
 ): ResultadoMonteCarlo {
   const inf = premissas.inflacao / 100
-  const retornoEsperado = premissas.rendimento / 100
+  const rendimentoLiquidoNoAno = resolverRendimentoLiquidoNominalPorAno(premissas)
   const {
     saldoInicial, aporteM, idadeAtual, prazo,
-    idadeApos, retiradaMensal, rendaAposentadoria, novaEntrada, idadeEntrada,
+    idadeApos, retiradaMensal, rendaAposentadoria,
   } = premissas
   const retiradaEfetiva = Math.max(0, retiradaMensal - (rendaAposentadoria || 0))
   const totalAnos = Math.max(0, prazo)
@@ -793,7 +807,7 @@ export function rodarMonteCarlo(
     let sucesso = true
 
     for (let t = 0; t <= totalAnos; t++) {
-      const retornoAno = amostraNormal(retornoEsperado, volatilidadeAnual)
+      const retornoAno = amostraNormal(rendimentoLiquidoNoAno(t), volatilidadeAnual)
       const idade = idadeAtual + t
       const fatorInf = Math.pow(1 + inf, t)
       const isAposentado = idade >= idadeApos
@@ -803,10 +817,7 @@ export function rodarMonteCarlo(
         (premissas.aportePorAnoNominal?.[t] ?? null) !== null
           ? Number(premissas.aportePorAnoNominal?.[t]) || 0
           : aporteM * fatorInf
-      const entradaAno =
-        novaEntrada > 0 && idadeEntrada > 0 && idade === idadeEntrada
-          ? novaEntrada * fatorInf
-          : 0
+      const entradaAno = entradaCapitalNominalNoAno(premissas, idade, fatorInf)
 
       if (t === 0) {
         saldo = saldoInicial + fvMensal(aporteNominalAno, retornoAno) - objetivosAno - dividasAno + entradaAno
@@ -1062,11 +1073,11 @@ export function calcularFluxoAnual(
   aliquotaIR = 0.15,
   displayMode: DisplayModeProjecao = "nominal",
 ): FluxoAnualRow[] {
-  const r   = premissas.rendimento / 100
   const inf = premissas.inflacao   / 100
+  const rendimentoLiquidoNoAno = resolverRendimentoLiquidoNominalPorAno(premissas)
   const {
     saldoInicial, aporteM, idadeAtual, prazo,
-    idadeApos, retiradaMensal, rendaAposentadoria, novaEntrada, idadeEntrada,
+    idadeApos, retiradaMensal, rendaAposentadoria,
   } = premissas
   const retiradaEfetiva = Math.max(0, retiradaMensal - (rendaAposentadoria || 0))
   const aliq = Math.max(0, Math.min(1, aliquotaIR))
@@ -1075,6 +1086,7 @@ export function calcularFluxoAnual(
   let saldo = saldoInicial
 
   for (let t = 0; t <= prazo; t++) {
+    const r = rendimentoLiquidoNoAno(t)
     const idade        = idadeAtual + t
     const fatorInf     = Math.pow(1 + inf, t)
     const isAposentado = idade >= idadeApos
@@ -1086,10 +1098,7 @@ export function calcularFluxoAnual(
       (premissas.aportePorAnoNominal?.[t] ?? null) !== null
         ? Number(premissas.aportePorAnoNominal?.[t]) || 0
         : aporteM * fatorInf
-    const entradaAno =
-      novaEntrada > 0 && idadeEntrada > 0 && idade === idadeEntrada
-        ? novaEntrada * fatorInf
-        : 0
+    const entradaAno = entradaCapitalNominalNoAno(premissas, idade, fatorInf)
 
     const aporte = isAposentado ? 0 : fvMensal(aporteNominalAno, r)
     const rendimento = t > 0 && saldoInicio > 0 ? saldoInicio * r : 0
@@ -1156,15 +1165,17 @@ export function encontrarIdadeLiberdadeFinanceira(
   inflacaoPct: number,
   retiradaMensalDesejada: number,
   objetivos: Objetivo[] = [],
+  opts?: { taxaRealNoAno?: (t: number) => number },
 ): number | null {
   const r = (Number(rendimentoLiquidoPct) || 0) / 100
   const inf = (Number(inflacaoPct) || 0) / 100
-  const taxaReal = (1 + r) / (1 + inf) - 1
-  const objetivosEternosAnuais = totalObjetivosEternosAnuais(objetivos, taxaReal)
-  const necessidadeAnualTotal =
-    Math.max(0, Number(retiradaMensalDesejada) || 0) * 12 + objetivosEternosAnuais
+  const taxaRealFixa = (1 + r) / (1 + inf) - 1
 
   for (const ano of projecao) {
+    const taxaReal = opts?.taxaRealNoAno ? opts.taxaRealNoAno(ano.t) : taxaRealFixa
+    const objetivosEternosAnuais = totalObjetivosEternosAnuais(objetivos, taxaReal)
+    const necessidadeAnualTotal =
+      Math.max(0, Number(retiradaMensalDesejada) || 0) * 12 + objetivosEternosAnuais
     const patrimonioReal = Number(ano.saldoReal) || 0
     const rendimentoRealAno = patrimonioReal * taxaReal
     if (rendimentoRealAno >= necessidadeAnualTotal) {
@@ -1186,13 +1197,15 @@ export function calcularKPIs(
   const patrimonioAposReal = anoApos?.saldoReal    || 0
   const rendaMensalReal    = premissas.retiradaMensal
 
-  const r   = premissas.rendimento / 100
-  const inf = premissas.inflacao   / 100
-  const taxaReal             = (1 + r) / (1 + inf) - 1
-  const objetivosEternosAnuais = totalObjetivosEternosAnuais(objetivos, taxaReal)
+  const taxaRealNoAno = resolverTaxaRealPorAno(premissas)
+  const idadeApos = Number(premissas.idadeApos) || 0
+  const idadeAtual = Number(premissas.idadeAtual) || 0
+  const anosAteApos = Math.max(0, idadeApos - idadeAtual)
+  const taxaRealApos = taxaRealNoAno(anosAteApos)
+  const objetivosEternosAnuais = totalObjetivosEternosAnuais(objetivos, taxaRealApos)
   const rendaAnualDesejada = Math.max(0, premissas.retiradaMensal) * 12
   const necessidadeAnualTotal = rendaAnualDesejada + objetivosEternosAnuais
-  const patrimonioNecessario = patrimonioPerpetuidade(necessidadeAnualTotal, taxaReal)
+  const patrimonioNecessario = patrimonioPerpetuidade(necessidadeAnualTotal, taxaRealApos)
 
   const idadeLF = encontrarIdadeLiberdadeFinanceira(
     projecao,
@@ -1200,6 +1213,7 @@ export function calcularKPIs(
     premissas.inflacao,
     premissas.retiradaMensal,
     objetivos,
+    { taxaRealNoAno },
   )
 
   const taxaPoupanca = renda > 0 ? ((renda - despesa) / renda) * 100 : 0
