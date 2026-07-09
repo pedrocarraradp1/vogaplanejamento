@@ -34,6 +34,7 @@ import {
   resolveTipoAtivoSlug,
   getSaldoDevedorPassivo,
   getParcelaMensalPassivo,
+  getCustoJurosProjetadoPassivo,
   INSTITUICOES_FINANCEIRAS,
   isInstituicaoFinanceiraListada,
   exibeInstituicaoAtivo,
@@ -73,6 +74,7 @@ import {
   CHART_TOOLTIP_STYLE,
   formatDonutTooltipPct,
 } from "@/lib/chart-tooltip"
+import { MODELOS_AMORTIZACAO, primeiraParcelaPassivo, resolveModeloAmortizacao, type ModeloAmortizacao } from "@/lib/amortizacao"
 import { usePieVogaProps } from "@/components/charts/use-pie-voga"
 import { isPlanoCompleto, type PlanoSecaoVariant } from "@/lib/plano-secoes"
 
@@ -113,6 +115,7 @@ type AddPassivoForm = {
   parcelaMensal: number
   taxaJurosMensal: number
   prazoRestanteMeses: number
+  modeloAmortizacao: ModeloAmortizacao
   instituicao: string
   bemVinculado: string
 }
@@ -135,6 +138,7 @@ const EMPTY_PASSIVO_FORM = (): AddPassivoForm => ({
   parcelaMensal: 0,
   taxaJurosMensal: 0,
   prazoRestanteMeses: 0,
+  modeloAmortizacao: "PRICE",
   instituicao: "",
   bemVinculado: "",
 })
@@ -1059,9 +1063,10 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
         categoria: form.categoria,
         descricao: form.descricao.trim() || form.categoria,
         saldoDevedor: form.saldoDevedor,
-        parcelaMensal: form.parcelaMensal,
+        parcelaMensal: form.modeloAmortizacao === "OUTRO" ? form.parcelaMensal : 0,
         taxaJurosMensal: form.taxaJurosMensal,
         prazoRestanteMeses: form.prazoRestanteMeses,
+        modelo: form.modeloAmortizacao,
         instituicao: form.instituicao,
         bemVinculado: form.bemVinculado,
       })
@@ -1100,9 +1105,11 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
       categoria: resolvePassivoCategoria(passivo),
       descricao: passivo.descricao?.trim() || resolvePassivoCategoria(passivo),
       saldoDevedor: getSaldoDevedorPassivo(passivo),
-      parcelaMensal: getParcelaMensalPassivo(passivo),
+      parcelaMensal:
+        resolveModeloAmortizacao(passivo) === "OUTRO" ? getParcelaMensalPassivo(passivo) : 0,
       taxaJurosMensal: Number(passivo.taxaJurosMensal) || 0,
       prazoRestanteMeses: Number(passivo.prazoRestanteMeses) || 0,
+      modeloAmortizacao: resolveModeloAmortizacao(passivo),
       instituicao: passivo.instituicao ?? "",
       bemVinculado: passivo.bemVinculado ?? "",
     })
@@ -1204,14 +1211,7 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
   )
 
   const custoJurosProjetado = useMemo(
-    () =>
-      passivos.reduce((s, p) => {
-        const saldo = getSaldoDevedorPassivo(p)
-        const parcela = getParcelaMensalPassivo(p)
-        const prazo = Number(p.prazoRestanteMeses) || 0
-        const totalPago = parcela * prazo
-        return s + Math.max(0, totalPago - saldo)
-      }, 0),
+    () => passivos.reduce((s, p) => s + getCustoJurosProjetadoPassivo(p), 0),
     [passivos],
   )
 
@@ -1427,6 +1427,17 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
   const mostrarInstituicaoAtivo =
     !isFormAtivoLiquido && exibeInstituicaoAtivo(ativoTipoSelect, ativoDescricaoSelect)
   const passivoCategoriaSelect = addPassivoForm.categoria || DEFAULT_CATEGORIA_PASSIVO
+  const parcelaPassivoExibida = useMemo(() => {
+    if (addPassivoForm.modeloAmortizacao === "OUTRO") return addPassivoForm.parcelaMensal
+    return primeiraParcelaPassivo({
+      saldoDevedor: addPassivoForm.saldoDevedor,
+      prazoRestanteMeses: addPassivoForm.prazoRestanteMeses,
+      taxaJurosMensal: addPassivoForm.taxaJurosMensal,
+      modelo: addPassivoForm.modeloAmortizacao,
+      parcelaMensal: 0,
+    })
+  }, [addPassivoForm])
+  const passivoAutomatico = addPassivoForm.modeloAmortizacao !== "OUTRO"
 
   const saveAddModal = () => {
     if (!addModal) return
@@ -1444,6 +1455,11 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
     } else {
       if (!passivoCategoriaSelect || !addPassivoForm.descricao.trim()) return
       if (addPassivoForm.saldoDevedor <= 0) return
+      if (passivoAutomatico) {
+        if (addPassivoForm.prazoRestanteMeses <= 0) return
+      } else if (addPassivoForm.parcelaMensal <= 0) {
+        return
+      }
       if (addModal.editId) {
         setPassivos(
           passivos.map((p) =>
@@ -1453,9 +1469,11 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
                   categoria: passivoCategoriaSelect,
                   descricao: addPassivoForm.descricao.trim() || passivoCategoriaSelect,
                   saldoDevedor: addPassivoForm.saldoDevedor,
-                  parcelaMensal: addPassivoForm.parcelaMensal,
+                  parcelaMensal:
+                    addPassivoForm.modeloAmortizacao === "OUTRO" ? addPassivoForm.parcelaMensal : 0,
                   taxaJurosMensal: addPassivoForm.taxaJurosMensal,
                   prazoRestanteMeses: addPassivoForm.prazoRestanteMeses,
+                  modelo: addPassivoForm.modeloAmortizacao,
                   instituicao: addPassivoForm.instituicao,
                   bemVinculado: addPassivoForm.bemVinculado,
                 })
@@ -2554,22 +2572,6 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
                   className="form-card text-foreground tabular-nums"
                 />
               </div>
-              <div className="space-y-2">
-                <label className="field-label">
-                  Parcela mensal (R$)
-                </label>
-                <Input
-                  value={addPassivoForm.parcelaMensal ? formatCurrency(addPassivoForm.parcelaMensal) : ""}
-                  onChange={(e) =>
-                    setAddPassivoForm((prev) => ({
-                      ...prev,
-                      parcelaMensal: parseCurrency(e.target.value),
-                    }))
-                  }
-                  placeholder="0"
-                  className="form-card text-foreground tabular-nums"
-                />
-              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <label className="field-label">
@@ -2611,6 +2613,64 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
                 </div>
               </div>
               <div className="space-y-2">
+                <label className="field-label">Modelo de amortização</label>
+                <Select
+                  value={addPassivoForm.modeloAmortizacao}
+                  onValueChange={(value) =>
+                    setAddPassivoForm((prev) => ({
+                      ...prev,
+                      modeloAmortizacao: value as ModeloAmortizacao,
+                      parcelaMensal: value === "OUTRO" ? prev.parcelaMensal : 0,
+                    }))
+                  }
+                >
+                  <SelectTrigger className="form-card text-foreground">
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent className="form-card">
+                    {MODELOS_AMORTIZACAO.map((m) => (
+                      <SelectItem key={m.value} value={m.value}>
+                        {m.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="field-label">
+                  Parcela mensal (R$)
+                  {passivoAutomatico ? (
+                    <span className="text-muted-foreground font-normal"> — calculada automaticamente</span>
+                  ) : null}
+                </label>
+                <Input
+                  value={
+                    parcelaPassivoExibida > 0 ? formatCurrency(parcelaPassivoExibida) : ""
+                  }
+                  readOnly={passivoAutomatico}
+                  onChange={(e) =>
+                    setAddPassivoForm((prev) => ({
+                      ...prev,
+                      parcelaMensal: parseCurrency(e.target.value),
+                    }))
+                  }
+                  placeholder="0"
+                  className={`form-card text-foreground tabular-nums ${
+                    passivoAutomatico ? "cursor-not-allowed opacity-70" : ""
+                  }`}
+                />
+                {passivoAutomatico && addPassivoForm.modeloAmortizacao === "SAC" ? (
+                  <p className="text-xs text-muted-foreground">
+                    Exibe a 1ª parcela (a maior). Nas projeções, a parcela diminui mês a mês.
+                  </p>
+                ) : null}
+                {passivoAutomatico && addPassivoForm.modeloAmortizacao === "AMERICANA" ? (
+                  <p className="text-xs text-muted-foreground">
+                    Juros mensais constantes; o principal integral é pago na última parcela.
+                  </p>
+                ) : null}
+              </div>
+              <div className="space-y-2">
                 <label className="field-label">
                   Bem vinculado
                 </label>
@@ -2638,7 +2698,10 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
                   : addModal?.kind === "passivo"
                     ? !passivoCategoriaSelect ||
                       !addPassivoForm.descricao.trim() ||
-                      addPassivoForm.saldoDevedor <= 0
+                      addPassivoForm.saldoDevedor <= 0 ||
+                      (passivoAutomatico
+                        ? addPassivoForm.prazoRestanteMeses <= 0
+                        : addPassivoForm.parcelaMensal <= 0)
                     : true
               }
               className="bg-primary text-primary-foreground"

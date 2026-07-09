@@ -12,6 +12,7 @@ import {
   Tooltip,
 } from "recharts"
 import type { MonteCarloTrajetoriaAno } from "@/lib/engine"
+import { CHART_TOOLTIP_ITEM_STYLE, CHART_TOOLTIP_LABEL_STYLE, CHART_TOOLTIP_STYLE } from "@/lib/chart-tooltip"
 import { LegendaFluxo } from "@/components/charts/fluxo-caixa-charts"
 
 type LinhaMonteCarlo = MonteCarloTrajetoriaAno & {
@@ -20,6 +21,19 @@ type LinhaMonteCarlo = MonteCarloTrajetoriaAno & {
   faixa75Base: number
   faixa75Span: number
 }
+
+const TOOLTIP_METRICAS: {
+  key: keyof Pick<MonteCarloTrajetoriaAno, "min" | "p10" | "p25" | "p50" | "p75" | "p90" | "max">
+  label: string
+}[] = [
+  { key: "min", label: "Mínimo simulado" },
+  { key: "p10", label: "Percentil 10 (pior)" },
+  { key: "p25", label: "Percentil 25" },
+  { key: "p50", label: "Mediana (p50)" },
+  { key: "p75", label: "Percentil 75" },
+  { key: "p90", label: "Percentil 90 (melhor)" },
+  { key: "max", label: "Máximo simulado" },
+]
 
 export function MonteCarloChart({
   data,
@@ -67,18 +81,29 @@ export function MonteCarloChart({
               tickFormatter={formatarMoeda}
             />
             <Tooltip
-              formatter={(value: number, name: string) => {
-                const map: Record<string, string> = {
-                  p10: "P10",
-                  p25: "P25",
-                  p50: "Mediana",
-                  p75: "P75",
-                  p90: "P90",
-                }
-                if (!(name in map)) return null
-                return [formatarMoedaCompleta(value), map[name]]
+              content={({ active, payload, label }) => {
+                if (!active || !payload?.length) return null
+                const row = payload[0]?.payload as LinhaMonteCarlo | undefined
+                if (!row) return null
+
+                return (
+                  <div style={{ ...CHART_TOOLTIP_STYLE, fontSize: 12, minWidth: 240 }}>
+                    <p style={{ ...CHART_TOOLTIP_LABEL_STYLE, margin: 0 }}>Idade {label}</p>
+                    {TOOLTIP_METRICAS.map((metrica, index) => (
+                      <p
+                        key={metrica.key}
+                        style={{
+                          ...CHART_TOOLTIP_ITEM_STYLE,
+                          marginTop: index === 0 ? 8 : 4,
+                          fontWeight: metrica.key === "p50" ? 600 : 400,
+                        }}
+                      >
+                        {metrica.label}: {formatarMoedaCompleta(row[metrica.key])}
+                      </p>
+                    ))}
+                  </div>
+                )
               }}
-              labelFormatter={(label) => `Idade ${label}`}
             />
             <ReferenceLine
               x={idadeApos}

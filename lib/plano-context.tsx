@@ -88,7 +88,7 @@ export interface Passivo {
   /** Legado: espelha `saldoDevedor` para compatibilidade com simulação antiga. */
   valor?: number
   tipo?: string
-  modelo?: "SAC" | "PRICE" | "AMERICANA"
+  modelo?: "SAC" | "PRICE" | "AMERICANA" | "OUTRO"
   taxa?: number
   prazo?: number
 }

@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, ArrowRight } from "lucide-react"
 import { CenariosInvestimento } from "@/components/ui/cenarios-investimento"
+import { CenariosRetiradaSection } from "@/components/ui/cenarios-retirada-section"
 import { isPlanoCompleto, type PlanoSecaoVariant } from "@/lib/plano-secoes"
 
 interface CenariosProps {
@@ -23,8 +24,8 @@ export function Cenarios({ onNavigate, variant = "full" }: CenariosProps) {
           onDisplayModeChange={setDisplayMode}
           editable={false}
           layout="resumo"
-          showEstrategiaRetirada
         />
+        <CenariosRetiradaSection displayMode={displayMode} className="mt-6" />
       </div>
     )
   }
@@ -47,19 +48,14 @@ export function Cenarios({ onNavigate, variant = "full" }: CenariosProps) {
         editable
       />
 
+      <CenariosRetiradaSection displayMode={displayMode} className="mt-6" />
+
       <div className="nav-footer">
-        <Button
-          variant="ghost"
-          className="btn-back"
-          onClick={() => onNavigate("projecao")}
-        >
+        <Button variant="ghost" className="btn-back" onClick={() => onNavigate("projecao")}>
           <ArrowLeft className="w-4 h-4 mr-2" />
           Voltar
         </Button>
-        <Button
-          onClick={() => onNavigate("sucessorio")}
-          className="btn-next"
-        >
+        <Button onClick={() => onNavigate("sucessorio")} className="btn-next">
           Próximo
           <ArrowRight className="w-4 h-4 ml-2" />
         </Button>

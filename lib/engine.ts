@@ -1,3 +1,5 @@
+import { pagamentoPassivoAno, parcelaDividaNoMes } from "@/lib/amortizacao"
+
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
 export interface Premissas {
@@ -202,20 +204,7 @@ export interface Passivo {
   prazo?: number
   taxa?: number
   tipo?: string
-  modelo?: "SAC" | "PRICE" | "AMERICANA"
-}
-
-function saldoDevedorEngine(p: Passivo): number {
-  const saldo = Number(p.saldoDevedor)
-  if (saldo > 0) return saldo
-  return Math.max(0, Number(p.valor) || 0)
-}
-
-function parcelaMensalEngine(p: Passivo): number {
-  const parcela = Number(p.parcelaMensal)
-  if (parcela > 0) return parcela
-  const saldo = saldoDevedorEngine(p)
-  return saldo > 0 ? saldo / 120 : 0
+  modelo?: "SAC" | "PRICE" | "AMERICANA" | "OUTRO"
 }
 
 export interface ProjecaoAno {
@@ -316,60 +305,20 @@ function saqueObjetivosAno(t: number, objetivos: Objetivo[], inf: number, prazoT
 // ─── Modelagem de Dívidas ─────────────────────────────────────────────────────
 
 /**
- * Calcula a parcela no mês t para cada modelo de dívida.
- * Replica a fórmula da sheet Apoio do Excel Voga.
- * t = mês relativo ao início (0-indexed). Retorna 0 se t >= prazo.
+ * Calcula a parcela no mês t (0-indexado) conforme o modelo de amortização.
  */
 export function calcularParcelaDivida(passivo: Passivo, t: number): number {
-  const parcelaInformada = parcelaMensalEngine(passivo)
-  if (parcelaInformada > 0) {
-    const prazoRest = Number(passivo.prazoRestanteMeses ?? passivo.prazo) || 0
-    if (prazoRest > 0 && t >= prazoRest) return 0
-    return parcelaInformada
-  }
-
-  const valor = saldoDevedorEngine(passivo)
-  const prazo = Number(passivo.prazoRestanteMeses ?? passivo.prazo) || 0
-  const taxa = Number(passivo.taxaJurosMensal ?? passivo.taxa) || 0
-  const modelo = passivo.modelo ?? "SAC"
-  const taxaDec = taxa / 100
-  if (prazo <= 0 || t >= prazo) return 0
-
-  if (modelo === "PRICE") {
-    if (taxaDec === 0) return valor / prazo
-    return valor * taxaDec / (1 - Math.pow(1 + taxaDec, -prazo))
-  }
-  if (modelo === "SAC") {
-    const amortizacao  = valor / prazo
-    const saldoDevedor = valor - amortizacao * t
-    return amortizacao + saldoDevedor * taxaDec
-  }
-  if (modelo === "AMERICANA") {
-    const juros = valor * taxaDec
-    if (t === prazo - 1) return juros + valor
-    return juros
-  }
-  return 0
+  return parcelaDividaNoMes(passivo, t)
 }
 
 function pagamentoDividaAno(passivo: Passivo, anoT: number): number {
-  let total = 0
-  for (let mes = anoT * 12; mes < (anoT + 1) * 12; mes++) {
-    total += calcularParcelaDivida(passivo, mes)
-  }
-  return total
+  return pagamentoPassivoAno(passivo, anoT)
 }
 
 /**
- * Pagamento anual: parcelaMensal × 12 (prioridade) ou soma SAC/PRICE/estimativa.
+ * Pagamento anual somando as parcelas mês a mês (SAC decrescente, Americano com balão, etc.).
  */
 export function calcularPagamentoPassivosAno(passivo: Passivo, anoT: number): number {
-  const parcela = parcelaMensalEngine(passivo)
-  if (parcela > 0) {
-    const prazoRest = Number(passivo.prazoRestanteMeses ?? passivo.prazo) || 0
-    if (prazoRest > 0 && anoT * 12 >= prazoRest) return 0
-    return parcela * 12
-  }
   return pagamentoDividaAno(passivo, anoT)
 }
 
@@ -779,11 +728,13 @@ export function encontrarAporteNecessarioConsumo(
 
 export interface MonteCarloTrajetoriaAno {
   idade: number
+  min: number
   p10: number
   p25: number
   p50: number
   p75: number
   p90: number
+  max: number
 }
 
 export interface ResultadoMonteCarlo {
@@ -881,11 +832,13 @@ export function rodarMonteCarlo(
     const ordenado = [...valores].sort((a, b) => a - b)
     return {
       idade: idadeAtual + t,
+      min: ordenado[0] ?? 0,
       p10: percentilOrdenado(ordenado, 10),
       p25: percentilOrdenado(ordenado, 25),
       p50: percentilOrdenado(ordenado, 50),
       p75: percentilOrdenado(ordenado, 75),
       p90: percentilOrdenado(ordenado, 90),
+      max: ordenado[ordenado.length - 1] ?? 0,
     }
   })
 

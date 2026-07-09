@@ -43,6 +43,8 @@ export interface EstrategiaRetiradaAposentadoriaProps {
   aliquotaIR: number
   fmtFull: (v: number) => string
   formatarMoeda: (v: number) => string
+  /** Quando true, o título/descrição da seção fica a cargo do container pai. */
+  hideHeader?: boolean
 }
 
 type EstrategiaKey = "acumulacao" | "preservacao" | "consumo"
@@ -99,6 +101,7 @@ export function EstrategiaRetiradaAposentadoria({
   aliquotaIR: _aliquotaIR,
   fmtFull,
   formatarMoeda,
+  hideHeader = false,
 }: EstrategiaRetiradaAposentadoriaProps) {
   const [pctAcumulacao, setPctAcumulacao] = useState(70)
 
@@ -240,15 +243,20 @@ export function EstrategiaRetiradaAposentadoria({
 
   return (
     <div className="space-y-5">
-      <div>
-        <h3 className="text-base font-semibold text-foreground">
-          Estratégia de retirada na aposentadoria
-        </h3>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Mesma simulação completa da Projeção em tempo real, rentabilidade do cenário moderado e
-          horizonte de {horizonte} anos — apenas a retirada mensal muda.
+      {!hideHeader ? (
+        <div>
+          <h3 className="text-base font-semibold text-foreground">Estratégia de retirada na aposentadoria</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Mesma simulação completa da Projeção em tempo real, rentabilidade do cenário moderado e horizonte de{" "}
+            {horizonte} anos — apenas a retirada mensal muda.
+          </p>
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          Mesma simulação completa da Projeção em tempo real, rentabilidade do cenário moderado e horizonte de{" "}
+          {horizonte} anos — apenas a retirada mensal muda.
         </p>
-      </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {estrategias.map((e) => {

@@ -1,4 +1,10 @@
 import type { Ativo, Passivo, PatrimonioState } from "@/lib/plano-context"
+import {
+  primeiraParcelaPassivo,
+  resolveModeloAmortizacao,
+  totalPagamentosPassivo,
+  type ModeloAmortizacao,
+} from "@/lib/amortizacao"
 
 export const TIPOS_ATIVO_OPCOES = [
   { value: "imobilizado", label: "Imobilizado" },
@@ -425,7 +431,19 @@ export function normalizePassivo(raw: Partial<Passivo> & Record<string, unknown>
         ? Number(raw.taxa)
         : 0
   let parcelaMensal = Number(raw.parcelaMensal) || 0
-  if (parcelaMensal <= 0 && saldo > 0 && prazoRestante <= 0) {
+  const modeloRaw = String(raw.modelo ?? "").toUpperCase()
+  const modelo: ModeloAmortizacao =
+    modeloRaw === "PRICE" || modeloRaw === "SAC" || modeloRaw === "AMERICANA"
+      ? (modeloRaw as ModeloAmortizacao)
+      : parcelaMensal > 0
+        ? "OUTRO"
+        : saldo > 0 && prazoRestante > 0
+          ? "PRICE"
+          : "OUTRO"
+
+  if (modelo !== "OUTRO") {
+    parcelaMensal = 0
+  } else if (parcelaMensal <= 0 && saldo > 0 && prazoRestante <= 0) {
     parcelaMensal = saldo / 120
   }
 
@@ -446,7 +464,7 @@ export function normalizePassivo(raw: Partial<Passivo> & Record<string, unknown>
     bemVinculado: String(raw.bemVinculado ?? "").trim(),
     valor: saldo,
     tipo: categoria,
-    modelo: raw.modelo,
+    modelo,
     taxa: taxaJuros,
     prazo: prazoRestante,
   }
@@ -459,11 +477,22 @@ export function getSaldoDevedorPassivo(passivo: Passivo): number {
 }
 
 export function getParcelaMensalPassivo(passivo: Passivo): number {
+  const modelo = resolveModeloAmortizacao(passivo)
+  if (modelo !== "OUTRO") {
+    return primeiraParcelaPassivo(passivo)
+  }
   const parcela = Number(passivo.parcelaMensal)
   if (parcela > 0) return parcela
   const saldo = getSaldoDevedorPassivo(passivo)
   if (saldo > 0) return saldo / 120
   return 0
+}
+
+export function getCustoJurosProjetadoPassivo(passivo: Passivo): number {
+  const saldo = getSaldoDevedorPassivo(passivo)
+  if (saldo <= 0) return 0
+  const totalPago = totalPagamentosPassivo(passivo)
+  return Math.max(0, totalPago - saldo)
 }
 
 export function sumAtivoTipo(ativos: Ativo[], tipo: TipoAtivoSlug): number {

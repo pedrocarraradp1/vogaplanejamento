@@ -42,7 +42,7 @@ import { GraficoFluxoAnual } from "@/components/charts/grafico-fluxo-anual"
 import { RendaCarteiraChart } from "@/components/charts/projecao-extra-charts"
 import { IndependenciaChart, type PontoIndependencia } from "@/components/charts/independencia-chart"
 import { MonteCarloChart } from "@/components/charts/monte-carlo-chart"
-import { EstrategiaRetiradaAposentadoria } from "@/components/ui/estrategia-retirada-aposentadoria"
+import { CenariosRetiradaSection } from "@/components/ui/cenarios-retirada-section"
 import { ControlesSimulacao } from "@/components/ui/controles-simulacao"
 import { BlocoAporteNecessario } from "@/components/ui/bloco-aporte-necessario"
 import { isPlanoCompleto, type PlanoSecaoVariant } from "@/lib/plano-secoes"
@@ -50,6 +50,19 @@ import { isPlanoCompleto, type PlanoSecaoVariant } from "@/lib/plano-secoes"
 const GOLD = VOGA.brasilia
 const GREEN = VOGA.brasilia
 const RED = VOGA.alerta
+
+const ALIQUOTAS_IR_OPCOES = [
+  { value: "0.15", pct: 0.15, label: "15% — renda fixa longo prazo" },
+  { value: "0.175", pct: 0.175, label: "17,5% — renda fixa 2-4 anos" },
+  { value: "0.2", pct: 0.2, label: "20% — renda fixa 1-2 anos" },
+  { value: "0.225", pct: 0.225, label: "22,5% — renda fixa até 1 ano" },
+] as const
+
+function aliquotaParaSelectValue(aliq: number | undefined): string {
+  const n = Number(aliq) || 0.15
+  const found = ALIQUOTAS_IR_OPCOES.find((o) => Math.abs(o.pct - n) < 1e-9)
+  return found?.value ?? String(n)
+}
 
 interface ProjecaoProps {
   onNavigate: (section: string) => void
@@ -954,17 +967,18 @@ export function Projecao({ onNavigate, variant = "full" }: ProjecaoProps) {
                 Alíquota de Imposto sobre Rendimento
               </Label>
               <Select
-                value={String(premissas.aliquotaImpostoRendimento ?? 0.15)}
+                value={aliquotaParaSelectValue(premissas.aliquotaImpostoRendimento)}
                 onValueChange={(v) => setPremissas({ aliquotaImpostoRendimento: parseFloat(v) || 0 })}
               >
                 <SelectTrigger className="form-card text-foreground focus:border-primary">
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent className="form-card">
-                  <SelectItem value="0.15">15% — renda fixa longo prazo</SelectItem>
-                  <SelectItem value="0.175">17,5% — renda fixa 2-4 anos</SelectItem>
-                  <SelectItem value="0.20">20% — renda fixa 1-2 anos</SelectItem>
-                  <SelectItem value="0.225">22,5% — renda fixa até 1 ano</SelectItem>
+                  {ALIQUOTAS_IR_OPCOES.map((opcao) => (
+                    <SelectItem key={opcao.value} value={opcao.value}>
+                      {opcao.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
@@ -1446,34 +1460,9 @@ export function Projecao({ onNavigate, variant = "full" }: ProjecaoProps) {
         displayMode={displayMode}
         onDisplayModeChange={setDisplayMode}
         editable
-        showEstrategiaRetirada={false}
       />
 
-      <Card className="form-card">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base font-medium text-foreground">
-            Estratégia de retirada na aposentadoria
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Acumulação / preservação / consumo — escolhe-se a retirada mensal; a rentabilidade é independente.
-          </p>
-        </CardHeader>
-        <CardContent>
-          <EstrategiaRetiradaAposentadoria
-            premissasCompletas={premissasCompletas}
-            objetivosEngine={objetivosEngine}
-            passivos={state.passivos}
-            rentabilidadeLiquidaPct={rendimentoLiquidoPct}
-            displayMode={displayMode}
-            inflacaoGlobal={Number(premissas.inflacao) || 0}
-            idadeAtualCalculada={idadeAtualCalculada}
-            projecaoModerada={projecao}
-            aliquotaIR={Number(premissas.aliquotaImpostoRendimento) || 0.15}
-            fmtFull={formatarMoedaCompleta}
-            formatarMoeda={formatarMoeda}
-          />
-        </CardContent>
-      </Card>
+      <CenariosRetiradaSection displayMode={displayMode} className="mt-6" />
 
       {/* Card 4 — Modo de Cálculo */}
       <Card className="form-card">
