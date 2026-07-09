@@ -6,12 +6,13 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 /** Aceita variações de nome da variável (Vercel/local) para evitar mismatch. */
-const OPENAI_API_KEY =
-  process.env.OPENAI_API_KEY ??
-  process.env.OPEN_AI_API_KEY ??
-  process.env.OPENAIAPIKEY
-
-const openai = new OpenAI({ apiKey: OPENAI_API_KEY })
+function resolveOpenAiApiKey(): string | undefined {
+  return (
+    process.env.OPENAI_API_KEY ??
+    process.env.OPEN_AI_API_KEY ??
+    process.env.OPENAIAPIKEY
+  )
+}
 
 const SYSTEM_PROMPT = `Você é um assistente de um Certified Financial Planner (CFP) analisando o cenário financeiro de um cliente de wealth management.
 
@@ -29,12 +30,15 @@ Responda APENAS em JSON válido, sem texto fora do JSON, exatamente neste format
 
 export async function POST(req: Request) {
   try {
-    if (!OPENAI_API_KEY) {
+    const apiKey = resolveOpenAiApiKey()
+    if (!apiKey) {
       return NextResponse.json(
-        { error: 'A chave da OpenAI não está configurada no servidor.' },
+        { error: 'OPENAI_API_KEY não configurada' },
         { status: 500 },
       )
     }
+
+    const openai = new OpenAI({ apiKey })
 
     const snapshot: SnapshotCliente = await req.json()
 
