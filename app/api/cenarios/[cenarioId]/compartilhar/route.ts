@@ -1,7 +1,7 @@
 import { randomBytes } from "crypto"
 import { NextResponse } from "next/server"
 import { jsonApiError, jsonSupabaseError, logAndJsonError } from "@/lib/api-error"
-import { buildShareUrl } from "@/lib/links-compartilhados"
+import { buildShareUrl, resolveShareAppBaseUrl } from "@/lib/links-compartilhados"
 import { createAdminClient } from "@/lib/supabase-admin"
 import { createServerSupabaseClient } from "@/lib/supabase-server"
 
@@ -51,6 +51,14 @@ export async function POST(_req: Request, context: RouteContext) {
         advisorId: simulacao.advisor_id,
         userId: user.id,
       })
+    }
+
+    if (!resolveShareAppBaseUrl()) {
+      return jsonApiError(
+        "NEXT_PUBLIC_APP_URL não configurada no servidor. Defina como https://vogaplanejamento.vercel.app em Production.",
+        500,
+        { code: "missing_app_url" },
+      )
     }
 
     let admin

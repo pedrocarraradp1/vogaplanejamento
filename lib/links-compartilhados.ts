@@ -11,10 +11,18 @@ export type CenarioCompartilhado = {
   }
 }
 
+/** Base pública do app — sempre NEXT_PUBLIC_APP_URL (nunca origin/preview do advisor). */
+export function resolveShareAppBaseUrl(): string | null {
+  const raw = process.env.NEXT_PUBLIC_APP_URL?.trim()
+  if (!raw) return null
+  return raw.replace(/\/$/, "")
+}
+
 export function buildShareUrl(token: string): string {
-  const base =
-    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ??
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")
+  const base = resolveShareAppBaseUrl()
+  if (!base) {
+    throw new Error("NEXT_PUBLIC_APP_URL não configurada.")
+  }
   return `${base}/plano/${token}`
 }
 

@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "test": "node --experimental-strip-types --import ./scripts/test-register.mjs --test lib/projecao-calculos.test.ts lib/patrimonio-moeda.test.ts lib/moeda-input.test.ts"
+    "test": "node --experimental-strip-types --import ./scripts/test-register.mjs --test lib/projecao-calculos.test.ts lib/patrimonio-moeda.test.ts lib/moeda-input.test.ts lib/links-compartilhados.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
