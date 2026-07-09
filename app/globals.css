@@ -503,7 +503,7 @@
     gap: 12px !important;
   }
 
-  /* Plano Financeiro Completo (modo leitura) */
+  /* Plano Financeiro Completo (modo leitura) — oculta edição, mantém hover nos gráficos */
   .plano-completo-readonly .nav-footer,
   .plano-completo-readonly .no-print,
   .plano-completo-readonly button,
@@ -520,10 +520,6 @@
   .plano-completo-readonly h1,
   .plano-completo-readonly > div > div > p.text-sm.text-muted-foreground {
     display: none !important;
-  }
-
-  .plano-completo-readonly {
-    pointer-events: none;
   }
 
   #balanco-patrimonial-content.pdf-export-mode .pdf-section {
