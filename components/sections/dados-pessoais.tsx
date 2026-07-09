@@ -723,7 +723,6 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
               </span>
             </p>
           </div>
-        </div>
       </div>
 
       <Dialog open={modalFonteOpen} onOpenChange={setModalFonteOpen}>
