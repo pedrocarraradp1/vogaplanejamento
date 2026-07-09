@@ -5,6 +5,7 @@ import * as SelectPrimitive from '@radix-ui/react-select'
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+import { usePlanoReadOnly } from '@/lib/plano-readonly-context'
 
 function Select({
   value,
@@ -37,24 +38,30 @@ function SelectTrigger({
   className,
   size = 'default',
   children,
+  disabled,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Trigger> & {
   size?: 'sm' | 'default'
 }) {
+  const planoReadOnly = usePlanoReadOnly()
   return (
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
       data-size={size}
+      disabled={disabled || planoReadOnly}
       className={cn(
         "form-input flex w-full items-center justify-between gap-2 whitespace-nowrap data-[placeholder]:text-muted-foreground outline-none disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        planoReadOnly && "field-value-readonly cursor-default opacity-100 [&_svg]:hidden",
         className,
       )}
       {...props}
     >
       {children}
-      <SelectPrimitive.Icon asChild>
-        <ChevronDownIcon className="size-4 opacity-50" />
-      </SelectPrimitive.Icon>
+      {!planoReadOnly ? (
+        <SelectPrimitive.Icon asChild>
+          <ChevronDownIcon className="size-4 opacity-50" />
+        </SelectPrimitive.Icon>
+      ) : null}
     </SelectPrimitive.Trigger>
   )
 }

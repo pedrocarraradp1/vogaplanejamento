@@ -89,29 +89,11 @@ export function resolveSubcategoriaLiquido(
   return byValue?.value
 }
 
+import { formatarValorDecimal, parseValorDecimalDigitado } from "@/lib/moeda-input"
+
 /** Converte string monetária (máscara ou decimal pt-BR) preservando centavos. */
 export function parseValorMoeda(value: string): number {
-  const trimmed = (value ?? "").trim()
-  if (!trimmed) return 0
-
-  if (trimmed.includes(",")) {
-    const normalized = trimmed
-      .replace(/[^\d,.-]/g, "")
-      .replace(/\./g, "")
-      .replace(",", ".")
-    const n = parseFloat(normalized)
-    return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0
-  }
-
-  if (trimmed.includes(".")) {
-    const normalized = trimmed.replace(/[^\d.-]/g, "")
-    const n = parseFloat(normalized)
-    return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0
-  }
-
-  const digits = trimmed.replace(/\D/g, "")
-  if (!digits) return 0
-  return Math.round(parseFloat(digits)) / 100
+  return parseValorDecimalDigitado(value ?? "")
 }
 
 export function formatValorMoeda(
@@ -120,6 +102,9 @@ export function formatValorMoeda(
   fractionDigits = 2,
 ): string {
   if (!value) return ""
+  if (fractionDigits === 2) {
+    return formatarValorDecimal(value, moeda)
+  }
   return new Intl.NumberFormat(moeda === "USD" ? "en-US" : "pt-BR", {
     minimumFractionDigits: fractionDigits,
     maximumFractionDigits: fractionDigits,

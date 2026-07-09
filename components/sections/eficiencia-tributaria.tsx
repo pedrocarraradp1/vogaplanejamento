@@ -4,6 +4,7 @@ import { EmBreve } from "./em-breve"
 
 interface EficienciaTributariaProps {
   onNavigate: (section: string) => void
+  readOnly?: boolean
 }
 
 export function EficienciaTributaria({ onNavigate }: EficienciaTributariaProps) {

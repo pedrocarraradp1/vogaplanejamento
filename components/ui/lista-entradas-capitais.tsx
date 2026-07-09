@@ -4,6 +4,7 @@ import { useMemo, useState } from "react"
 import { Pencil, Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { InputMoeda } from "@/components/ui/input-moeda"
 import { Label } from "@/components/ui/label"
 import {
   Dialog,
@@ -18,14 +19,6 @@ import {
   totalEntradasCapitaisValorHoje,
   type EntradaCapital,
 } from "@/lib/entradas-capitais"
-
-function formatCurrency(value: number) {
-  return value.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })
-}
-
-function parseCurrency(value: string) {
-  return parseInt(value.replace(/\D/g, ""), 10) || 0
-}
 
 interface ListaEntradasCapitaisProps {
   entradas: EntradaCapital[]
@@ -154,11 +147,11 @@ export function ListaEntradasCapitais({
             </div>
             <div className="space-y-2">
               <Label className="field-label">Valor (R$)</Label>
-              <Input
-                value={form.valor ? formatCurrency(form.valor) : ""}
-                onChange={(e) => setForm((f) => ({ ...f, valor: parseCurrency(e.target.value) }))}
-                placeholder="0"
-                className="form-card text-foreground focus:border-primary tabular-nums"
+              <InputMoeda
+                value={form.valor}
+                onChange={(valor) => setForm((f) => ({ ...f, valor }))}
+                placeholder="0,00"
+                className="form-card text-foreground focus:border-primary"
               />
             </div>
             <div className="space-y-2">

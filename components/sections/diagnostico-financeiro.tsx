@@ -42,6 +42,7 @@ const PAINEL_BG = "#F5F5F5"
 
 interface DiagnosticoFinanceiroProps {
   onNavigate: (section: string) => void
+  readOnly?: boolean
 }
 
 export function DiagnosticoFinanceiro({ onNavigate }: DiagnosticoFinanceiroProps) {

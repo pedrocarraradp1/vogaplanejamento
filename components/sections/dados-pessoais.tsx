@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { Input } from "@/components/ui/input"
+import { InputMoeda } from "@/components/ui/input-moeda"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -51,6 +52,7 @@ import {
 
 interface DadosPessoaisProps {
   onNavigate: (section: string) => void
+  readOnly?: boolean
 }
 
 const ICONES_FONTE: Record<TipoFonteRenda, LucideIcon> = {
@@ -180,19 +182,6 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
     const percentual = receitaTotal > 0 ? (poupanca / receitaTotal) * 100 : 0
     return { valor: poupanca, percentual }
   }, [receitaTotal, despesaTotal])
-
-  const formatCurrency = (value: number) => {
-    if (value === 0) return ""
-    return value.toLocaleString(moeda === "USD" ? "en-US" : "pt-BR", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })
-  }
-
-  const parseCurrency = (value: string) => {
-    const numbers = value.replace(/\D/g, "")
-    return parseFloat(numbers) / 100 || 0
-  }
 
   const cardStyle = {
     background: "var(--surface)",
@@ -777,12 +766,11 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
 
             <div className="space-y-2">
               <Label className="field-label">Valor mensal (R$)</Label>
-              <Input
-                value={formatCurrency(formFonte.valorMensal)}
-                onChange={(e) =>
-                  setFormFonte((f) => ({ ...f, valorMensal: parseCurrency(e.target.value) }))
-                }
-                className="form-input tabular-nums"
+              <InputMoeda
+                value={formFonte.valorMensal}
+                onChange={(valorMensal) => setFormFonte((f) => ({ ...f, valorMensal }))}
+                moeda={moeda === "USD" ? "USD" : "BRL"}
+                className="form-input"
                 placeholder="0,00"
               />
             </div>
@@ -978,12 +966,11 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
 
             <div className="space-y-2">
               <Label className="field-label">Valor mensal (R$)</Label>
-              <Input
-                value={formatCurrency(formDespesa.valor)}
-                onChange={(e) =>
-                  setFormDespesa((f) => ({ ...f, valor: parseCurrency(e.target.value) }))
-                }
-                className="form-input tabular-nums"
+              <InputMoeda
+                value={formDespesa.valor}
+                onChange={(valor) => setFormDespesa((f) => ({ ...f, valor }))}
+                moeda={moeda === "USD" ? "USD" : "BRL"}
+                className="form-input"
                 placeholder="0,00"
               />
             </div>

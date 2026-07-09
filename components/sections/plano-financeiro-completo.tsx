@@ -137,31 +137,31 @@ export function PlanoFinanceiroCompleto({ onNavigate, readOnly = false }: PlanoF
   const temObjetivos = (state.objetivos?.length ?? 0) > 0
   const conteudoPorSecao: Record<SecaoId, ReactNode> = {
     patrimonio: temPatrimonio ? (
-      <div className="plano-completo-readonly">
+      <div className="plano-completo-embed">
         <Patrimonio onNavigate={onNavigate} variant="planoCompleto" />
       </div>
     ) : (
       <EstadoVazio />
     ),
     objetivos: temObjetivos ? (
-      <div className="plano-completo-readonly">
+      <div className="plano-completo-embed">
         <Objetivos onNavigate={onNavigate} />
       </div>
     ) : (
       <EstadoVazio />
     ),
     fluxo: (
-      <div className="plano-completo-readonly">
+      <div className="plano-completo-embed">
         <FluxoDeCaixa onNavigate={onNavigate} variant="planoCompleto" />
       </div>
     ),
     projecao: (
-      <div className="plano-completo-readonly">
+      <div className="plano-completo-embed">
         <Projecao onNavigate={onNavigate} variant="planoCompleto" />
       </div>
     ),
     cenarios: (
-      <div className="plano-completo-readonly">
+      <div className="plano-completo-embed">
         <Cenarios onNavigate={onNavigate} variant="planoCompleto" />
       </div>
     ),

@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState, type ComponentType } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { InputMoeda } from "@/components/ui/input-moeda"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
@@ -35,6 +36,7 @@ import { VOGA, VOGA_CHART_SCALE } from "@/lib/voga-tokens"
 
 interface ObjetivosProps {
   onNavigate: (section: string) => void
+  readOnly?: boolean
 }
 
 const OBJETIVOS_PREDEFINIDOS = [
@@ -283,11 +285,6 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(value)
-  }
-
-  const parseCurrency = (value: string) => {
-    const numbers = value.replace(/\D/g, "")
-    return parseInt(numbers, 10) || 0
   }
 
   const openAddObjetivo = () => {
@@ -1136,9 +1133,10 @@ export function Objetivos({ onNavigate }: ObjetivosProps) {
                 <label className="field-label">
                   Valor Estimado (R$)
                 </label>
-                <Input
-                  value={form.valor ? formatCurrency(form.valor) : ""}
-                  onChange={(e) => setForm({ ...form, valor: parseCurrency(e.target.value) })}
+                <InputMoeda
+                  value={form.valor}
+                  onChange={(valor) => setForm({ ...form, valor })}
+                  moeda={moeda === "USD" ? "USD" : "BRL"}
                   placeholder="0,00"
                   className="form-card text-foreground placeholder:text-muted-foreground"
                 />

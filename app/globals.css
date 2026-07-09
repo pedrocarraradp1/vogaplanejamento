@@ -503,22 +503,58 @@
     gap: 12px !important;
   }
 
-  /* Plano Financeiro Completo (modo leitura) — oculta edição, mantém hover nos gráficos */
-  .plano-completo-readonly .nav-footer,
-  .plano-completo-readonly .no-print,
-  .plano-completo-readonly button,
-  .plano-completo-readonly input,
-  .plano-completo-readonly textarea,
-  .plano-completo-readonly select,
-  .plano-completo-readonly [role="button"],
-  .plano-completo-readonly [contenteditable="true"] {
+  .field-value-readonly {
+    display: flex;
+    align-items: center;
+    min-height: 36px;
+    width: 100%;
+    margin: 0;
+    padding: 0 10px;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--text-primary);
+    background: var(--input-bg);
+    border: none;
+    border-radius: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Link público / modo leitura — mantém cards e campos visíveis */
+  .plano-readonly-view .nav-footer,
+  .plano-readonly-view .no-print {
     display: none !important;
   }
 
-  /* Remove headers/breadcrumbs das seções embutidas */
-  .plano-completo-readonly .page-title,
-  .plano-completo-readonly h1,
-  .plano-completo-readonly > div > div > p.text-sm.text-muted-foreground {
+  /* Oculta apenas ações de edição (mantém selects como valor estático) */
+  .plano-readonly-view button:not([data-slot="select-trigger"]) {
+    display: none !important;
+  }
+
+  .plano-readonly-view [role="switch"],
+  .plano-readonly-view input[type="range"] {
+    display: none !important;
+  }
+
+  /* Seções embutidas no Plano Completo — remove cabeçalho duplicado */
+  .plano-completo-embed .page-breadcrumb,
+  .plano-completo-embed .page-title,
+  .plano-completo-embed .page-subtitle,
+  .plano-completo-embed .nav-footer {
+    display: none !important;
+  }
+
+  /* Legado: plano completo interno em modo leitura (ocultar edição, manter layout) */
+  .plano-completo-readonly .nav-footer,
+  .plano-completo-readonly .no-print {
+    display: none !important;
+  }
+
+  .plano-completo-readonly button:not([data-slot="select-trigger"]) {
+    display: none !important;
+  }
+
+  .plano-completo-readonly .page-breadcrumb,
+  .plano-completo-readonly > .space-y-8 > div > .page-title {
     display: none !important;
   }
 

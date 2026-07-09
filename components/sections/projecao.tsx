@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, type ReactNode } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { InputMoeda } from "@/components/ui/input-moeda"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -76,6 +77,7 @@ function aliquotaParaSelectValue(aliq: number | undefined): string {
 interface ProjecaoProps {
   onNavigate: (section: string) => void
   variant?: PlanoSecaoVariant
+  readOnly?: boolean
 }
 
 function KpiCardComTooltip({
@@ -252,12 +254,6 @@ export function Projecao({ onNavigate, variant = "full" }: ProjecaoProps) {
   const [displayMode, setDisplayMode] = useState<"nominal" | "real">("real")
 
   // ── Formatadores ─────────────────────────────────────────────────────────
-  const formatCurrency = (value: number) => {
-    if (!value) return ""
-    return new Intl.NumberFormat(moeda === "USD" ? "en-US" : "pt-BR").format(value)
-  }
-  const parseCurrency = (value: string) => parseInt(value.replace(/\D/g, ""), 10) || 0
-
   const formatarMoeda = (valor: number) => {
     const prefix = moeda === "USD" ? "US$ " : "R$ "
     if (Math.abs(valor) >= 1_000_000) return `${prefix}${(valor / 1_000_000).toFixed(1)}M`
@@ -1096,8 +1092,12 @@ export function Projecao({ onNavigate, variant = "full" }: ProjecaoProps) {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label className="field-label">Saldo Inicial Líquido (R$)</Label>
-              <Input value={formatCurrency(saldoInicialCalculado)} readOnly
-                className="form-card text-foreground cursor-not-allowed opacity-70" />
+              <InputMoeda
+                value={saldoInicialCalculado}
+                readOnly
+                moeda={moeda === "USD" ? "USD" : "BRL"}
+                className="form-card text-foreground cursor-not-allowed opacity-70"
+              />
               <p className="text-xs text-muted-foreground">Calculado automaticamente: Ativos Líquidos + Previdência</p>
             </div>
             {modoRentabilidade === "padrao" ? (
@@ -1211,9 +1211,10 @@ export function Projecao({ onNavigate, variant = "full" }: ProjecaoProps) {
           {aporteModo === "fixo" ? (
             <div className="space-y-2">
               <Label className="field-label">Aporte Mensal (R$)</Label>
-              <Input
-                value={formatCurrency(aporteMensal)}
+              <InputMoeda
+                value={aporteMensal}
                 readOnly
+                moeda={moeda === "USD" ? "USD" : "BRL"}
                 className="form-card text-foreground cursor-not-allowed opacity-70"
               />
               <p className="text-xs text-muted-foreground">
@@ -1246,16 +1247,16 @@ export function Projecao({ onNavigate, variant = "full" }: ProjecaoProps) {
                       </p>
                       <div className="mt-3 space-y-2">
                         <Label className="field-label">Aporte (R$)</Label>
-                        <Input
-                          value={formatCurrency(real)}
-                          onChange={(e) => {
-                            const v = parseCurrency(e.target.value)
+                        <InputMoeda
+                          value={real}
+                          onChange={(v) => {
                             const cur = premissas.aportePeriodosReal ?? []
                             const next = Array.from({ length: blocosAporte.length }, (_, i) => (cur[i] ?? aporteMensal))
                             next[b.i] = v
                             setPremissas({ aportePeriodosReal: next, aporteModo: "periodos" })
                           }}
-                          placeholder="0"
+                          moeda={moeda === "USD" ? "USD" : "BRL"}
+                          placeholder="0,00"
                           className="form-card text-foreground focus:border-primary"
                         />
                         <p className="text-xs text-muted-foreground">
@@ -1297,9 +1298,13 @@ export function Projecao({ onNavigate, variant = "full" }: ProjecaoProps) {
             </div>
             <div className="space-y-2">
               <Label className="field-label">Retirada Mensal Desejada (R$)</Label>
-              <Input value={formatCurrency(premissas.retiradaMensal)}
-                onChange={e => setPremissas({ retiradaMensal: parseCurrency(e.target.value) })}
-                className="form-card text-foreground focus:border-primary" />
+              <InputMoeda
+                value={premissas.retiradaMensal}
+                onChange={(retiradaMensal) => setPremissas({ retiradaMensal })}
+                moeda={moeda === "USD" ? "USD" : "BRL"}
+                className="form-card text-foreground focus:border-primary"
+                placeholder="0,00"
+              />
               <input
                 type="range"
                 min={0}
@@ -1314,10 +1319,11 @@ export function Projecao({ onNavigate, variant = "full" }: ProjecaoProps) {
               <Label className="field-label">
                 Renda Mensal na Aposentadoria (R$)
               </Label>
-              <Input
-                value={formatCurrency(premissas.rendaAposentadoria ?? 0)}
-                onChange={(e) => setPremissas({ rendaAposentadoria: parseCurrency(e.target.value) })}
-                placeholder="0"
+              <InputMoeda
+                value={premissas.rendaAposentadoria ?? 0}
+                onChange={(rendaAposentadoria) => setPremissas({ rendaAposentadoria })}
+                moeda={moeda === "USD" ? "USD" : "BRL"}
+                placeholder="0,00"
                 className="form-card text-foreground focus:border-primary"
               />
               <input

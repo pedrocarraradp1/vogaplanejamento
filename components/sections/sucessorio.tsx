@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { InputMoeda } from "@/components/ui/input-moeda"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -48,6 +49,7 @@ function premioPorEstimativa(capital: number, idade: number, codigoProduto: stri
 
 interface SucessorioProps {
   onNavigate: (section: string) => void
+  readOnly?: boolean
 }
 
 export function Sucessorio({ onNavigate }: SucessorioProps) {
@@ -392,13 +394,11 @@ export function Sucessorio({ onNavigate }: SucessorioProps) {
 
             <div className="space-y-2">
               <Label className="text-sm text-muted-foreground">Capital segurado</Label>
-              <Input
-                type="number"
-                min={0}
-                step={1000}
-                value={capitalSegurado || ""}
-                onChange={(e) => setCapitalSegurado(parseFloat(e.target.value) || 0)}
-                className="form-card text-foreground focus:border-primary focus:ring-1 focus:ring-primary tabular-nums"
+              <InputMoeda
+                value={capitalSegurado}
+                onChange={(v) => setCapitalSegurado(Math.max(0, v))}
+                moeda={moeda === "USD" ? "USD" : "BRL"}
+                className="form-card text-foreground focus:border-primary focus:ring-1 focus:ring-primary"
               />
             </div>
 

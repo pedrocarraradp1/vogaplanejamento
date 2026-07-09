@@ -10,6 +10,7 @@ import { isPlanoCompleto, type PlanoSecaoVariant } from "@/lib/plano-secoes"
 interface CenariosProps {
   onNavigate: (section: string) => void
   variant?: PlanoSecaoVariant
+  readOnly?: boolean
 }
 
 export function Cenarios({ onNavigate, variant = "full" }: CenariosProps) {

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { InputMoeda } from "@/components/ui/input-moeda"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, ArrowRight } from "lucide-react"
@@ -33,6 +34,7 @@ import { isPlanoCompleto, type PlanoSecaoVariant } from "@/lib/plano-secoes"
 interface FluxoDeCaixaProps {
   onNavigate: (section: string) => void
   variant?: PlanoSecaoVariant
+  readOnly?: boolean
 }
 
 const PAINEL_BG = "#F5F5F5"
@@ -251,15 +253,6 @@ export function FluxoDeCaixa({ onNavigate, variant = "full" }: FluxoDeCaixaProps
 
   const formatarMoedaCompleta = (valor: number) => fmt(valor)
 
-  const parseCurrency = (value: string) => parseInt(value.replace(/\D/g, ""), 10) || 0
-  const formatCurrencyInput = (value: number) => {
-    if (!value) return ""
-    return new Intl.NumberFormat(moeda === "USD" ? "en-US" : "pt-BR", {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value)
-  }
-
   const dadosRealizado = useMemo(
     () => calcularRealizadoMensal(fluxoDeCaixa),
     [fluxoDeCaixa],
@@ -282,15 +275,15 @@ export function FluxoDeCaixa({ onNavigate, variant = "full" }: FluxoDeCaixaProps
       : "Até dezembro"
   const saldoCardValor = dadosRealizado[idxSaldoCard]?.saldoAcumulado ?? 0
 
-  const updateMes = (idx: number, field: keyof FluxoMesRealizado, raw: string) => {
+  const updateMes = (idx: number, field: keyof FluxoMesRealizado, valor: number) => {
     const next = [...fluxoDeCaixa.meses]
-    next[idx] = { ...next[idx], [field]: parseCurrency(raw) }
+    next[idx] = { ...next[idx], [field]: valor }
     setFluxoDeCaixa({ meses: next })
   }
 
-  const updateAnualUnico = (field: keyof FluxoMesRealizado, raw: string) => {
+  const updateAnualUnico = (field: keyof FluxoMesRealizado, valor: number) => {
     setFluxoDeCaixa({
-      anualUnico: { ...fluxoDeCaixa.anualUnico, [field]: parseCurrency(raw) },
+      anualUnico: { ...fluxoDeCaixa.anualUnico, [field]: valor },
     })
   }
 
@@ -341,11 +334,12 @@ export function FluxoDeCaixa({ onNavigate, variant = "full" }: FluxoDeCaixaProps
                         <td className="py-2 pr-3 font-medium text-foreground">{mes}</td>
                         {(["rentabilidade", "receita", "despesa"] as const).map((field) => (
                           <td key={field} className="py-1.5 px-1">
-                            <Input
-                              value={formatCurrencyInput(fluxoDeCaixa.meses[i]?.[field] ?? 0)}
-                              onChange={(e) => updateMes(i, field, e.target.value)}
+                            <InputMoeda
+                              value={fluxoDeCaixa.meses[i]?.[field] ?? 0}
+                              onChange={(valor) => updateMes(i, field, valor)}
+                              moeda={moeda === "USD" ? "USD" : "BRL"}
                               className="h-8 text-sm bg-white"
-                              placeholder="0"
+                              placeholder="0,00"
                             />
                           </td>
                         ))}
@@ -365,11 +359,12 @@ export function FluxoDeCaixa({ onNavigate, variant = "full" }: FluxoDeCaixaProps
                 ).map(({ field, label }) => (
                   <div key={field} className="space-y-2">
                     <Label className="field-label">{label}</Label>
-                    <Input
-                      value={formatCurrencyInput(fluxoDeCaixa.anualUnico[field])}
-                      onChange={(e) => updateAnualUnico(field, e.target.value)}
+                    <InputMoeda
+                      value={fluxoDeCaixa.anualUnico[field]}
+                      onChange={(valor) => updateAnualUnico(field, valor)}
+                      moeda={moeda === "USD" ? "USD" : "BRL"}
                       className="h-9 bg-white"
-                      placeholder="0"
+                      placeholder="0,00"
                     />
                   </div>
                 ))}

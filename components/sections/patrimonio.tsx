@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo, type ReactNode } from "react"
 import { Input } from "@/components/ui/input"
+import { InputMoeda } from "@/components/ui/input-moeda"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -65,7 +66,6 @@ import {
   labelSubcategoriaLiquido,
   labelLocalizacaoAtivo,
   resolveSubcategoriaLiquido,
-  parseValorMoeda,
   formatValorMoeda,
   type LocalizacaoAtivo,
   type SubcategoriaLiquido,
@@ -86,6 +86,7 @@ import { isPlanoCompleto, type PlanoSecaoVariant } from "@/lib/plano-secoes"
 interface PatrimonioProps {
   onNavigate: (section: string) => void
   variant?: PlanoSecaoVariant
+  readOnly?: boolean
 }
 
 type DonutSlice = { name: string; value: number; fill: string }
@@ -810,6 +811,7 @@ function AtivoListaBarRow({
   totalSecao,
   barColor,
   formatCurrency,
+  moeda = "BRL",
   valueColor = "#393939",
   onValueCommit,
   onRemove,
@@ -821,6 +823,7 @@ function AtivoListaBarRow({
   totalSecao: number
   barColor: string
   formatCurrency: (value: number) => string
+  moeda?: "BRL" | "USD"
   valueColor?: string
   onValueCommit: (valor: number) => void
   onRemove: () => void
@@ -920,19 +923,17 @@ function AtivoListaBarRow({
             </button>
           </div>
           {editing ? (
-            <Input
+            <InputMoeda
               autoFocus
-              type="number"
-              step="0.01"
-              min="0"
-              value={draft > 0 ? draft : ""}
-              onChange={(e) => setDraft(parseFloat(e.target.value) || 0)}
+              value={draft}
+              onChange={setDraft}
+              moeda={moeda === "USD" ? "USD" : "BRL"}
               onBlur={() => commit(draft)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") commit(draft)
                 if (e.key === "Escape") setEditing(false)
               }}
-              className="form-input text-right tabular-nums"
+              className="form-input text-right"
               style={{ width: 120, height: 32 }}
             />
           ) : (
@@ -2390,6 +2391,7 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
                         totalSecao={total}
                         barColor={secao.cor}
                         formatCurrency={formatCurrency}
+                        moeda={moeda === "USD" ? "USD" : "BRL"}
                         valueColor="#393939"
                         onValueCommit={(v) => updateAtivoValor(linha.id, v)}
                         onRemove={() => removerAtivo(linha.id)}
@@ -2526,19 +2528,12 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
                     </div>
                     <div className="space-y-2">
                       <label className="field-label">Valor (R$)</label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={addAtivoForm.valor > 0 ? addAtivoForm.valor : ""}
-                        onChange={(e) =>
-                          setAddAtivoForm({
-                            ...addAtivoForm,
-                            valor: Math.round((parseFloat(e.target.value) || 0) * 100) / 100,
-                          })
-                        }
+                      <InputMoeda
+                        value={addAtivoForm.valor}
+                        onChange={(valor) => setAddAtivoForm({ ...addAtivoForm, valor })}
+                        moeda={moeda === "USD" ? "USD" : "BRL"}
                         placeholder="0,00"
-                        className="form-card text-foreground tabular-nums"
+                        className="form-card text-foreground"
                       />
                     </div>
                   </div>
@@ -2590,19 +2585,12 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
                   </div>
                   <div className="space-y-2">
                     <label className="field-label">Valor (R$)</label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={addAtivoForm.valor > 0 ? addAtivoForm.valor : ""}
-                      onChange={(e) =>
-                        setAddAtivoForm({
-                          ...addAtivoForm,
-                          valor: Math.round((parseFloat(e.target.value) || 0) * 100) / 100,
-                        })
-                      }
+                    <InputMoeda
+                      value={addAtivoForm.valor}
+                      onChange={(valor) => setAddAtivoForm({ ...addAtivoForm, valor })}
+                      moeda={moeda === "USD" ? "USD" : "BRL"}
                       placeholder="0,00"
-                      className="form-card text-foreground tabular-nums"
+                      className="form-card text-foreground"
                     />
                   </div>
                   {mostrarInstituicaoAtivo ? (
@@ -2693,19 +2681,14 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
                 <label className="field-label">
                   Saldo devedor (R$)
                 </label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={addPassivoForm.saldoDevedor > 0 ? addPassivoForm.saldoDevedor : ""}
-                  onChange={(e) =>
-                    setAddPassivoForm((prev) => ({
-                      ...prev,
-                      saldoDevedor: Math.round((parseFloat(e.target.value) || 0) * 100) / 100,
-                    }))
+                <InputMoeda
+                  value={addPassivoForm.saldoDevedor}
+                  onChange={(saldoDevedor) =>
+                    setAddPassivoForm((prev) => ({ ...prev, saldoDevedor }))
                   }
+                  moeda={moeda === "USD" ? "USD" : "BRL"}
                   placeholder="0,00"
-                  className="form-card text-foreground tabular-nums"
+                  className="form-card text-foreground"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -2779,20 +2762,15 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
                     <span className="text-muted-foreground font-normal"> — calculada automaticamente</span>
                   ) : null}
                 </label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={parcelaPassivoExibida > 0 ? parcelaPassivoExibida : ""}
+                <InputMoeda
+                  value={parcelaPassivoExibida}
                   readOnly={passivoAutomatico}
-                  onChange={(e) =>
-                    setAddPassivoForm((prev) => ({
-                      ...prev,
-                      parcelaMensal: Math.round((parseFloat(e.target.value) || 0) * 100) / 100,
-                    }))
+                  onChange={(parcelaMensal) =>
+                    setAddPassivoForm((prev) => ({ ...prev, parcelaMensal }))
                   }
+                  moeda={moeda === "USD" ? "USD" : "BRL"}
                   placeholder="0,00"
-                  className={`form-card text-foreground tabular-nums ${
+                  className={`form-card text-foreground ${
                     passivoAutomatico ? "cursor-not-allowed opacity-70" : ""
                   }`}
                 />

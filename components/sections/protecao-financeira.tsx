@@ -4,6 +4,7 @@ import { useMemo, useState } from "react"
 import { usePlano } from "@/lib/plano-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { InputMoeda } from "@/components/ui/input-moeda"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, ArrowRight, ShieldCheck, ShieldX, Info, AlertTriangle, CheckCircle } from "lucide-react"
@@ -15,6 +16,7 @@ import { CHART_TOOLTIP_PROPS } from "@/lib/chart-tooltip"
 
 interface ProtecaoFinanceiraProps {
   onNavigate: (section: string) => void
+  readOnly?: boolean
 }
 
 function BeneficioFiscalPrevidenciaCard() {
@@ -23,11 +25,6 @@ function BeneficioFiscalPrevidenciaCard() {
   const [rendaBrutaAnual, setRendaBrutaAnual] = useState<number>(0)
   const [aportePGBL, setAportePGBL] = useState<number>(0)
 
-  const parseCurrency = (value: string) => parseInt(value.replace(/\D/g, ""), 10) || 0
-  const formatCurrency = (value: number) => {
-    if (!value) return ""
-    return new Intl.NumberFormat(moeda === "USD" ? "en-US" : "pt-BR").format(value)
-  }
   const fmtFull = (v: number) =>
     new Intl.NumberFormat(moeda === "USD" ? "en-US" : "pt-BR", { style: "currency", currency: moeda === "USD" ? "USD" : "BRL", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v)
 
@@ -72,20 +69,22 @@ function BeneficioFiscalPrevidenciaCard() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label className="field-label">RENDA BRUTA ANUAL ({moeda === "USD" ? "US$" : "R$"})</Label>
-            <Input
-              value={formatCurrency(rendaBrutaAnual)}
-              onChange={(e) => setRendaBrutaAnual(parseCurrency(e.target.value))}
-              placeholder="0"
+            <InputMoeda
+              value={rendaBrutaAnual}
+              onChange={setRendaBrutaAnual}
+              moeda={moeda === "USD" ? "USD" : "BRL"}
+              placeholder="0,00"
               className="form-card text-foreground focus:border-primary"
             />
             <p className="text-xs text-muted-foreground">Soma de todos os rendimentos tributáveis do ano</p>
           </div>
           <div className="space-y-2">
             <Label className="field-label">APORTE EM PGBL ({moeda === "USD" ? "US$" : "R$"})</Label>
-            <Input
-              value={formatCurrency(aportePGBL)}
-              onChange={(e) => setAportePGBL(parseCurrency(e.target.value))}
-              placeholder="0"
+            <InputMoeda
+              value={aportePGBL}
+              onChange={setAportePGBL}
+              moeda={moeda === "USD" ? "USD" : "BRL"}
+              placeholder="0,00"
               className="form-card text-foreground focus:border-primary"
             />
             <p className="text-xs text-muted-foreground">Valor investido em PGBL no ano (limite: 12% da renda bruta)</p>
@@ -185,12 +184,6 @@ export function ProtecaoFinanceira({ onNavigate }: ProtecaoFinanceiraProps) {
     return value.toString()
   }
 
-  const parseCurrency = (value: string) => Number(value.replace(/\D/g, "")) || 0
-
-  const handleCurrencyChange = (field: keyof typeof protecao, value: string) => {
-    setProtecao({ [field]: parseCurrency(value) })
-  }
-
   const handleNumberChange = (field: keyof typeof protecao, value: string) => {
     setProtecao({ [field]: Number(value) || 0 })
   }
@@ -242,11 +235,12 @@ export function ProtecaoFinanceira({ onNavigate }: ProtecaoFinanceiraProps) {
         <div className="grid grid-cols-2 gap-6">
           <div>
             <label className={labelClass}>Custo de Vida Mensal ({moeda === "USD" ? "US$" : "R$"})</label>
-            <input
-              type="text"
-              value={(protecao.custoVida || 0).toLocaleString(moeda === "USD" ? "en-US" : "pt-BR")}
-              onChange={e => handleCurrencyChange("custoVida", e.target.value)}
+            <InputMoeda
+              value={protecao.custoVida || 0}
+              onChange={(custoVida) => setProtecao({ custoVida })}
+              moeda={moeda === "USD" ? "USD" : "BRL"}
               className={inputClass}
+              placeholder="0,00"
             />
           </div>
           <div>
@@ -260,20 +254,22 @@ export function ProtecaoFinanceira({ onNavigate }: ProtecaoFinanceiraProps) {
           </div>
           <div>
             <label className={labelClass}>Educação dos Filhos ({moeda === "USD" ? "US$" : "R$"})</label>
-            <input
-              type="text"
-              value={(protecao.eduFilhos || 0).toLocaleString(moeda === "USD" ? "en-US" : "pt-BR")}
-              onChange={e => handleCurrencyChange("eduFilhos", e.target.value)}
+            <InputMoeda
+              value={protecao.eduFilhos || 0}
+              onChange={(eduFilhos) => setProtecao({ eduFilhos })}
+              moeda={moeda === "USD" ? "USD" : "BRL"}
               className={inputClass}
+              placeholder="0,00"
             />
           </div>
           <div>
             <label className={labelClass}>Dívidas Pendentes ({moeda === "USD" ? "US$" : "R$"})</label>
-            <input
-              type="text"
-              value={(protecao.dividasPend || 0).toLocaleString(moeda === "USD" ? "en-US" : "pt-BR")}
-              onChange={e => handleCurrencyChange("dividasPend", e.target.value)}
+            <InputMoeda
+              value={protecao.dividasPend || 0}
+              onChange={(dividasPend) => setProtecao({ dividasPend })}
+              moeda={moeda === "USD" ? "USD" : "BRL"}
               className={inputClass}
+              placeholder="0,00"
             />
           </div>
         </div>

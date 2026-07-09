@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
 import { Input } from "@/components/ui/input"
+import { InputMoeda } from "@/components/ui/input-moeda"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import {
@@ -39,6 +40,7 @@ import { cn } from "@/lib/utils"
 
 interface SimuladorSegurosProps {
   onNavigate: (section: string) => void
+  readOnly?: boolean
 }
 
 const CS_MIN = 0
@@ -688,11 +690,11 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
               <Label className="text-xs text-muted-foreground uppercase tracking-wide">
                 Patrimônio total atual
               </Label>
-              <Input
-                type="number"
-                value={patTotal || ""}
-                onChange={(e) => setPatTotal(Math.max(0, parseFloat(e.target.value) || 0))}
-                className="form-input tabular-nums"
+              <InputMoeda
+                value={patTotal}
+                onChange={(v) => setPatTotal(Math.max(0, v))}
+                moeda={moeda === "USD" ? "USD" : "BRL"}
+                className="form-input"
               />
               <p className="text-xs text-muted-foreground">
                 Base global: ativos líquidos − passivos ({fmtMoney(getPatrimonioLiquido(), moeda)}). Editável para
