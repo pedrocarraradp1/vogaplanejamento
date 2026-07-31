@@ -59,9 +59,12 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const supabase = createClient()
+      const redirectTo =
+        process.env.NEXT_PUBLIC_SITE_URL || window.location.origin
       const { error: signUpError } = await supabase.auth.signUp({
         email,
         password,
+        options: { emailRedirectTo: redirectTo },
       })
       if (signUpError) {
         setError(signUpError.message)
