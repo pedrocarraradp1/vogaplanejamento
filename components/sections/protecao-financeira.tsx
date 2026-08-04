@@ -316,6 +316,65 @@ export function ProtecaoFinanceira({ onNavigate }: ProtecaoFinanceiraProps) {
         </p>
       </div>
 
+      {/* Seguros cadastrados */}
+      <div className="bg-card rounded-xl border border-border p-6 space-y-4">
+        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+          Seguros
+        </h2>
+        {seguros.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nenhum seguro cadastrado.</p>
+        ) : (
+          <ul className="space-y-2">
+            {seguros.map((seguro) => (
+              <li
+                key={seguro.id}
+                className="flex items-center gap-3 rounded-lg border border-border/50 bg-background px-3 py-2.5"
+              >
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                  <Shield className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {seguro.tipoSeguro}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Capital: {formatCurrency(seguro.capitalSegurado)}
+                    {seguro.beneficiario ? ` · Beneficiário: ${seguro.beneficiario}` : ""}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0 text-muted-foreground"
+                  onClick={() => abrirEditarSeguro(seguro)}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                  onClick={() => removerSeguro(seguro.id)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full border-dashed border-border text-muted-foreground hover:text-foreground hover:border-primary/50"
+          onClick={abrirNovoSeguro}
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Adicionar seguro
+        </Button>
+      </div>
+
       {/* Card 1 — Parâmetros */}
       <div className="bg-card rounded-xl border border-border p-6">
         <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-6">
@@ -389,65 +448,6 @@ export function ProtecaoFinanceira({ onNavigate }: ProtecaoFinanceiraProps) {
             <span className="text-primary font-bold text-2xl">{formatCurrency(capitalSeguravel)}</span>
           </div>
         </div>
-      </div>
-
-      {/* Seguros cadastrados */}
-      <div className="bg-card rounded-xl border border-border p-6 space-y-4">
-        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-          Seguros
-        </h2>
-        {seguros.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nenhum seguro cadastrado.</p>
-        ) : (
-          <ul className="space-y-2">
-            {seguros.map((seguro) => (
-              <li
-                key={seguro.id}
-                className="flex items-center gap-3 rounded-lg border border-border/50 bg-background px-3 py-2.5"
-              >
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-                  <Shield className="h-4 w-4" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-foreground truncate">
-                    {seguro.tipoSeguro}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Capital: {formatCurrency(seguro.capitalSegurado)}
-                    {seguro.beneficiario ? ` · Beneficiário: ${seguro.beneficiario}` : ""}
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 shrink-0 text-muted-foreground"
-                  onClick={() => abrirEditarSeguro(seguro)}
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
-                  onClick={() => removerSeguro(seguro.id)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </li>
-            ))}
-          </ul>
-        )}
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full border-dashed border-border text-muted-foreground hover:text-foreground hover:border-primary/50"
-          onClick={abrirNovoSeguro}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Adicionar seguro
-        </Button>
       </div>
 
       {/* Card 3 — Comparação */}

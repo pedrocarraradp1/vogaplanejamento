@@ -38,7 +38,6 @@ export function GrupoSelecaoUnica({
               <RadioGroupItem
                 id={id}
                 value={opt}
-                className="border-border data-[state=checked]:border-[#2D6DF5] data-[state=checked]:text-[#2D6DF5]"
               />
               <span>{opt}</span>
             </label>

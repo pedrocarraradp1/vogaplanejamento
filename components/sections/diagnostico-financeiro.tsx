@@ -112,18 +112,19 @@ export function DiagnosticoFinanceiro({ onNavigate }: DiagnosticoFinanceiroProps
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="space-y-1">
-        <p className="text-sm text-muted-foreground">Planejamento Financeiro</p>
-        <h1 className="page-title text-[24px] text-foreground">
-          Diagnóstico e <span className="text-primary">plano de ação</span>
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Gerado com base no cenário calculado do cliente — totalmente editável pelo advisor
-        </p>
-      </div>
+      {abaInterna === "diagnostico" && (
+        <div className="space-y-1">
+          <p className="text-sm text-muted-foreground">Planejamento Financeiro</p>
+          <h1 className="page-title text-[24px] text-foreground">
+            Diagnóstico e <span className="text-primary">plano de ação</span>
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Gerado com base no cenário calculado do cliente — totalmente editável pelo advisor
+          </p>
+        </div>
+      )}
 
-      <div className="inline-flex flex-wrap rounded-lg bg-card border border-border p-1 gap-1">
+      <div className="inline-flex flex-wrap rounded-lg bg-card border border-border p-1 gap-1 no-print">
         {(
           [
             { id: "diagnostico", label: "Diagnóstico" },
