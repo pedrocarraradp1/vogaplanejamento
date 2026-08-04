@@ -1,18 +1,63 @@
 ﻿"use client"
 
 import { useMemo, useState } from "react"
-import { usePlano } from "@/lib/plano-context"
+import { usePlano, type SeguroItem } from "@/lib/plano-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { InputMoeda } from "@/components/ui/input-moeda"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, ArrowRight, ShieldCheck, ShieldX, Info, AlertTriangle, CheckCircle } from "lucide-react"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  ArrowLeft,
+  ArrowRight,
+  ShieldCheck,
+  ShieldX,
+  Info,
+  AlertTriangle,
+  CheckCircle,
+  Pencil,
+  Trash2,
+  Plus,
+  Shield,
+} from "lucide-react"
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell, Legend,
 } from "recharts"
 import { CHART_TOOLTIP_PROPS } from "@/lib/chart-tooltip"
+
+const TIPOS_SEGURO = [
+  "Vida",
+  "Invalidez",
+  "Prestamista",
+  "Patrimonial",
+  "Saúde",
+  "Outros",
+] as const
+
+type FormSeguro = {
+  tipoSeguro: string
+  capitalSegurado: number
+  beneficiario: string
+  observacao: string
+}
+
+const EMPTY_SEGURO = (): FormSeguro => ({
+  tipoSeguro: "Vida",
+  capitalSegurado: 0,
+  beneficiario: "",
+  observacao: "",
+})
 
 interface ProtecaoFinanceiraProps {
   onNavigate: (section: string) => void
@@ -167,9 +212,53 @@ function BeneficioFiscalPrevidenciaCard() {
 }
 
 export function ProtecaoFinanceira({ onNavigate }: ProtecaoFinanceiraProps) {
-  const { state, setProtecao, getPatrimonioLiquido } = usePlano()
+  const { state, setProtecao, setSeguros, getPatrimonioLiquido } = usePlano()
   const { protecao, premissas } = state
+  const seguros = state.seguros ?? []
   const moeda = state.moeda ?? "BRL"
+
+  const [modalSeguroOpen, setModalSeguroOpen] = useState(false)
+  const [editingSeguro, setEditingSeguro] = useState<SeguroItem | null>(null)
+  const [formSeguro, setFormSeguro] = useState<FormSeguro>(() => EMPTY_SEGURO())
+
+  const abrirNovoSeguro = () => {
+    setEditingSeguro(null)
+    setFormSeguro(EMPTY_SEGURO())
+    setModalSeguroOpen(true)
+  }
+
+  const abrirEditarSeguro = (seguro: SeguroItem) => {
+    setEditingSeguro(seguro)
+    setFormSeguro({
+      tipoSeguro: seguro.tipoSeguro || "Vida",
+      capitalSegurado: Number(seguro.capitalSegurado) || 0,
+      beneficiario: seguro.beneficiario ?? "",
+      observacao: seguro.observacao ?? "",
+    })
+    setModalSeguroOpen(true)
+  }
+
+  const salvarSeguro = () => {
+    if (!formSeguro.tipoSeguro.trim()) return
+    const payload: SeguroItem = {
+      id: editingSeguro?.id ?? `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      tipoSeguro: formSeguro.tipoSeguro.trim(),
+      capitalSegurado: formSeguro.capitalSegurado,
+      beneficiario: formSeguro.beneficiario.trim(),
+      observacao: formSeguro.observacao.trim() || undefined,
+    }
+    setSeguros(
+      editingSeguro
+        ? seguros.map((s) => (s.id === editingSeguro.id ? payload : s))
+        : [...seguros, payload],
+    )
+    setModalSeguroOpen(false)
+  }
+
+  const removerSeguro = (id: string) => {
+    if (!window.confirm("Remover este seguro?")) return
+    setSeguros(seguros.filter((s) => s.id !== id))
+  }
 
   // ── Formatadores ──────────────────────────────────────────────────────────
   const formatCurrency = (value: number) =>
@@ -302,6 +391,65 @@ export function ProtecaoFinanceira({ onNavigate }: ProtecaoFinanceiraProps) {
         </div>
       </div>
 
+      {/* Seguros cadastrados */}
+      <div className="bg-card rounded-xl border border-border p-6 space-y-4">
+        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+          Seguros
+        </h2>
+        {seguros.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nenhum seguro cadastrado.</p>
+        ) : (
+          <ul className="space-y-2">
+            {seguros.map((seguro) => (
+              <li
+                key={seguro.id}
+                className="flex items-center gap-3 rounded-lg border border-border/50 bg-background px-3 py-2.5"
+              >
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                  <Shield className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {seguro.tipoSeguro}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Capital: {formatCurrency(seguro.capitalSegurado)}
+                    {seguro.beneficiario ? ` · Beneficiário: ${seguro.beneficiario}` : ""}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0 text-muted-foreground"
+                  onClick={() => abrirEditarSeguro(seguro)}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                  onClick={() => removerSeguro(seguro.id)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full border-dashed border-border text-muted-foreground hover:text-foreground hover:border-primary/50"
+          onClick={abrirNovoSeguro}
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Adicionar seguro
+        </Button>
+      </div>
+
       {/* Card 3 — Comparação */}
       <div className="bg-card rounded-xl border border-border p-6">
         <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
@@ -387,6 +535,70 @@ export function ProtecaoFinanceira({ onNavigate }: ProtecaoFinanceiraProps) {
           <ArrowRight className="w-4 h-4 ml-2" />
         </Button>
       </div>
+
+      <Dialog open={modalSeguroOpen} onOpenChange={setModalSeguroOpen}>
+        <DialogContent className="max-w-md form-card">
+          <DialogHeader>
+            <DialogTitle>{editingSeguro ? "Editar seguro" : "Adicionar seguro"}</DialogTitle>
+            <DialogDescription>Informe os dados da apólice</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label className="field-label">Tipo de seguro</Label>
+              <Select
+                value={formSeguro.tipoSeguro}
+                onValueChange={(tipoSeguro) => setFormSeguro((f) => ({ ...f, tipoSeguro }))}
+              >
+                <SelectTrigger className="form-card text-foreground">
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent className="form-card">
+                  {TIPOS_SEGURO.map((t) => (
+                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="field-label">Capital segurado</Label>
+              <InputMoeda
+                value={formSeguro.capitalSegurado}
+                onChange={(capitalSegurado) => setFormSeguro((f) => ({ ...f, capitalSegurado }))}
+                moeda={moeda === "USD" ? "USD" : "BRL"}
+                placeholder="0,00"
+                className="form-card text-foreground"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="field-label">Beneficiário</Label>
+              <Input
+                value={formSeguro.beneficiario}
+                onChange={(e) => setFormSeguro((f) => ({ ...f, beneficiario: e.target.value }))}
+                placeholder="Nome do beneficiário"
+                className="form-card text-foreground"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="field-label">Observação (opcional)</Label>
+              <Textarea
+                value={formSeguro.observacao}
+                onChange={(e) => setFormSeguro((f) => ({ ...f, observacao: e.target.value }))}
+                placeholder="Detalhes opcionais"
+                rows={3}
+                className="form-card text-foreground min-h-[72px] resize-y"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => setModalSeguroOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="button" className="btn-next" onClick={salvarSeguro}>
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

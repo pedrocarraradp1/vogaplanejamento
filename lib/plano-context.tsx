@@ -45,6 +45,35 @@ import { normalizarEntradasCapitais, type EntradaCapital } from "@/lib/entradas-
 export type { FonteRenda, TipoFonteRenda, PrazoFonteRenda } from "@/lib/renda-utils"
 export type { DespesaItem, CategoriaDespesa } from "@/lib/despesa-utils"
 
+export type ClasseInvestimento =
+  | "Renda fixa"
+  | "Multimercado"
+  | "Ações"
+  | "FIIs"
+  | "Exterior"
+  | "Alternativos"
+
+export interface PerfilInvestidor {
+  experiencia?: "Nenhuma" | "Iniciante" | "Intermediária" | "Avançada"
+  toleranciaOscilacoes?: "Baixa" | "Moderada" | "Alta"
+  reacaoPerdas?: "Resgata" | "Mantém posição" | "Aproveita para aportar"
+  necessidadeLiquidez?: "Imediata" | "Curto prazo" | "Baixa / não relevante"
+  horizontePredominante?: "Curto prazo" | "Médio prazo" | "Longo prazo"
+  classesAceita: ClasseInvestimento[]
+  classesEvitar: ClasseInvestimento[]
+  perfil?: "Conservador" | "Moderado" | "Agressivo"
+  grauDelegacao?:
+    | "Delega 100%"
+    | "Acompanha seus próprios investimentos"
+    | "Delega porém gosta de acompanhar"
+}
+
+export interface DadosBanking {
+  bancoPrincipal?: string
+  instituicoesBancariasUtilizadas?: string
+  cartoesEBeneficios?: string
+}
+
 export interface DadosPessoais {
   nome: string
   conjuge: string
@@ -67,6 +96,15 @@ export interface DadosPessoais {
   uf?: string
   /** CPF (só números) para simulações MAG */
   cpf?: string
+  email?: string
+  telefone?: string
+  cidadeResidencia?: string
+  estadoResidencia?: string
+  dataNascimentoConjuge?: string
+  profissaoConjuge?: string
+  observacoesDinamicaFamiliar?: string
+  perfilInvestidor?: PerfilInvestidor
+  banking?: DadosBanking
 }
 
 export interface Ativo {
@@ -87,6 +125,8 @@ export interface Ativo {
    */
   heranca?: boolean
   bemDeHeranca?: boolean
+  regimeTributarioPrevidencia?: "Regressiva" | "Progressiva"
+  tipoPlanoPrevidencia?: "PGBL" | "VGBL"
 }
 
 export interface Passivo {
@@ -159,6 +199,16 @@ export interface Premissas {
   rendimentoAcumulacao: number
   /** Rentabilidade bruta na fase de aposentadoria (modo acumulacao_aposentadoria). */
   rendimentoAposentadoria: number
+  /** Observações livres sobre aposentadoria (advisor/cliente). */
+  observacaoAposentadoria?: string
+}
+
+export interface SeguroItem {
+  id: string
+  tipoSeguro: string
+  capitalSegurado: number
+  beneficiario: string
+  observacao?: string
 }
 
 export interface Protecao {
@@ -166,6 +216,20 @@ export interface Protecao {
   anosCob: number
   eduFilhos: number
   dividasPend: number
+}
+
+export interface QuestionarioSucessorio {
+  modeloDeclaracaoIR?: "Completa" | "Simplificada" | "Não declara"
+  usoPGBL?: "Sim, uso atualmente" | "Uso potencial" | "Não"
+  bensNoExterior?: "Sim" | "Não"
+  planejamentoSucessorioRealizado?: "Sim" | "Não" | "Em andamento"
+  testamento?: "Sim" | "Não"
+  holdingPatrimonialOuFamiliar?: "Sim" | "Não"
+  doacoesJaRealizadas?: "Sim" | "Não"
+  usufruto?: "Sim" | "Não"
+  preocupacaoComInventario?: "Alta" | "Média" | "Baixa" | "Nenhuma"
+  preocupacaoComITCMD?: "Alta" | "Média" | "Baixa" | "Nenhuma"
+  observacoesSucessorio?: string
 }
 
 export type { EntradaCapital } from "@/lib/entradas-capitais"
@@ -185,6 +249,7 @@ export interface Sucessao {
   cartoriais: number
   herdeiros: number
   regimeSucessao: string
+  questionario?: QuestionarioSucessorio
 }
 
 export interface PlanoState {
@@ -197,6 +262,7 @@ export interface PlanoState {
   premissas: Premissas
   sucessao: Sucessao
   protecao: Protecao
+  seguros: SeguroItem[]
   fluxoDeCaixa: FluxoDeCaixaState
   projecao: ProjecaoAno[]
   kpis: KPIs | null
@@ -226,6 +292,7 @@ interface PlanoContextType {
   setPremissas: (premissas: Partial<Premissas>) => void
   setSucessao: (sucessao: Partial<Sucessao>) => void
   setProtecao: (protecao: Partial<Protecao>) => void
+  setSeguros: (seguros: SeguroItem[]) => void
   setFluxoDeCaixa: (fluxo: Partial<FluxoDeCaixaState>) => void
   /** Substitui o estado atual por um estado salvo (hidratando defaults) */
   loadState: (state: unknown, meta?: Partial<SimulacaoMeta>) => void
@@ -336,6 +403,7 @@ const initialState: PlanoState = {
     eduFilhos:   0,
     dividasPend: 0,
   },
+  seguros: [],
   fluxoDeCaixa: criarFluxoDeCaixaInicial(),
   projecao: calcularProjecao(
     { ...defaultPremissas, saldoInicial: 0, aporteM: 0, idadeAtual: 0 },
@@ -375,6 +443,7 @@ export function PlanoProvider({
       premissas: { ...initialState.premissas, ...(raw?.premissas ?? {}) },
       sucessao: { ...initialState.sucessao, ...(raw?.sucessao ?? {}) },
       protecao: { ...initialState.protecao, ...(raw?.protecao ?? {}) },
+      seguros: Array.isArray(raw?.seguros) ? raw.seguros : [],
       ativos: Array.isArray(raw?.ativos) ? raw.ativos : [],
       passivos: Array.isArray(raw?.passivos) ? raw.passivos : [],
       patrimonio: {
@@ -417,6 +486,30 @@ export function PlanoProvider({
     dp.fontesRenda = normalizarFontesRenda(dp.fontesRenda, dp.renda)
     dp.renda = receitaMensalAtual(dp.fontesRenda)
     dp.despesas = normalizarDespesas(dp.despesas, dp.despesa)
+
+    const rawPerfil = (raw?.dadosPessoais as any)?.perfilInvestidor
+    if (rawPerfil && typeof rawPerfil === "object") {
+      dp.perfilInvestidor = {
+        ...rawPerfil,
+        classesAceita: Array.isArray(rawPerfil.classesAceita) ? rawPerfil.classesAceita : [],
+        classesEvitar: Array.isArray(rawPerfil.classesEvitar) ? rawPerfil.classesEvitar : [],
+      }
+    }
+    const rawBanking = (raw?.dadosPessoais as any)?.banking
+    dp.banking =
+      rawBanking && typeof rawBanking === "object" ? { ...rawBanking } : undefined
+
+    const rawQuestionario = (raw?.sucessao as any)?.questionario
+    merged.sucessao.questionario =
+      rawQuestionario && typeof rawQuestionario === "object" ? { ...rawQuestionario } : undefined
+
+    merged.seguros = (Array.isArray(raw?.seguros) ? raw.seguros : []).map((s: any) => ({
+      id: String(s?.id ?? `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`),
+      tipoSeguro: String(s?.tipoSeguro ?? ""),
+      capitalSegurado: Number(s?.capitalSegurado) || 0,
+      beneficiario: String(s?.beneficiario ?? ""),
+      observacao: s?.observacao != null ? String(s.observacao) : undefined,
+    }))
     dp.despesa = despesaMensalAtual(dp.despesas)
 
     if (merged.premissas.aporteModo !== "fixo" && merged.premissas.aporteModo !== "periodos") {
@@ -648,6 +741,10 @@ export function PlanoProvider({
     setState(prev => ({ ...prev, protecao: { ...prev.protecao, ...protecao } }))
   }, [])
 
+  const setSeguros = useCallback((seguros: SeguroItem[]) => {
+    setState((prev) => ({ ...prev, seguros }))
+  }, [])
+
   const setFluxoDeCaixa = useCallback((fluxo: Partial<FluxoDeCaixaState>) => {
     setState((prev) => ({
       ...prev,
@@ -797,7 +894,7 @@ export function PlanoProvider({
       setMoeda,
       setSimulacaoMeta: setSimulacaoMetaPartial,
       setDadosPessoais, setFontesRenda, setDespesas, setAtivos, setPassivos, setPatrimonio, setObjetivos,
-      setPremissas, setSucessao, setProtecao, setFluxoDeCaixa,
+      setPremissas, setSucessao, setProtecao, setSeguros, setFluxoDeCaixa,
       loadState, clearSimulacaoMeta,
       getPatrimonioLiquido, getSaldoInicialLiquido, getAtivosFinanceiros, getAtivosLiquidosImediatos,
       getPatrimonioTotalConsolidado, getAporteMensal, getDespesaMensalEm, getAporteMensalEm, getIdadeAtual,

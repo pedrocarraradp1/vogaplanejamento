@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { InputMoeda } from "@/components/ui/input-moeda"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ArrowLeft, ArrowRight, Info } from "lucide-react"
 import {
@@ -1363,6 +1364,16 @@ export function Projecao({ onNavigate, variant = "full" }: ProjecaoProps) {
           <p className="text-xs text-muted-foreground">
             Os aportes cessam na aposentadoria. A retirada cresce com a inflação anualmente.
           </p>
+          <div className="space-y-2 pt-2">
+            <Label className="field-label">Observações</Label>
+            <Textarea
+              value={premissas.observacaoAposentadoria ?? ""}
+              onChange={(e) => setPremissas({ observacaoAposentadoria: e.target.value })}
+              placeholder="Observações sobre a aposentadoria do cliente"
+              rows={4}
+              className="form-card text-foreground min-h-[96px] resize-y focus:border-primary"
+            />
+          </div>
         </CardContent>
       </Card>
 

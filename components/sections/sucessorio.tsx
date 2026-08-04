@@ -6,10 +6,12 @@ import { Input } from "@/components/ui/input"
 import { InputMoeda } from "@/components/ui/input-moeda"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
+import { GrupoSelecaoUnica } from "@/components/ui/grupo-selecao"
 import { ArrowLeft, ArrowRight } from "lucide-react"
-import { usePlano } from "@/lib/plano-context"
+import { usePlano, type QuestionarioSucessorio } from "@/lib/plano-context"
 import { getSaldoDevedorPassivo } from "@/lib/patrimonio-utils"
 import { calcularInventario } from "@/lib/engine"
 import { MAG_PRODUTO_META, taxaFaixaEtaria } from "@/lib/mag/produtos"
@@ -224,6 +226,14 @@ export function Sucessorio({ onNavigate }: SucessorioProps) {
 
   const handleProximo = () => {
     onNavigate("diagnostico-financeiro")
+  }
+
+  const questionario: QuestionarioSucessorio = { ...(sucessao.questionario ?? {}) }
+
+  const updateQuestionario = (patch: Partial<QuestionarioSucessorio>) => {
+    setSucessao({
+      questionario: { ...questionario, ...patch },
+    })
   }
 
   return (
@@ -482,6 +492,126 @@ export function Sucessorio({ onNavigate }: SucessorioProps) {
                 Informe a data de nascimento em Dados pessoais para habilitar a cotação MAG; enquanto isso, o valor é estimativa.
               </p>
             )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Questionário Sucessório */}
+      <Card className="form-card">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-base font-medium text-foreground">
+            Questionário Sucessório
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <GrupoSelecaoUnica
+            label="Modelo de declaração de imposto de renda"
+            value={questionario.modeloDeclaracaoIR}
+            options={["Completa", "Simplificada", "Não declara"]}
+            onChange={(v) =>
+              updateQuestionario({
+                modeloDeclaracaoIR: v as QuestionarioSucessorio["modeloDeclaracaoIR"],
+              })
+            }
+          />
+          <GrupoSelecaoUnica
+            label="Uso atual ou potencial de PGBL"
+            value={questionario.usoPGBL}
+            options={["Sim, uso atualmente", "Uso potencial", "Não"]}
+            onChange={(v) =>
+              updateQuestionario({ usoPGBL: v as QuestionarioSucessorio["usoPGBL"] })
+            }
+          />
+          <GrupoSelecaoUnica
+            label="Bens no exterior"
+            value={questionario.bensNoExterior}
+            options={["Sim", "Não"]}
+            onChange={(v) =>
+              updateQuestionario({
+                bensNoExterior: v as QuestionarioSucessorio["bensNoExterior"],
+              })
+            }
+          />
+          <GrupoSelecaoUnica
+            label="Planejamento sucessório se já realizado"
+            value={questionario.planejamentoSucessorioRealizado}
+            options={["Sim", "Não", "Em andamento"]}
+            onChange={(v) =>
+              updateQuestionario({
+                planejamentoSucessorioRealizado:
+                  v as QuestionarioSucessorio["planejamentoSucessorioRealizado"],
+              })
+            }
+          />
+          <GrupoSelecaoUnica
+            label="Testamento, se houver"
+            value={questionario.testamento}
+            options={["Sim", "Não"]}
+            onChange={(v) =>
+              updateQuestionario({ testamento: v as QuestionarioSucessorio["testamento"] })
+            }
+          />
+          <GrupoSelecaoUnica
+            label="Holding patrimonial ou familiar"
+            value={questionario.holdingPatrimonialOuFamiliar}
+            options={["Sim", "Não"]}
+            onChange={(v) =>
+              updateQuestionario({
+                holdingPatrimonialOuFamiliar:
+                  v as QuestionarioSucessorio["holdingPatrimonialOuFamiliar"],
+              })
+            }
+          />
+          <GrupoSelecaoUnica
+            label="Doações já realizadas"
+            value={questionario.doacoesJaRealizadas}
+            options={["Sim", "Não"]}
+            onChange={(v) =>
+              updateQuestionario({
+                doacoesJaRealizadas: v as QuestionarioSucessorio["doacoesJaRealizadas"],
+              })
+            }
+          />
+          <GrupoSelecaoUnica
+            label="Usufruto, se houver"
+            value={questionario.usufruto}
+            options={["Sim", "Não"]}
+            onChange={(v) =>
+              updateQuestionario({ usufruto: v as QuestionarioSucessorio["usufruto"] })
+            }
+          />
+          <GrupoSelecaoUnica
+            label="Preocupação com inventário"
+            value={questionario.preocupacaoComInventario}
+            options={["Alta", "Média", "Baixa", "Nenhuma"]}
+            onChange={(v) =>
+              updateQuestionario({
+                preocupacaoComInventario:
+                  v as QuestionarioSucessorio["preocupacaoComInventario"],
+              })
+            }
+          />
+          <GrupoSelecaoUnica
+            label="Preocupação com ITCMD"
+            value={questionario.preocupacaoComITCMD}
+            options={["Alta", "Média", "Baixa", "Nenhuma"]}
+            onChange={(v) =>
+              updateQuestionario({
+                preocupacaoComITCMD: v as QuestionarioSucessorio["preocupacaoComITCMD"],
+              })
+            }
+          />
+          <div className="space-y-2">
+            <Label className="field-label">Observações (opcional)</Label>
+            <Textarea
+              value={questionario.observacoesSucessorio ?? ""}
+              onChange={(e) =>
+                updateQuestionario({ observacoesSucessorio: e.target.value })
+              }
+              placeholder="Observações adicionais sobre o planejamento sucessório"
+              rows={3}
+              className="form-card text-foreground min-h-[80px] resize-y"
+            />
           </div>
         </CardContent>
       </Card>

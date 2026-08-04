@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input"
 import { InputMoeda } from "@/components/ui/input-moeda"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Dialog,
@@ -15,6 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Switch } from "@/components/ui/switch"
+import { GrupoSelecaoMultipla, GrupoSelecaoUnica } from "@/components/ui/grupo-selecao"
 import {
   ArrowRight,
   Briefcase,
@@ -33,7 +35,16 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import { usePlano } from "@/lib/plano-context"
-import type { FonteRenda, TipoFonteRenda, PrazoFonteRenda, DespesaItem, CategoriaDespesa } from "@/lib/plano-context"
+import type {
+  FonteRenda,
+  TipoFonteRenda,
+  PrazoFonteRenda,
+  DespesaItem,
+  CategoriaDespesa,
+  PerfilInvestidor,
+  ClasseInvestimento,
+  DadosBanking,
+} from "@/lib/plano-context"
 import {
   criarFonteRenda,
   getFontesRenda,
@@ -49,6 +60,25 @@ import {
   CATEGORIAS_DESPESA,
   DESCRICOES_DESPESA_PADRAO,
 } from "@/lib/despesa-utils"
+
+const UFS_BR = [
+  "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG",
+  "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO",
+] as const
+
+const CLASSES_INVESTIMENTO: ClasseInvestimento[] = [
+  "Renda fixa",
+  "Multimercado",
+  "Ações",
+  "FIIs",
+  "Exterior",
+  "Alternativos",
+]
+
+const PERFIL_VAZIO = (): PerfilInvestidor => ({
+  classesAceita: [],
+  classesEvitar: [],
+})
 
 interface DadosPessoaisProps {
   onNavigate: (section: string) => void
@@ -105,6 +135,27 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
   const [modalDespesaOpen, setModalDespesaOpen] = useState(false)
   const [editingDespesa, setEditingDespesa] = useState<DespesaItem | null>(null)
   const [formDespesa, setFormDespesa] = useState<DespesaItem>(() => criarDespesa())
+  const [modoVisualizacao, setModoVisualizacao] = useState<"resumido" | "completo">("resumido")
+
+  const perfilInvestidor: PerfilInvestidor = {
+    ...PERFIL_VAZIO(),
+    ...dadosPessoais.perfilInvestidor,
+    classesAceita: dadosPessoais.perfilInvestidor?.classesAceita ?? [],
+    classesEvitar: dadosPessoais.perfilInvestidor?.classesEvitar ?? [],
+  }
+  const banking: DadosBanking = { ...dadosPessoais.banking }
+
+  const updatePerfil = (patch: Partial<PerfilInvestidor>) => {
+    setDadosPessoais({
+      perfilInvestidor: { ...perfilInvestidor, ...patch },
+    })
+  }
+
+  const updateBanking = (patch: Partial<DadosBanking>) => {
+    setDadosPessoais({
+      banking: { ...banking, ...patch },
+    })
+  }
 
   const abrirNovaFonte = () => {
     setEditingFonte(null)
@@ -201,6 +252,32 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
         <p className="page-subtitle">
           Informações básicas para o diagnóstico financeiro personalizado
         </p>
+      </div>
+
+      {/* Toggle Resumido / Completo */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <span className="field-label">Visualização</span>
+        <div className="inline-flex flex-wrap rounded-lg bg-card border border-border p-1 gap-1">
+          {(
+            [
+              { id: "resumido", label: "Resumido" },
+              { id: "completo", label: "Completo" },
+            ] as const
+          ).map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => setModoVisualizacao(opt.id)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                modoVisualizacao === opt.id
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Card 1 - Identificação */}
@@ -458,6 +535,98 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
                 className="form-input placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
               />
             </div>
+
+            {modoVisualizacao === "completo" && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="field-label">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={dadosPessoais.email ?? ""}
+                    onChange={(e) => setDadosPessoais({ email: e.target.value })}
+                    placeholder="email@exemplo.com"
+                    className="form-input placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="telefone" className="field-label">Telefone</Label>
+                  <Input
+                    id="telefone"
+                    value={dadosPessoais.telefone ?? ""}
+                    onChange={(e) => setDadosPessoais({ telefone: e.target.value })}
+                    placeholder="(00) 00000-0000"
+                    className="form-input placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cidadeResidencia" className="field-label">Cidade de residência</Label>
+                  <Input
+                    id="cidadeResidencia"
+                    value={dadosPessoais.cidadeResidencia ?? ""}
+                    onChange={(e) => setDadosPessoais({ cidadeResidencia: e.target.value })}
+                    placeholder="Cidade"
+                    className="form-input placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="estadoResidencia" className="field-label">Estado de residência</Label>
+                  <Select
+                    value={dadosPessoais.estadoResidencia || dadosPessoais.uf || "SP"}
+                    onValueChange={(v) => setDadosPessoais({ estadoResidencia: v })}
+                  >
+                    <SelectTrigger
+                      id="estadoResidencia"
+                      className="form-input focus:border-primary focus:ring-1 focus:ring-primary/30"
+                    >
+                      <SelectValue placeholder="UF" />
+                    </SelectTrigger>
+                    <SelectContent className="form-card">
+                      {UFS_BR.map((u) => (
+                        <SelectItem key={u} value={u}>{u}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="dataNascimentoConjuge" className="field-label">
+                    Data de nascimento do cônjuge
+                  </Label>
+                  <Input
+                    id="dataNascimentoConjuge"
+                    type="date"
+                    value={dadosPessoais.dataNascimentoConjuge ?? ""}
+                    onChange={(e) => setDadosPessoais({ dataNascimentoConjuge: e.target.value })}
+                    className="form-input focus:border-primary focus:ring-1 focus:ring-primary/30"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="profissaoConjuge" className="field-label">
+                    Profissão do cônjuge
+                  </Label>
+                  <Input
+                    id="profissaoConjuge"
+                    value={dadosPessoais.profissaoConjuge ?? ""}
+                    onChange={(e) => setDadosPessoais({ profissaoConjuge: e.target.value })}
+                    placeholder="Profissão do cônjuge"
+                    className="form-input placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="observacoesDinamicaFamiliar" className="field-label">
+                    Observações sobre dinâmica familiar
+                  </Label>
+                  <Textarea
+                    id="observacoesDinamicaFamiliar"
+                    value={dadosPessoais.observacoesDinamicaFamiliar ?? ""}
+                    onChange={(e) => setDadosPessoais({ observacoesDinamicaFamiliar: e.target.value })}
+                    placeholder="Observações opcionais"
+                    rows={3}
+                    className="form-input min-h-[80px] resize-y placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
+                  />
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -518,6 +687,144 @@ export function DadosPessoais({ onNavigate }: DadosPessoaisProps) {
             ))}
           </div>
         </div>
+      )}
+
+      {modoVisualizacao === "completo" && (
+        <>
+          <div className="space-y-4">
+            <span className="field-label">Perfil Investidor Cliente</span>
+            <div style={cardStyle} className="space-y-5">
+              <GrupoSelecaoUnica
+                label="Experiência com investimentos"
+                value={perfilInvestidor.experiencia}
+                options={["Nenhuma", "Iniciante", "Intermediária", "Avançada"]}
+                onChange={(v) =>
+                  updatePerfil({ experiencia: v as PerfilInvestidor["experiencia"] })
+                }
+              />
+              <GrupoSelecaoUnica
+                label="Tolerância a oscilações de mercado"
+                value={perfilInvestidor.toleranciaOscilacoes}
+                options={["Baixa", "Moderada", "Alta"]}
+                onChange={(v) =>
+                  updatePerfil({
+                    toleranciaOscilacoes: v as PerfilInvestidor["toleranciaOscilacoes"],
+                  })
+                }
+              />
+              <GrupoSelecaoUnica
+                label="Reação diante de perdas"
+                value={perfilInvestidor.reacaoPerdas}
+                options={["Resgata", "Mantém posição", "Aproveita para aportar"]}
+                onChange={(v) =>
+                  updatePerfil({ reacaoPerdas: v as PerfilInvestidor["reacaoPerdas"] })
+                }
+              />
+              <GrupoSelecaoUnica
+                label="Necessidade de liquidez"
+                value={perfilInvestidor.necessidadeLiquidez}
+                options={["Imediata", "Curto prazo", "Baixa / não relevante"]}
+                onChange={(v) =>
+                  updatePerfil({
+                    necessidadeLiquidez: v as PerfilInvestidor["necessidadeLiquidez"],
+                  })
+                }
+              />
+              <GrupoSelecaoUnica
+                label="Horizonte predominante"
+                value={perfilInvestidor.horizontePredominante}
+                options={["Curto prazo", "Médio prazo", "Longo prazo"]}
+                onChange={(v) =>
+                  updatePerfil({
+                    horizontePredominante: v as PerfilInvestidor["horizontePredominante"],
+                  })
+                }
+              />
+              <GrupoSelecaoMultipla
+                label="Classes que aceita"
+                values={perfilInvestidor.classesAceita}
+                options={CLASSES_INVESTIMENTO}
+                onChange={(values) =>
+                  updatePerfil({ classesAceita: values as ClasseInvestimento[] })
+                }
+              />
+              <GrupoSelecaoMultipla
+                label="Classes que prefere evitar"
+                values={perfilInvestidor.classesEvitar}
+                options={CLASSES_INVESTIMENTO}
+                onChange={(values) =>
+                  updatePerfil({ classesEvitar: values as ClasseInvestimento[] })
+                }
+              />
+              <GrupoSelecaoUnica
+                label="Perfil"
+                value={perfilInvestidor.perfil}
+                options={["Conservador", "Moderado", "Agressivo"]}
+                onChange={(v) => updatePerfil({ perfil: v as PerfilInvestidor["perfil"] })}
+              />
+              <GrupoSelecaoUnica
+                label="Grau de Delegação ao Advisor"
+                value={perfilInvestidor.grauDelegacao}
+                options={[
+                  "Delega 100%",
+                  "Acompanha seus próprios investimentos",
+                  "Delega porém gosta de acompanhar",
+                ]}
+                onChange={(v) =>
+                  updatePerfil({ grauDelegacao: v as PerfilInvestidor["grauDelegacao"] })
+                }
+              />
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <span className="field-label">Banking</span>
+            <div style={cardStyle}>
+              <div className="grid grid-cols-1 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="bancoPrincipal" className="field-label">
+                    Banco principal
+                  </Label>
+                  <Input
+                    id="bancoPrincipal"
+                    value={banking.bancoPrincipal ?? ""}
+                    onChange={(e) => updateBanking({ bancoPrincipal: e.target.value })}
+                    placeholder="Ex.: Itaú, Bradesco, Nubank..."
+                    className="form-input placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="instituicoesBancarias" className="field-label">
+                    Instituições bancárias utilizadas
+                  </Label>
+                  <Textarea
+                    id="instituicoesBancarias"
+                    value={banking.instituicoesBancariasUtilizadas ?? ""}
+                    onChange={(e) =>
+                      updateBanking({ instituicoesBancariasUtilizadas: e.target.value })
+                    }
+                    placeholder="Liste as instituições utilizadas"
+                    rows={3}
+                    className="form-input min-h-[80px] resize-y placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cartoesBeneficios" className="field-label">
+                    Cartões e benefícios relevantes
+                  </Label>
+                  <Textarea
+                    id="cartoesBeneficios"
+                    value={banking.cartoesEBeneficios ?? ""}
+                    onChange={(e) => updateBanking({ cartoesEBeneficios: e.target.value })}
+                    placeholder="Cartões, milhas, cashback, etc."
+                    rows={3}
+                    className="form-input min-h-[80px] resize-y placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
       )}
 
       {/* Receitas e Despesas */}

@@ -24,6 +24,7 @@ import type {
   StatusAcao,
   Responsavel,
 } from "@/types/diagnostico"
+import { InfoClient } from "@/components/sections/diagnostico/infoclient"
 
 import { VOGA } from "@/lib/voga-tokens"
 
@@ -48,6 +49,7 @@ interface DiagnosticoFinanceiroProps {
 export function DiagnosticoFinanceiro({ onNavigate }: DiagnosticoFinanceiroProps) {
   const { state } = usePlano()
 
+  const [abaInterna, setAbaInterna] = useState<"diagnostico" | "infoclient">("diagnostico")
   const [diagnostico, setDiagnostico] = useState<BlocoDiagnostico[]>([])
   const [planoDeAcao, setPlanoDeAcao] = useState<ItemAcao[]>([])
   const [carregando, setCarregando] = useState(false)
@@ -121,6 +123,32 @@ export function DiagnosticoFinanceiro({ onNavigate }: DiagnosticoFinanceiroProps
         </p>
       </div>
 
+      <div className="inline-flex flex-wrap rounded-lg bg-card border border-border p-1 gap-1">
+        {(
+          [
+            { id: "diagnostico", label: "Diagnóstico" },
+            { id: "infoclient", label: "InfoClient" },
+          ] as const
+        ).map((opt) => (
+          <button
+            key={opt.id}
+            type="button"
+            onClick={() => setAbaInterna(opt.id)}
+            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+              abaInterna === opt.id
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+
+      {abaInterna === "infoclient" ? (
+        <InfoClient />
+      ) : (
+      <>
       {/* Diagnóstico */}
       <Card className="form-card">
         <CardHeader className="flex flex-row items-center justify-between gap-3 pb-4">
@@ -311,6 +339,9 @@ export function DiagnosticoFinanceiro({ onNavigate }: DiagnosticoFinanceiroProps
             ))}
           </CardContent>
         </Card>
+      )}
+
+      </>
       )}
 
       {/* Footer */}

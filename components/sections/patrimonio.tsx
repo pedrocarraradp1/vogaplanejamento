@@ -111,6 +111,8 @@ type AddAtivoForm = {
   observacao: string
   bemDeHeranca: BemDeHerancaSelect
   reservaLiquidez: boolean
+  regimeTributarioPrevidencia: "" | "Regressiva" | "Progressiva"
+  tipoPlanoPrevidencia: "" | "PGBL" | "VGBL"
 }
 
 type FiltroLocalizacaoLiquido = "todos" | LocalizacaoAtivo
@@ -137,6 +139,8 @@ const EMPTY_ATIVO_FORM = (): AddAtivoForm => ({
   observacao: "",
   bemDeHeranca: "nao",
   reservaLiquidez: true,
+  regimeTributarioPrevidencia: "",
+  tipoPlanoPrevidencia: "",
 })
 
 const EMPTY_PASSIVO_FORM = (): AddPassivoForm => ({
@@ -1079,6 +1083,14 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
           heranca: bem,
           bemDeHeranca: bem,
           reservaLiquidez: isLiquido ? form.reservaLiquidez : undefined,
+          regimeTributarioPrevidencia:
+            form.tipo === "previdencia" && form.regimeTributarioPrevidencia
+              ? form.regimeTributarioPrevidencia
+              : undefined,
+          tipoPlanoPrevidencia:
+            form.tipo === "previdencia" && form.tipoPlanoPrevidencia
+              ? form.tipoPlanoPrevidencia
+              : undefined,
         }),
       )
     },
@@ -1181,6 +1193,8 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
       observacao: ativo.observacao ?? "",
       bemDeHeranca: ativo.heranca === true || ativo.bemDeHeranca === true ? "sim" : "nao",
       reservaLiquidez: ativo.reservaLiquidez !== false,
+      regimeTributarioPrevidencia: ativo.regimeTributarioPrevidencia ?? "",
+      tipoPlanoPrevidencia: ativo.tipoPlanoPrevidencia ?? "",
     })
     setAddModal({ kind: "ativo", tipoInicial: tipo, editId: ativo.id })
   }, [])
@@ -1314,8 +1328,14 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
       const obs = (a.observacao ?? "").trim()
       const tipo = normalizeAtivoTipo(a.tipo, a.descricao)
       const herancaNote = a.heranca || a.bemDeHeranca ? "Bem de herança" : null
+      const prevNote =
+        tipo === "previdencia"
+          ? [a.tipoPlanoPrevidencia, a.regimeTributarioPrevidencia].filter(Boolean).join(" · ")
+          : ""
       const infoTooltip =
-        tipo === "imobilizado" ? obs : [inst, herancaNote].filter(Boolean).join(" · ")
+        tipo === "imobilizado"
+          ? obs
+          : [inst, prevNote || null, herancaNote].filter(Boolean).join(" · ")
       return {
         id: a.id,
         nome: desc || "Sem descrição",
@@ -1489,6 +1509,8 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
       observacao:
         tipo === "ativo_liquido" || tipo === "imobilizado" ? prev.observacao : "",
       reservaLiquidez: tipo === "ativo_liquido" ? prev.reservaLiquidez ?? true : true,
+      regimeTributarioPrevidencia: tipo === "previdencia" ? prev.regimeTributarioPrevidencia : "",
+      tipoPlanoPrevidencia: tipo === "previdencia" ? prev.tipoPlanoPrevidencia : "",
     }))
   }
 
@@ -1496,6 +1518,7 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
   const ativoDescricaoSelect = resolveDescricaoAtivo(ativoTipoSelect, addAtivoForm.descricao)
   const isFormAtivoLiquido = ativoTipoSelect === "ativo_liquido"
   const isFormImobilizado = ativoTipoSelect === "imobilizado"
+  const isFormPrevidencia = ativoTipoSelect === "previdencia"
   const mostrarInstituicaoAtivo =
     !isFormAtivoLiquido && exibeInstituicaoAtivo(ativoTipoSelect, ativoDescricaoSelect)
   const passivoCategoriaSelect = addPassivoForm.categoria || DEFAULT_CATEGORIA_PASSIVO
@@ -1541,6 +1564,14 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
         heranca: bem,
         bemDeHeranca: bem,
         reservaLiquidez: isFormAtivoLiquido ? addAtivoForm.reservaLiquidez : undefined,
+        regimeTributarioPrevidencia:
+          isFormPrevidencia && addAtivoForm.regimeTributarioPrevidencia
+            ? addAtivoForm.regimeTributarioPrevidencia
+            : undefined,
+        tipoPlanoPrevidencia:
+          isFormPrevidencia && addAtivoForm.tipoPlanoPrevidencia
+            ? addAtivoForm.tipoPlanoPrevidencia
+            : undefined,
       }
 
       if (addModal.editId) {
@@ -2599,6 +2630,50 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
                       value={addAtivoForm.instituicao}
                       onChange={(instituicao) => setAddAtivoForm({ ...addAtivoForm, instituicao })}
                     />
+                  ) : null}
+                  {isFormPrevidencia ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <label className="field-label">Regime tributário</label>
+                        <Select
+                          value={addAtivoForm.regimeTributarioPrevidencia || undefined}
+                          onValueChange={(v) =>
+                            setAddAtivoForm((prev) => ({
+                              ...prev,
+                              regimeTributarioPrevidencia: v as "Regressiva" | "Progressiva",
+                            }))
+                          }
+                        >
+                          <SelectTrigger className="form-card text-foreground">
+                            <SelectValue placeholder="Selecione" />
+                          </SelectTrigger>
+                          <SelectContent className="form-card">
+                            <SelectItem value="Regressiva">Regressiva</SelectItem>
+                            <SelectItem value="Progressiva">Progressiva</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="field-label">Tipo de plano</label>
+                        <Select
+                          value={addAtivoForm.tipoPlanoPrevidencia || undefined}
+                          onValueChange={(v) =>
+                            setAddAtivoForm((prev) => ({
+                              ...prev,
+                              tipoPlanoPrevidencia: v as "PGBL" | "VGBL",
+                            }))
+                          }
+                        >
+                          <SelectTrigger className="form-card text-foreground">
+                            <SelectValue placeholder="Selecione" />
+                          </SelectTrigger>
+                          <SelectContent className="form-card">
+                            <SelectItem value="PGBL">PGBL</SelectItem>
+                            <SelectItem value="VGBL">VGBL</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
                   ) : null}
                 </>
               )}
