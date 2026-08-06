@@ -113,7 +113,7 @@ function KpiCardComTooltip({
 
 export function Projecao({ onNavigate, variant = "full" }: ProjecaoProps) {
   const resumo = isPlanoCompleto(variant)
-  const { state, setPremissas, setDadosPessoais, getSaldoInicialLiquido } = usePlano()
+  const { state, setPremissas, getSaldoInicialLiquido } = usePlano()
   const { premissas, objetivos, dadosPessoais } = state
   const moeda = state.moeda ?? "BRL"
 
@@ -138,6 +138,15 @@ export function Projecao({ onNavigate, variant = "full" }: ProjecaoProps) {
   const despesas = useMemo(() => getDespesas(dadosPessoais), [dadosPessoais])
   const despesaMensalAtualVal = useMemo(() => despesaMensalAtual(despesas), [despesas])
   const rendaMensalAtual = useMemo(() => receitaMensalAtual(fontesRenda), [fontesRenda])
+
+  /** Override manual do slider — se null, usa a despesa calculada das despesas cadastradas. */
+  const [despesaMensalOverride, setDespesaMensalOverride] = useState<number | null>(null)
+
+  useEffect(() => {
+    setDespesaMensalOverride(null)
+  }, [despesaMensalAtualVal])
+
+  const despesaMensalEfetiva = despesaMensalOverride ?? despesaMensalAtualVal
 
   const aporteModo = premissas.aporteModo ?? "fixo"
   const anosAcumulacaoAporteVal = useMemo(
@@ -200,10 +209,39 @@ export function Projecao({ onNavigate, variant = "full" }: ProjecaoProps) {
     setPremissas({ aportePeriodosReal: next })
   }, [aporteModo, blocosAporte.length, aporteBase, premissas.aportePeriodosReal, setPremissas])
 
-  const { aporteM: aporteMensal, aportePorAnoNominal } = useMemo(
+  const { aporteM: aporteMensalCalculado, aportePorAnoNominal: aportePorAnoCalculado } = useMemo(
     () => resolveAporteParaPremissas(fontesRenda, despesas, premissasComAporte, blocosAporte),
     [fontesRenda, despesas, premissasComAporte, blocosAporte],
   )
+
+  const aporteMensal =
+    despesaMensalOverride != null
+      ? Math.max(0, rendaMensalAtual - despesaMensalOverride)
+      : aporteMensalCalculado
+
+  const aportePorAnoNominal = useMemo(() => {
+    if (despesaMensalOverride == null || aporteModo === "periodos") {
+      return aportePorAnoCalculado
+    }
+    const prazo = Math.max(0, Number(premissas.prazo) || 0)
+    const inf = (Number(premissas.inflacao) || 0) / 100
+    const anosAcum = anosAcumulacaoAporte(
+      idadeAtualCalculada,
+      Number(premissas.idadeApos) || 0,
+    )
+    return Array.from({ length: prazo + 1 }, (_, t) =>
+      t < anosAcum ? aporteMensal * Math.pow(1 + inf, t) : 0,
+    )
+  }, [
+    despesaMensalOverride,
+    aporteModo,
+    aportePorAnoCalculado,
+    aporteMensal,
+    premissas.prazo,
+    premissas.inflacao,
+    premissas.idadeApos,
+    idadeAtualCalculada,
+  ])
 
   // Premissas completas — junta os campos editáveis com os derivados
   const premissasCompletasLive = useMemo(() => ({
@@ -218,7 +256,7 @@ export function Projecao({ onNavigate, variant = "full" }: ProjecaoProps) {
   const [simulacaoInputs, setSimulacaoInputs] = useState(() => ({
     premissasCompletas: premissasCompletasLive,
     rendaMensalAtual,
-    despesaMensal: despesaMensalAtualVal,
+    despesaMensal: despesaMensalEfetiva,
   }))
 
   useEffect(() => {
@@ -226,12 +264,12 @@ export function Projecao({ onNavigate, variant = "full" }: ProjecaoProps) {
       setSimulacaoInputs({
         premissasCompletas: premissasCompletasLive,
         rendaMensalAtual,
-        despesaMensal: despesaMensalAtualVal,
+        despesaMensal: despesaMensalEfetiva,
       })
     }, 120)
 
     return () => window.clearTimeout(timer)
-  }, [premissasCompletasLive, rendaMensalAtual, despesaMensalAtualVal])
+  }, [premissasCompletasLive, rendaMensalAtual, despesaMensalEfetiva])
 
   const premissasCompletas = simulacaoInputs.premissasCompletas
   const rendaMensalAtualSimulacao = simulacaoInputs.rendaMensalAtual
@@ -794,13 +832,13 @@ export function Projecao({ onNavigate, variant = "full" }: ProjecaoProps) {
       rentabilidadeBruta={rentabilidadeBrutaPct}
       rentabilidadeRealEquivalente={rentabilidadeRealEquivalentePct}
       inflacaoPct={inflacaoPctPremissas}
-      despesaMensal={despesaMensalAtualVal}
+      despesaMensal={despesaMensalEfetiva}
       aporteMensal={aporteMensal}
       retiradaMensal={Number(premissas.retiradaMensal) || 0}
       idadeAposentadoria={Number(premissas.idadeApos) || 30}
       formatarMoedaCompleta={formatarMoedaCompleta}
       onRentabilidadeBrutaChange={(valor) => setPremissas({ rendimentoBruto: valor })}
-      onDespesaMensalChange={(valor) => setDadosPessoais({ despesa: valor })}
+      onDespesaMensalChange={(valor) => setDespesaMensalOverride(valor)}
       onRetiradaMensalChange={(valor) => setPremissas({ retiradaMensal: valor })}
       onIdadeAposentadoriaChange={(valor) => setPremissas({ idadeApos: valor })}
     />
