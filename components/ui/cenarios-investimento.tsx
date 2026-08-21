@@ -164,9 +164,9 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
         "Agressivo",
         "Maior retorno esperado",
         "Alta",
-        "#01121E",
-        "bg-[rgba(1,18,30,0.06)]",
-        "border-[#01121E]/25",
+        "#8A7220",
+        "bg-[rgba(138,114,32,0.06)]",
+        "border-[#8A7220]/25",
         cenarioAgressivo,
         pAgr,
         projecaoAgressiva,
@@ -423,24 +423,27 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
                       dataKey="conservador"
                       name="conservador"
                       stroke="#1F6D3E"
-                      strokeWidth={2}
+                      strokeWidth={2.5}
                       dot={false}
+                      isAnimationActive={false}
                     />
                     <Line
                       type="monotone"
                       dataKey="moderado"
                       name="moderado"
                       stroke="#1066DA"
-                      strokeWidth={2}
+                      strokeWidth={2.5}
                       dot={false}
+                      isAnimationActive={false}
                     />
                     <Line
                       type="monotone"
                       dataKey="agressivo"
                       name="agressivo"
-                      stroke="#01121E"
-                      strokeWidth={2}
+                      stroke="#8A7220"
+                      strokeWidth={2.5}
                       dot={false}
+                      isAnimationActive={false}
                     />
                   </LineChart>
                 </ResponsiveContainer>

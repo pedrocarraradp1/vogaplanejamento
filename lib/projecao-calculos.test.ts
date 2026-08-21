@@ -122,3 +122,47 @@ describe("Liberdade Financeira e retirada líquida", () => {
     }
   })
 })
+
+describe("cenários conservador/moderado/agressivo", () => {
+  it("gera 3 curvas distintas mesmo com rendimentoBruto e modo por_periodo no plano", () => {
+    const base = {
+      saldoInicial: 500_000,
+      aporteM: 3000,
+      rendimento: 8.5,
+      rendimentoBruto: 10,
+      aliquotaImpostoRendimento: 0.15,
+      inflacao: 4,
+      idadeAtual: 40,
+      prazo: 25,
+      idadeApos: 65,
+      retiradaMensal: 0,
+      rendaAposentadoria: 0,
+      novaEntrada: 0,
+      idadeEntrada: 0,
+      modoRentabilidade: "por_periodo" as const,
+      rendimentoPeriodosBruto: [10, 10, 10, 10, 10],
+    }
+
+    const aliq = 0.15
+    const liquida = (bruta: number) => bruta * (1 - aliq)
+    const run = (bruta: number) =>
+      calcularProjecao(
+        {
+          ...base,
+          modoRentabilidade: "padrao",
+          rendimentoBruto: bruta,
+          rendimento: liquida(bruta),
+          rendimentoPeriodosBruto: undefined,
+        },
+        [],
+      )
+
+    const con = run(7)
+    const mod = run(10)
+    const agr = run(13)
+    const last = (p: ReturnType<typeof calcularProjecao>) => p[p.length - 1]?.saldoNominal ?? 0
+
+    assert.ok(last(con) < last(mod), "conservador < moderado")
+    assert.ok(last(mod) < last(agr), "moderado < agressivo")
+  })
+})

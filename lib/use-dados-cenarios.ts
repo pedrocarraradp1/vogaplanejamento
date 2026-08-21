@@ -81,33 +81,29 @@ export function useDadosCenarios() {
     [objetivos],
   )
 
+  /** Força modo padrão + bruto do perfil — senão rendimentoBruto/por_periodo do plano anula as 3 curvas. */
+  const premissasParaCenario = (brutaPct: number) => ({
+    ...premissasCompletas,
+    modoRentabilidade: "padrao" as const,
+    rendimentoBruto: brutaPct,
+    rendimento: rentabilidadeLiquidaDeBruta(brutaPct),
+    rendimentoPeriodosBruto: undefined,
+    rendimentoAcumulacao: undefined,
+    rendimentoAposentadoria: undefined,
+  })
+
   const projecaoConservadora = useMemo(
-    () =>
-      calcularProjecao(
-        { ...premissasCompletas, rendimento: rentabilidadeLiquidaDeBruta(cenarioConservador) },
-        objetivosEngine,
-        passivos,
-      ),
+    () => calcularProjecao(premissasParaCenario(cenarioConservador), objetivosEngine, passivos),
     [premissasCompletas, objetivosEngine, passivos, cenarioConservador, aliquotaIR],
   )
 
   const projecaoModerada = useMemo(
-    () =>
-      calcularProjecao(
-        { ...premissasCompletas, rendimento: rentabilidadeLiquidaDeBruta(cenarioModerado) },
-        objetivosEngine,
-        passivos,
-      ),
+    () => calcularProjecao(premissasParaCenario(cenarioModerado), objetivosEngine, passivos),
     [premissasCompletas, objetivosEngine, passivos, cenarioModerado, aliquotaIR],
   )
 
   const projecaoAgressiva = useMemo(
-    () =>
-      calcularProjecao(
-        { ...premissasCompletas, rendimento: rentabilidadeLiquidaDeBruta(cenarioAgressivo) },
-        objetivosEngine,
-        passivos,
-      ),
+    () => calcularProjecao(premissasParaCenario(cenarioAgressivo), objetivosEngine, passivos),
     [premissasCompletas, objetivosEngine, passivos, cenarioAgressivo, aliquotaIR],
   )
 
