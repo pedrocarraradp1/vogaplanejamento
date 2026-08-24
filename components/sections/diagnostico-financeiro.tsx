@@ -24,7 +24,6 @@ import type {
   StatusAcao,
   Responsavel,
 } from "@/types/diagnostico"
-import { InfoClient } from "@/components/sections/diagnostico/infoclient"
 
 import { VOGA } from "@/lib/voga-tokens"
 
@@ -49,7 +48,6 @@ interface DiagnosticoFinanceiroProps {
 export function DiagnosticoFinanceiro({ onNavigate }: DiagnosticoFinanceiroProps) {
   const { state } = usePlano()
 
-  const [abaInterna, setAbaInterna] = useState<"diagnostico" | "infoclient">("diagnostico")
   const [diagnostico, setDiagnostico] = useState<BlocoDiagnostico[]>([])
   const [planoDeAcao, setPlanoDeAcao] = useState<ItemAcao[]>([])
   const [carregando, setCarregando] = useState(false)
@@ -112,44 +110,16 @@ export function DiagnosticoFinanceiro({ onNavigate }: DiagnosticoFinanceiroProps
 
   return (
     <div className="space-y-6">
-      {abaInterna === "diagnostico" && (
-        <div className="space-y-1">
-          <p className="text-sm text-muted-foreground">Planejamento Financeiro</p>
-          <h1 className="page-title text-[24px] text-foreground">
-            Diagnóstico e <span className="text-primary">plano de ação</span>
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Gerado com base no cenário calculado do cliente — totalmente editável pelo advisor
-          </p>
-        </div>
-      )}
-
-      <div className="inline-flex flex-wrap rounded-lg bg-card border border-border p-1 gap-1 no-print">
-        {(
-          [
-            { id: "diagnostico", label: "Diagnóstico" },
-            { id: "infoclient", label: "InfoClient" },
-          ] as const
-        ).map((opt) => (
-          <button
-            key={opt.id}
-            type="button"
-            onClick={() => setAbaInterna(opt.id)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
-              abaInterna === opt.id
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {opt.label}
-          </button>
-        ))}
+      <div className="space-y-1">
+        <p className="text-sm text-muted-foreground">Diagnóstico</p>
+        <h1 className="page-title text-[24px] text-foreground">
+          Diagnóstico e <span className="text-primary">plano de ação</span>
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Gerado com base no cenário calculado do cliente — totalmente editável pelo advisor
+        </p>
       </div>
 
-      {abaInterna === "infoclient" ? (
-        <InfoClient />
-      ) : (
-      <>
       {/* Diagnóstico */}
       <Card className="form-card">
         <CardHeader className="flex flex-row items-center justify-between gap-3 pb-4">
@@ -342,16 +312,13 @@ export function DiagnosticoFinanceiro({ onNavigate }: DiagnosticoFinanceiroProps
         </Card>
       )}
 
-      </>
-      )}
-
       {/* Footer */}
       <div className="nav-footer">
         <Button variant="ghost" className="btn-back" onClick={() => onNavigate("fluxo-de-caixa")}>
           <ArrowLeft className="w-4 h-4 mr-2" />
           Voltar
         </Button>
-        <Button onClick={() => onNavigate("sucessorio")} className="btn-next">
+        <Button onClick={() => onNavigate("infoclient")} className="btn-next">
           Próximo
           <ArrowRight className="w-4 h-4 ml-2" />
         </Button>

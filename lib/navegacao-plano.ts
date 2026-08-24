@@ -37,7 +37,10 @@ export const NAV_GROUPS_FULL: NavGroup[] = [
   },
   {
     title: "Diagnóstico",
-    items: [{ id: "diagnostico-financeiro", label: "Diagnóstico e Plano de Ação" }],
+    items: [
+      { id: "diagnostico-financeiro", label: "Diagnóstico e Plano de Ação" },
+      { id: "infoclient", label: "InfoClient" },
+    ],
   },
 ]
 
