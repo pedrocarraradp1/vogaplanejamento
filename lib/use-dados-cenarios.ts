@@ -5,6 +5,7 @@ import { usePlano } from "@/lib/plano-context"
 import { getFontesRenda, resolveAporteParaPremissas, buildBlocosAporte, anosAcumulacaoAporte } from "@/lib/renda-utils"
 import { getDespesas } from "@/lib/despesa-utils"
 import { calcularProjecao, type ProjecaoAno } from "@/lib/engine"
+import { aplicarRentabilidadeDoCenario } from "@/lib/rentabilidade-utils"
 
 export function useDadosCenarios() {
   const { state, getSaldoInicialLiquido } = usePlano()
@@ -81,30 +82,34 @@ export function useDadosCenarios() {
     [objetivos],
   )
 
-  /** Força modo padrão + bruto do perfil — senão rendimentoBruto/por_periodo do plano anula as 3 curvas. */
-  const premissasParaCenario = (brutaPct: number) => ({
-    ...premissasCompletas,
-    modoRentabilidade: "padrao" as const,
-    rendimentoBruto: brutaPct,
-    rendimento: rentabilidadeLiquidaDeBruta(brutaPct),
-    rendimentoPeriodosBruto: undefined,
-    rendimentoAcumulacao: undefined,
-    rendimentoAposentadoria: undefined,
-  })
-
   const projecaoConservadora = useMemo(
-    () => calcularProjecao(premissasParaCenario(cenarioConservador), objetivosEngine, passivos),
-    [premissasCompletas, objetivosEngine, passivos, cenarioConservador, aliquotaIR],
+    () =>
+      calcularProjecao(
+        aplicarRentabilidadeDoCenario(premissasCompletas, cenarioConservador),
+        objetivosEngine,
+        passivos,
+      ),
+    [premissasCompletas, objetivosEngine, passivos, cenarioConservador],
   )
 
   const projecaoModerada = useMemo(
-    () => calcularProjecao(premissasParaCenario(cenarioModerado), objetivosEngine, passivos),
-    [premissasCompletas, objetivosEngine, passivos, cenarioModerado, aliquotaIR],
+    () =>
+      calcularProjecao(
+        aplicarRentabilidadeDoCenario(premissasCompletas, cenarioModerado),
+        objetivosEngine,
+        passivos,
+      ),
+    [premissasCompletas, objetivosEngine, passivos, cenarioModerado],
   )
 
   const projecaoAgressiva = useMemo(
-    () => calcularProjecao(premissasParaCenario(cenarioAgressivo), objetivosEngine, passivos),
-    [premissasCompletas, objetivosEngine, passivos, cenarioAgressivo, aliquotaIR],
+    () =>
+      calcularProjecao(
+        aplicarRentabilidadeDoCenario(premissasCompletas, cenarioAgressivo),
+        objetivosEngine,
+        passivos,
+      ),
+    [premissasCompletas, objetivosEngine, passivos, cenarioAgressivo],
   )
 
   const fmtFull = (v: number) =>

@@ -3,6 +3,7 @@
 import { CenarioSecaoBox } from "@/components/ui/cenario-secao-box"
 import { EstrategiaRetiradaAposentadoria } from "@/components/ui/estrategia-retirada-aposentadoria"
 import { useDadosCenarios } from "@/lib/use-dados-cenarios"
+import { aplicarRentabilidadeDoCenario } from "@/lib/rentabilidade-utils"
 import { cn } from "@/lib/utils"
 
 type DisplayMode = "nominal" | "real"
@@ -23,7 +24,10 @@ export function CenariosRetiradaSection({ displayMode = "real", className }: Cen
     >
       <EstrategiaRetiradaAposentadoria
         hideHeader
-        premissasCompletas={dados.premissasCompletas}
+        premissasCompletas={aplicarRentabilidadeDoCenario(
+          dados.premissasCompletas,
+          dados.cenarioModerado,
+        )}
         objetivosEngine={dados.objetivosEngine}
         passivos={dados.passivos}
         rentabilidadeLiquidaPct={dados.rentabilidadeLiquidaDeBruta(dados.cenarioModerado)}

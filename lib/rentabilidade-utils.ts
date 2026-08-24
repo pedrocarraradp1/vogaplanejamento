@@ -43,6 +43,30 @@ export function blocosRentabilidadePorPrazo(prazoSimulacao: number): BlocoAporte
   return buildBlocosAporte(Math.max(0, Number(prazoSimulacao) || 0))
 }
 
+/**
+ * Isola a taxa bruta de um perfil (conservador/moderado/agressivo) para a
+ * simulação de cenários. Sem isso, `modoRentabilidade` / `rendimentoBruto` do
+ * plano vazam e as três curvas (e o gráfico) ignoram o input de cada cenário.
+ */
+export function aplicarRentabilidadeDoCenario<T extends PremissasRentabilidade>(
+  premissas: T,
+  brutaPct: number,
+): T {
+  const bruta = Math.max(0, Number(brutaPct) || 0)
+  const aliq = Number(premissas.aliquotaImpostoRendimento) || 0
+  const prazo = Math.max(0, Number(premissas.prazo) || 0)
+  const nBlocos = Math.max(1, Math.ceil(prazo / 5) || 1)
+  return {
+    ...premissas,
+    modoRentabilidade: "padrao",
+    rendimentoBruto: bruta,
+    rendimento: rendimentoLiquidoDeBruto(bruta, aliq),
+    rendimentoPeriodosBruto: Array.from({ length: nBlocos }, () => bruta),
+    rendimentoAcumulacao: bruta,
+    rendimentoAposentadoria: bruta,
+  }
+}
+
 export function resolverRendimentoBrutoPorAno(premissas: PremissasRentabilidade): (t: number) => number {
   const modo = premissas.modoRentabilidade ?? "padrao"
   const padrao = Number(premissas.rendimentoBruto ?? premissas.rendimento) || 0

@@ -325,12 +325,15 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
                   <div className="relative">
                     <Input
                       type="number"
+                      step="0.1"
+                      min={0}
                       value={c.taxaBruta}
                       onChange={(e) => {
-                        const v = parseFloat(e.target.value) || 0
-                        if (c.key === "conservador") setPremissas({ rentabilidadeConservador: v })
-                        if (c.key === "moderado") setPremissas({ rentabilidadeModerado: v })
-                        if (c.key === "agressivo") setPremissas({ rentabilidadeAgressivo: v })
+                        const v = Number(e.target.value)
+                        const taxa = Number.isFinite(v) ? v : 0
+                        if (c.key === "conservador") setPremissas({ rentabilidadeConservador: taxa })
+                        if (c.key === "moderado") setPremissas({ rentabilidadeModerado: taxa })
+                        if (c.key === "agressivo") setPremissas({ rentabilidadeAgressivo: taxa })
                       }}
                       className="form-card text-foreground focus:border-primary pr-16"
                     />
@@ -387,7 +390,11 @@ export function CenariosInvestimento(props: CenariosInvestimentoProps) {
               </p>
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={dadosLinhaCenariosDisplay} margin={{ top: 10, right: 30, left: 20, bottom: 10 }}>
+                  <LineChart
+                    key={`cenarios-${cenarioConservador}-${cenarioModerado}-${cenarioAgressivo}-${displayMode}-${dadosLinhaCenariosDisplay.at(-1)?.conservador ?? 0}-${dadosLinhaCenariosDisplay.at(-1)?.moderado ?? 0}-${dadosLinhaCenariosDisplay.at(-1)?.agressivo ?? 0}`}
+                    data={dadosLinhaCenariosDisplay}
+                    margin={{ top: 10, right: 30, left: 20, bottom: 10 }}
+                  >
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
                     <XAxis
                       dataKey="idade"
