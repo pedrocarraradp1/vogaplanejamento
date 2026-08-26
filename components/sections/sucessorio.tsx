@@ -189,7 +189,7 @@ export function Sucessorio({ onNavigate }: SucessorioProps) {
           sexoId: dadosPessoais.sexo === "M" ? 1 : 2,
           renda: dadosPessoais.renda,
           uf: dadosPessoais.uf || "SP",
-          codigoModeloProposta: produtoSelecionado,
+          codigoModeloProposta: meta?.codigoModelo ?? produtoSelecionado,
           capitalSegurado,
           anospag,
         }),

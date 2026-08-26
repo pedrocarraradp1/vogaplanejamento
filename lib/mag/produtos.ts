@@ -1,7 +1,13 @@
-/** Produtos MAG Private Solutions (A75) / WHOLE LIFE 2019 (id 2111). Prazos: 10, 20, 30 anos. */
+import {
+  MODELO_PROPOSTA_ATUAL,
+  MAG_MODELOS,
+  type MagModeloProposta,
+} from "@/lib/mag/config"
+
+/** Prazos de pagamento do Whole Life (10, 20, 30 anos). */
 
 export interface MagProduto {
-  codigo: string
+  codigo: MagModeloProposta
   nome: string
   subtitulo: string
   anospag: number
@@ -9,43 +15,60 @@ export interface MagProduto {
   descricao: string
 }
 
-export const MAG_PRODUTOS: MagProduto[] = [
-  {
-    codigo: "A75",
-    nome: "Vida Inteira Resgatável",
-    subtitulo: "10 anos",
-    anospag: 10,
-    mult: 1,
-    descricao:
-      "Cobertura vitalícia com reserva resgatável. Prêmio pago em 10 anos. Resgate disponível a partir do 25º mês.",
-  },
-  {
-    codigo: "A75",
-    nome: "Vida Inteira Resgatável",
-    subtitulo: "20 anos",
-    anospag: 20,
-    mult: 1,
-    descricao:
-      "Cobertura vitalícia com reserva resgatável. Prêmio pago em 20 anos. Prêmio mensal mais acessível com prazo estendido.",
-  },
-  {
-    codigo: "A75",
-    nome: "Vida Inteira Resgatável",
-    subtitulo: "30 anos",
-    anospag: 30,
-    mult: 1,
-    descricao:
-      "Cobertura vitalícia com reserva resgatável. Prêmio pago em 30 anos. Menor prêmio mensal, prazo máximo de pagamento.",
-  },
-]
+function produtosDoModelo(codigo: MagModeloProposta): MagProduto[] {
+  const spec = MAG_MODELOS[codigo]
+  const nome =
+    codigo === "ER6" ? "Vida Inteira Integral" : "Vida Inteira Resgatável"
+  return [
+    {
+      codigo,
+      nome,
+      subtitulo: "10 anos",
+      anospag: 10,
+      mult: 1,
+      descricao:
+        codigo === "ER6"
+          ? `Cobertura vitalícia (${spec.nome}, SUSEP ${spec.susep}). Prêmio pago em 10 anos.`
+          : "Cobertura vitalícia com reserva resgatável. Prêmio pago em 10 anos. Resgate disponível a partir do 25º mês.",
+    },
+    {
+      codigo,
+      nome,
+      subtitulo: "20 anos",
+      anospag: 20,
+      mult: 1,
+      descricao:
+        codigo === "ER6"
+          ? `Cobertura vitalícia (${spec.nome}, SUSEP ${spec.susep}). Prêmio pago em 20 anos.`
+          : "Cobertura vitalícia com reserva resgatável. Prêmio pago em 20 anos. Prêmio mensal mais acessível com prazo estendido.",
+    },
+    {
+      codigo,
+      nome,
+      subtitulo: "30 anos",
+      anospag: 30,
+      mult: 1,
+      descricao:
+        codigo === "ER6"
+          ? `Cobertura vitalícia (${spec.nome}, SUSEP ${spec.susep}). Prêmio pago em 30 anos.`
+          : "Cobertura vitalícia com reserva resgatável. Prêmio pago em 30 anos. Menor prêmio mensal, prazo máximo de pagamento.",
+    },
+  ]
+}
+
+/** Lista exibida no simulador — segue MODELO_PROPOSTA_ATUAL (ER6 em STG). */
+export const MAG_PRODUTOS: MagProduto[] = produtosDoModelo(MODELO_PROPOSTA_ATUAL)
+
+/** Catálogo A75 mantido para fallback / comparação. */
+export const MAG_PRODUTOS_A75: MagProduto[] = produtosDoModelo("A75")
 
 export const MAG_PRODUTO_META: Record<
   string,
-  { nome: string; mult: number; anospag: number }
+  { nome: string; mult: number; anospag: number; codigoModelo: MagModeloProposta }
 > = Object.fromEntries(
   MAG_PRODUTOS.map((p) => [
     `${p.codigo}_${p.anospag}`,
-    { nome: `${p.nome} ${p.subtitulo}`, mult: p.mult, anospag: p.anospag },
+    { nome: `${p.nome} ${p.subtitulo}`, mult: p.mult, anospag: p.anospag, codigoModelo: p.codigo },
   ]),
 )
 

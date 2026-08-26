@@ -2,9 +2,10 @@
  * Extrai premioMensal / premioAnual de respostas MAG.
  *
  * A MAG retorna `premioBase` por R$1.000 de capital em cada cobertura.
- * Para obter o prêmio mensal total da cobertura principal (morte),
- * multiplica-se: premioBase * (capitalSegurado / 1000).
- * Em seguida aplica-se calibração atuarial → comercial (interpolar).
+ * Prêmio mensal = premioBase * (capitalSegurado / 1000).
+ *
+ * A75 / 2111: aplica calibração atuarial → comercial histórica (`interpolar`).
+ * ER6 / 3109: usa a taxa da MAG direto (já é a cotação interna atual).
  *
  * Se a resposta já trouxer `premioMensal` direto, usa esse valor.
  */
@@ -40,6 +41,7 @@ export function extrairPremiosMag(
   let premioMensal: number | undefined
   let premioAnual: number | undefined
   let premioBaseMorte: number | undefined
+  let calibrarPremioComercial = true
 
   const walk = (obj: unknown): void => {
     if (obj === null || typeof obj !== "object") return
@@ -50,10 +52,13 @@ export function extrairPremiosMag(
 
     if (typeof rec.idProduto === "number" && Array.isArray(rec.coberturas)) {
       const desc = String(rec.descricao ?? "").toUpperCase()
-      // Produto correto: 2111 (WHOLE LIFE 2019) — não mais 2011 (VIR)
-      const isWholeLife =
+      const isWholeLifeEr6 =
+        rec.idProduto === 3109 || desc.includes("WHOLE LIFE INTEGRAL")
+      const isWholeLifeA75 =
         rec.idProduto === 2111 ||
-        (desc.includes("WHOLE LIFE") && !desc.includes("DECRESCENTE"))
+        (desc.includes("WHOLE LIFE") &&
+          !desc.includes("DECRESCENTE") &&
+          !desc.includes("INTEGRAL"))
       const isVIR =
         rec.idProduto === 2011 ||
         (desc.includes("MORTE") &&
@@ -61,11 +66,15 @@ export function extrairPremiosMag(
           !desc.includes("DECRESCENTE") &&
           !desc.includes("WHOLE LIFE"))
 
-      if (isWholeLife || isVIR) {
+      if (isWholeLifeEr6 || isWholeLifeA75 || isVIR) {
         const cob = rec.coberturas[0] as Record<string, unknown> | undefined
         if (cob && typeof cob.premioBase === "number" && cob.premioBase > 0) {
-          if (isWholeLife) {
+          if (isWholeLifeEr6) {
             premioBaseMorte = cob.premioBase
+            calibrarPremioComercial = false
+          } else if (isWholeLifeA75) {
+            premioBaseMorte = cob.premioBase
+            calibrarPremioComercial = true
           } else if (premioBaseMorte === undefined) {
             premioBaseMorte = cob.premioBase
           }
@@ -83,9 +92,13 @@ export function extrairPremiosMag(
   // 1. Prêmio puro a partir da taxa atuarial (premioBase × capital/1000)
   if (premioMensal === undefined && premioBaseMorte != null && capitalSegurado && capitalSegurado > 0) {
     const premioMensalPuro = premioBaseMorte * (capitalSegurado / 1000)
-    // 2. Calibração obrigatória atuarial → comercial
-    const premioFinal = interpolar(premioMensalPuro)
-    console.log("PREMIO PURO:", premioMensalPuro, "→ CALIBRADO:", premioFinal)
+    const premioFinal = calibrarPremioComercial ? interpolar(premioMensalPuro) : premioMensalPuro
+    console.log(
+      "PREMIO PURO:",
+      premioMensalPuro,
+      calibrarPremioComercial ? "→ CALIBRADO:" : "→ SEM CALIBRACAO A75:",
+      premioFinal,
+    )
     premioMensal = premioFinal
   }
 

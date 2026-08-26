@@ -3,6 +3,7 @@ export const runtime = "edge"
 import { NextRequest, NextResponse } from "next/server"
 import { requestMAGToken } from "@/lib/mag/auth"
 import { extrairPremiosMag } from "@/lib/mag/extract-premio"
+import { modeloPropostaEfetivo, parseMagModeloCodigo } from "@/lib/mag/config"
 
 type SimulacaoBody = {
   nome?: string
@@ -59,13 +60,15 @@ export async function POST(req: NextRequest) {
     const token = tokenResult.token
 
     const cnpj = (process.env.MAG_CNPJ || "27945275000154").replace(/\D/g, "")
-    const url = `${apiUrl}/apiseguradora/v3/simulacao?cnpj=${encodeURIComponent(cnpj)}&codigoModeloProposta=A75&canalVenda=4`
+    const parsedModelo = parseMagModeloCodigo(body.codigoModeloProposta)
+    const spec = modeloPropostaEfetivo(body.codigoModeloProposta)
+    const prazoPedido = Number(body.prazo ?? body.anospag ?? parsedModelo?.anospag ?? 30)
+    const prazoFinal = [10, 20, 30].includes(prazoPedido) ? prazoPedido : 10
+
+    const url = `${apiUrl}/apiseguradora/v3/simulacao?cnpj=${encodeURIComponent(cnpj)}&codigoModeloProposta=${encodeURIComponent(spec.codigo)}&canalVenda=4`
     console.log("MAG URL:", url)
 
     const renda = Number(body.rendaMensal ?? body.renda ?? 0)
-    const prazo = Number(body.prazo ?? body.anospag ?? 30)
-    const prazoFinal = [10, 20, 30].includes(prazo) ? prazo : 10
-
     let sexoId = 1
     if (body.sexoId != null) {
       sexoId = Number(body.sexoId)
@@ -90,14 +93,14 @@ export async function POST(req: NextRequest) {
       periodicidadeCobrancaId: 30,
       prazoPagamentoAntecipado: prazoFinal,
       prazoDecrescimo: prazoFinal,
-      idProduto: 2111,
+      idProduto: spec.idProduto,
     }
 
     if (body.capitalSegurado != null && body.capitalSegurado > 0) {
       simulacaoPayload.capitalSegurado = Number(body.capitalSegurado)
     }
 
-    console.log("PRODUTO USADO:", { codigo: "A75", idProduto: 2111, prazo: prazoFinal })
+    console.log("PRODUTO USADO:", { codigo: spec.codigo, idProduto: spec.idProduto, prazo: prazoFinal })
     console.log("MAG SIMULACAO PAYLOAD:", JSON.stringify({ simulacoes: [simulacaoPayload] }, null, 2))
 
     const magRes = await fetch(url, {
@@ -145,8 +148,8 @@ export async function POST(req: NextRequest) {
       premioAnual: premioAnualExtr ?? (premioMensal != null ? premioMensal * 12 : null),
       premioBaseMorte: premioBaseMorte ?? null,
       capitalSegurado: cs,
-      codigoModeloProposta: "A75",
-      idProduto: 2111,
+      codigoModeloProposta: spec.codigo,
+      idProduto: spec.idProduto,
       prazo: prazoFinal,
     }
 

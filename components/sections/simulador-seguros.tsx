@@ -843,7 +843,9 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
       {/* SEÇÃO 3 — Produto MAG */}
       <Card className="form-card">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base font-medium text-foreground">Vida Inteira Resgatável — Prazo de pagamento</CardTitle>
+          <CardTitle className="text-base font-medium text-foreground">
+            {produto.nome} — Prazo de pagamento
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -862,7 +864,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
                     : "border-border",
                 )}
               >
-                <p className="text-sm font-semibold text-foreground">Resgatável</p>
+                <p className="text-sm font-semibold text-foreground">{p.nome}</p>
                 <p className="text-xs text-primary font-medium tabular-nums">{p.subtitulo}</p>
               </button>
             ))}
