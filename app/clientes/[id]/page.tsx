@@ -14,6 +14,7 @@ import {
   moedaFromDados,
   patrimonioProjetadoFromDados,
 } from "@/lib/clientes-utils"
+import { useIsAdmin } from "@/hooks/use-is-admin"
 
 type ClienteRow = {
   id: string
@@ -31,6 +32,7 @@ type SimulacaoRow = {
 }
 
 export default function ClienteDetailPage() {
+  const { isAdmin } = useIsAdmin()
   const params = useParams<{ id: string }>()
   const clienteId = String(params?.id ?? "")
 
@@ -144,7 +146,7 @@ export default function ClienteDetailPage() {
   if (error) {
     return (
       <div className="min-h-screen bg-background">
-        <ClientesHeader novoCenarioHref={novoCenarioHref} />
+        <ClientesHeader novoCenarioHref={novoCenarioHref} showAdmin={isAdmin} />
         <div style={{ padding: "40px 48px" }} className="text-destructive text-sm">{error}</div>
       </div>
     )
@@ -152,7 +154,7 @@ export default function ClienteDetailPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <ClientesHeader novoCenarioHref={novoCenarioHref} />
+      <ClientesHeader novoCenarioHref={novoCenarioHref} showAdmin={isAdmin} />
 
       <div style={{ padding: "40px 48px" }} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

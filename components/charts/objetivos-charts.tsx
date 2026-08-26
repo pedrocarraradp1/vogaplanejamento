@@ -185,3 +185,104 @@ export function GraficoCapitalPorAno({
     </div>
   )
 }
+
+/** Mesmo desenho de barras do gráfico "Necessidade de capital por ano". */
+export function GraficoBarrasQuantidade({
+  pontos,
+}: {
+  pontos: { id: string; label: string; valor: number; mostrarLabel?: boolean }[]
+}) {
+  const { containerRef, hoveredIdx, tooltipPos, updateTooltip, handleLeave } = useTooltipHover()
+  const max = Math.max(0, ...pontos.map((p) => p.valor))
+  const hovered = hoveredIdx !== null ? pontos[hoveredIdx] : null
+
+  return (
+    <div
+      ref={containerRef}
+      className="w-full min-w-0 relative"
+      style={{ height: CHART_HEIGHT + 22 }}
+      onMouseLeave={handleLeave}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-end",
+          gap: 4,
+          height: CHART_HEIGHT,
+        }}
+      >
+        {pontos.map((ponto, i) => {
+          const barHeight =
+            ponto.valor > 0 && max > 0
+              ? Math.max(20, Math.round((ponto.valor / max) * 100))
+              : 4
+          const mostrarLabel = ponto.mostrarLabel !== false
+
+          return (
+            <div
+              key={ponto.id}
+              className="ano-coluna"
+              style={{
+                flex: 1,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                minWidth: 0,
+                height: "100%",
+                justifyContent: "flex-end",
+                cursor: "default",
+              }}
+              onMouseEnter={(e) => updateTooltip(i, e.clientX, e.clientY)}
+              onMouseMove={(e) => updateTooltip(i, e.clientX, e.clientY)}
+            >
+              {ponto.valor > 0 ? (
+                <div
+                  style={{
+                    width: "100%",
+                    height: barHeight,
+                    background: "#1066DA",
+                    borderRadius: "3px 3px 0 0",
+                    pointerEvents: "none",
+                  }}
+                />
+              ) : (
+                <div
+                  style={{
+                    width: "100%",
+                    height: 4,
+                    borderRadius: 2,
+                    background: "var(--border, #E2E2E2)",
+                    pointerEvents: "none",
+                  }}
+                />
+              )}
+              <span
+                style={{
+                  marginTop: 8,
+                  fontSize: 10,
+                  color: "#5F85B8",
+                  visibility: mostrarLabel ? "visible" : "hidden",
+                  height: 14,
+                  lineHeight: "14px",
+                  pointerEvents: "none",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {mostrarLabel ? ponto.label : "\u00A0"}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+
+      {hovered && tooltipPos ? (
+        <TooltipFlutuante
+          pos={tooltipPos}
+          titulo={`${hovered.valor} ${hovered.valor === 1 ? "planejamento" : "planejamentos"}`}
+          subtitulo={hovered.label}
+        />
+      ) : null}
+    </div>
+  )
+}
+

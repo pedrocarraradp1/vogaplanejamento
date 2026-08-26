@@ -7,6 +7,7 @@ import { PlanoProvider, usePlano } from "@/lib/plano-context"
 import { Sidebar } from "@/components/sidebar"
 import { ContentArea } from "@/components/content-area"
 import { PlanningBreadcrumb, PlanningHeader } from "@/components/planning-header"
+import { useAdminSidebarNav } from "@/hooks/use-admin-sidebar-nav"
 
 function Loader({ simulacaoId }: { simulacaoId: string }) {
   const { loadState } = usePlano()
@@ -73,12 +74,17 @@ function Loader({ simulacaoId }: { simulacaoId: string }) {
 
 function SimulacaoShell() {
   const [activeSection, setActiveSection] = useState("dados-pessoais")
+  const { isAdmin, onSectionChange } = useAdminSidebarNav(setActiveSection)
 
   return (
     <>
       <PlanningHeader breadcrumb={<PlanningBreadcrumb />} />
-      <Sidebar activeSection={activeSection} onSectionChange={setActiveSection} />
-      <ContentArea activeSection={activeSection} onNavigate={setActiveSection} />
+      <Sidebar
+        activeSection={activeSection}
+        onSectionChange={onSectionChange}
+        isAdmin={isAdmin}
+      />
+      <ContentArea activeSection={activeSection} onNavigate={onSectionChange} />
     </>
   )
 }

@@ -1,12 +1,14 @@
 import { createBrowserClient } from "@supabase/ssr"
+import type { ProfileRole } from "@/lib/profile-role"
+
+export type { ProfileRole }
 
 /**
  * Perfis na tabela `public.profiles` (migration em supabase/migrations).
- * `cliente`: acesso somente leitura em /meu-diagnostico (plano compartilhado pelo advisor).
- * `advisor`: app completo em /dashboard.
+ * `cliente`: acesso somente leitura em /meu-diagnostico.
+ * `advisor`: app completo em /dashboard e /clientes.
+ * `admin`: mesmo acesso do advisor + rota /admin (métricas agregadas).
  */
-export type ProfileRole = "advisor" | "cliente"
-
 export type Profile = {
   id: string
   role: ProfileRole

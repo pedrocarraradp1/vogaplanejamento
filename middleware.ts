@@ -1,9 +1,11 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
+import { isAdminRole, isClienteRole, type ProfileRole } from "@/lib/profile-role"
 
 const DASHBOARD = "/dashboard"
 const CLIENTES = "/clientes"
 const MEU_DIAGNOSTICO = "/meu-diagnostico"
+const ADMIN = "/admin"
 
 function isLoginPath(path: string) {
   return path === "/login" || path.startsWith("/login/")
@@ -11,6 +13,10 @@ function isLoginPath(path: string) {
 
 function isPublicPlanoPath(path: string) {
   return path === "/plano" || path.startsWith("/plano/")
+}
+
+function isAdminPath(path: string) {
+  return path === ADMIN || path.startsWith(`${ADMIN}/`)
 }
 
 export async function middleware(request: NextRequest) {
@@ -43,14 +49,15 @@ export async function middleware(request: NextRequest) {
 
   const path = request.nextUrl.pathname
 
-  let role: "advisor" | "cliente" | null = null
+  let role: ProfileRole | null = null
   if (user) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("role")
       .eq("id", user.id)
       .maybeSingle()
-    if (profile?.role === "cliente") role = "cliente"
+    if (isClienteRole(profile?.role)) role = "cliente"
+    else if (isAdminRole(profile?.role)) role = "admin"
     else role = "advisor"
   }
 
@@ -81,9 +88,15 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(u)
   }
 
-  if (role === "advisor" && path === MEU_DIAGNOSTICO) {
+  if (role !== "cliente" && path === MEU_DIAGNOSTICO) {
     const u = request.nextUrl.clone()
     u.pathname = DASHBOARD
+    return NextResponse.redirect(u)
+  }
+
+  if (isAdminPath(path) && role !== "admin") {
+    const u = request.nextUrl.clone()
+    u.pathname = homeForRole
     return NextResponse.redirect(u)
   }
 

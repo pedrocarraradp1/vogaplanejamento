@@ -7,6 +7,7 @@ import { Search, Plus, ArrowRight, Users, FileText, TrendingUp } from "lucide-re
 import { ClientesHeader } from "@/components/clientes/clientes-header"
 import { KpiStatCard } from "@/components/clientes/kpi-stat-card"
 import { fmtFull, patrimonioTotalFromDados } from "@/lib/clientes-utils"
+import { useIsAdmin } from "@/hooks/use-is-admin"
 
 type SimulacaoRow = {
   id: string
@@ -19,6 +20,7 @@ type SimulacaoRow = {
 }
 
 export default function ClientesPage() {
+  const { isAdmin } = useIsAdmin()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -136,7 +138,7 @@ export default function ClientesPage() {
 
     return (
       <div className="min-h-screen bg-background">
-        <ClientesHeader novoCenarioHref="/dashboard" />
+        <ClientesHeader novoCenarioHref="/dashboard" showAdmin={isAdmin} />
         <div style={{ padding: "40px 48px" }}>
           <div className="form-card">
             <p className="text-sm font-semibold text-destructive">Não foi possível carregar as simulações</p>
@@ -153,7 +155,7 @@ export default function ClientesPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <ClientesHeader novoCenarioHref="/dashboard" />
+        <ClientesHeader novoCenarioHref="/dashboard" showAdmin={isAdmin} />
 
       <div style={{ padding: "40px 48px" }} className="space-y-6">
         <h1 className="clientes-title">

@@ -1,5 +1,12 @@
+import { ADMIN_SECTION_ID } from "@/lib/profile-role"
+
 export type NavItem = { id: string; label: string }
 export type NavGroup = { title: string; items: NavItem[] }
+
+export const NAV_GROUP_ADMIN: NavGroup = {
+  title: "Gestão",
+  items: [{ id: ADMIN_SECTION_ID, label: "Admin" }],
+}
 
 export const NAV_GROUPS_FULL: NavGroup[] = [
   {
@@ -61,3 +68,13 @@ export const NAV_GROUPS_PUBLIC: NavGroup[] = NAV_GROUPS_FULL.map((group) => ({
 })).filter((group) => group.items.length > 0)
 
 export const DEFAULT_PUBLIC_SECTION = "dados-pessoais"
+
+export function navGroupsForSession(opts: {
+  variant?: "full" | "public"
+  isAdmin?: boolean
+}): NavGroup[] {
+  const variant = opts.variant ?? "full"
+  const base = variant === "public" ? NAV_GROUPS_PUBLIC : NAV_GROUPS_FULL
+  if (variant === "public" || !opts.isAdmin) return base
+  return [NAV_GROUP_ADMIN, ...base]
+}

@@ -1,17 +1,24 @@
 "use client"
 
 import { ChevronRight } from "lucide-react"
-import { NAV_GROUPS_FULL, NAV_GROUPS_PUBLIC } from "@/lib/navegacao-plano"
+import { navGroupsForSession } from "@/lib/navegacao-plano"
 
 interface SidebarProps {
   activeSection: string
   onSectionChange: (section: string) => void
   /** `public` = apenas abas do link compartilhado com o cliente */
   variant?: "full" | "public"
+  /** Só então a aba Admin aparece no menu. */
+  isAdmin?: boolean
 }
 
-export function Sidebar({ activeSection, onSectionChange, variant = "full" }: SidebarProps) {
-  const navGroups = variant === "public" ? NAV_GROUPS_PUBLIC : NAV_GROUPS_FULL
+export function Sidebar({
+  activeSection,
+  onSectionChange,
+  variant = "full",
+  isAdmin = false,
+}: SidebarProps) {
+  const navGroups = navGroupsForSession({ variant, isAdmin })
 
   return (
     <aside
