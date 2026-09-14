@@ -66,12 +66,18 @@ import {
   labelLocalizacaoAtivo,
   resolveSubcategoriaLiquido,
   formatValorMoeda,
+  agruparAtivosPorEmpresa,
+  labelEmpresaParticipacao,
+  parsePercentualParticipacaoDigitado,
+  percentualParticipacaoLabel,
+  calcularComposicaoLiquidosPorLocalizacao,
   type LocalizacaoAtivo,
   type SubcategoriaLiquido,
   type SecaoAtivoConfig,
   type TipoAtivoSlug,
+  type ComposicaoLiquidosPorLocalizacao,
 } from "@/lib/patrimonio-utils"
-import { VOGA } from "@/lib/voga-tokens"
+import { VOGA, CORES_LOCALIZACAO_ATIVO } from "@/lib/voga-tokens"
 import { MODELOS_AMORTIZACAO, primeiraParcelaPassivo, resolveModeloAmortizacao, type ModeloAmortizacao } from "@/lib/amortizacao"
 import { isPlanoCompleto, type PlanoSecaoVariant } from "@/lib/plano-secoes"
 import { DonutComLegenda, type DonutSlice } from "@/components/charts/donut-com-legenda"
@@ -98,6 +104,8 @@ type AddAtivoForm = {
   descricao: string
   valor: number
   instituicao: string
+  empresa: string
+  percentualParticipacao: string
   subcategoria: SubcategoriaLiquido
   localizacao: LocalizacaoAtivo
   observacao: string
@@ -126,6 +134,8 @@ const EMPTY_ATIVO_FORM = (): AddAtivoForm => ({
   descricao: DESCRICOES_ATIVOS_POR_TIPO.ativo_liquido[0],
   valor: 0,
   instituicao: "",
+  empresa: "",
+  percentualParticipacao: "",
   subcategoria: SUBCATEGORIAS_LIQUIDO[0].value,
   localizacao: "nacional",
   observacao: "",
@@ -476,29 +486,35 @@ function BalancoAtivoAccordion({
 }) {
   const [expandidas, setExpandidas] = useState<Set<string>>(new Set())
 
-  const porInstituicao = useMemo(() => agruparAtivosPorInstituicao(ativosLista), [ativosLista])
-
-  const instituicoesOrdenadas = useMemo(
+  const porGrupo = useMemo(
     () =>
-      Object.keys(porInstituicao).sort((a, b) => {
-        const totalA = porInstituicao[a].reduce((s, at) => s + (Number(at.valor) || 0), 0)
-        const totalB = porInstituicao[b].reduce((s, at) => s + (Number(at.valor) || 0), 0)
-        return totalB - totalA
-      }),
-    [porInstituicao],
+      variant === "participacao"
+        ? agruparAtivosPorEmpresa(ativosLista)
+        : agruparAtivosPorInstituicao(ativosLista),
+    [ativosLista, variant],
   )
 
-  const toggleInstituicao = (inst: string) => {
+  const gruposOrdenados = useMemo(
+    () =>
+      Object.keys(porGrupo).sort((a, b) => {
+        const totalA = porGrupo[a].reduce((s, at) => s + (Number(at.valor) || 0), 0)
+        const totalB = porGrupo[b].reduce((s, at) => s + (Number(at.valor) || 0), 0)
+        return totalB - totalA
+      }),
+    [porGrupo],
+  )
+
+  const toggleGrupo = (grupo: string) => {
     setExpandidas((prev) => {
       const next = new Set(prev)
-      if (next.has(inst)) next.delete(inst)
-      else next.add(inst)
+      if (next.has(grupo)) next.delete(grupo)
+      else next.add(grupo)
       return next
     })
   }
 
-  const totalInst = (inst: string) =>
-    porInstituicao[inst].reduce((s, a) => s + (Number(a.valor) || 0), 0)
+  const totalGrupo = (grupo: string) =>
+    porGrupo[grupo].reduce((s, a) => s + (Number(a.valor) || 0), 0)
 
   const pct = (valor: number) =>
     totalSecao > 0 ? ((valor / totalSecao) * 100).toFixed(1) : "0.0"
@@ -520,16 +536,16 @@ function BalancoAtivoAccordion({
 
   return (
     <>
-      {instituicoesOrdenadas.map((inst) => (
-        <div key={inst}>
+      {gruposOrdenados.map((grupo) => (
+        <div key={grupo}>
           <div
             role="button"
             tabIndex={0}
-            onClick={() => toggleInstituicao(inst)}
+            onClick={() => toggleGrupo(grupo)}
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault()
-                toggleInstituicao(inst)
+                toggleGrupo(grupo)
               }
             }}
             style={{
@@ -539,7 +555,7 @@ function BalancoAtivoAccordion({
               padding: "7px 14px 7px 22px",
               borderBottom: "0.5px solid #F0F2F5",
               cursor: "pointer",
-              background: expandidas.has(inst) ? "#F0F5FA" : "white",
+              background: expandidas.has(grupo) ? "#F0F5FA" : "white",
               transition: "background .12s",
             }}
           >
@@ -548,7 +564,7 @@ function BalancoAtivoAccordion({
                 style={{
                   fontSize: 10,
                   color: "#5F85B8",
-                  transform: expandidas.has(inst) ? "rotate(90deg)" : "rotate(0deg)",
+                  transform: expandidas.has(grupo) ? "rotate(90deg)" : "rotate(0deg)",
                   transition: "transform .15s",
                   display: "inline-block",
                   flexShrink: 0,
@@ -557,27 +573,31 @@ function BalancoAtivoAccordion({
                 ›
               </span>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 12, color: "#1a1a1a", fontWeight: 500 }}>{inst}</div>
+                <div style={{ fontSize: 12, color: "#1a1a1a", fontWeight: 500 }}>{grupo}</div>
                 <div style={{ fontSize: 10, color: "#5F85B8" }}>
-                  {porInstituicao[inst].length}{" "}
-                  {porInstituicao[inst].length === 1 ? "ativo" : "ativos"}
+                  {porGrupo[grupo].length}{" "}
+                  {porGrupo[grupo].length === 1 ? "ativo" : "ativos"}
                 </div>
               </div>
             </div>
             <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 8 }}>
               <div style={{ fontSize: 12, fontWeight: 500, color: "#1a1a1a" }}>
-                {formatCurrency(totalInst(inst))}
+                {formatCurrency(totalGrupo(grupo))}
               </div>
               <div style={{ fontSize: 10, color: "#5F85B8" }}>
-                {pct(totalInst(inst))}% dos {variant === "liquido" ? "líquidos" : "participações"}
+                {pct(totalGrupo(grupo))}% dos {variant === "liquido" ? "líquidos" : "participações"}
               </div>
             </div>
           </div>
 
-          {expandidas.has(inst) &&
-            porInstituicao[inst].map((ativo) => {
+          {expandidas.has(grupo) &&
+            porGrupo[grupo].map((ativo) => {
               const loc = (ativo.localizacao ?? "").trim()
               const obs = (ativo.observacao ?? "").trim()
+              const pctPart = percentualParticipacaoLabel(ativo.percentualParticipacao)
+              const mostrarSub =
+                (variant === "liquido" && (loc || obs)) ||
+                (variant === "participacao" && (obs || pctPart))
               return (
                 <div
                   key={ativo.id}
@@ -593,7 +613,7 @@ function BalancoAtivoAccordion({
                 >
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 11, color: "#1a1a1a" }}>{labelAtivo(ativo)}</div>
-                    {(variant === "liquido" && (loc || obs)) || (variant === "participacao" && obs) ? (
+                    {mostrarSub ? (
                       <div
                         style={{
                           fontSize: 10,
@@ -607,8 +627,14 @@ function BalancoAtivoAccordion({
                         {variant === "liquido" && loc ? (
                           <span
                             style={{
-                              background: loc === "nacional" ? "#E6F0F8" : "#E8F5EE",
-                              color: loc === "nacional" ? "#4B759B" : "#1066DA",
+                              background:
+                                loc === "nacional"
+                                  ? CORES_LOCALIZACAO_ATIVO.nacional.muted
+                                  : CORES_LOCALIZACAO_ATIVO.internacional.muted,
+                              color:
+                                loc === "nacional"
+                                  ? CORES_LOCALIZACAO_ATIVO.nacional.fill
+                                  : CORES_LOCALIZACAO_ATIVO.internacional.fill,
                               padding: "1px 6px",
                               borderRadius: 10,
                               fontSize: 9,
@@ -617,6 +643,7 @@ function BalancoAtivoAccordion({
                             {labelLocalizacao(loc)}
                           </span>
                         ) : null}
+                        {variant === "participacao" && pctPart ? <span>{pctPart}</span> : null}
                         {obs ? <span>{obs}</span> : null}
                       </div>
                     ) : null}
@@ -636,6 +663,103 @@ function BalancoAtivoAccordion({
         </div>
       ))}
     </>
+  )
+}
+
+function formatPctLocalizacao(pct: number): string {
+  return `${pct.toFixed(1).replace(".", ",")}%`
+}
+
+function AtivosLiquidosPorLocalizacaoBar({
+  composicao,
+  formatCurrency,
+}: {
+  composicao: ComposicaoLiquidosPorLocalizacao
+  formatCurrency: (v: number) => string
+}) {
+  const segmentos = [
+    {
+      key: "nacional" as const,
+      label: "Nacional",
+      valor: composicao.nacional,
+      pct: composicao.percentualNacional,
+      cor: CORES_LOCALIZACAO_ATIVO.nacional.fill,
+    },
+    {
+      key: "internacional" as const,
+      label: "Internacional",
+      valor: composicao.internacional,
+      pct: composicao.percentualInternacional,
+      cor: CORES_LOCALIZACAO_ATIVO.internacional.fill,
+    },
+  ]
+
+  return (
+    <div style={{ marginTop: 14 }}>
+      <p style={{ fontSize: 11, color: "#5F85B8", marginBottom: 8, fontWeight: 500 }}>
+        Ativos líquidos por localização
+      </p>
+      <div
+        style={{
+          display: "flex",
+          height: 28,
+          borderRadius: 4,
+          overflow: "hidden",
+          background: "var(--surface-2)",
+        }}
+      >
+        {segmentos.map((s) => (
+          <div
+            key={s.key}
+            style={{
+              width: `${s.pct}%`,
+              background: s.cor,
+              transition: "width 0.4s ease",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              minWidth: 0,
+              overflow: "hidden",
+            }}
+          >
+            {s.valor > 0 ? (
+              <span
+                style={{
+                  fontSize: 10,
+                  color: "#fff",
+                  fontWeight: 500,
+                  whiteSpace: "nowrap",
+                  padding: "0 6px",
+                }}
+              >
+                {s.label} {formatPctLocalizacao(s.pct)}
+              </span>
+            ) : null}
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "flex", marginTop: 4 }}>
+        {segmentos.map((s, i) => (
+          <div
+            key={s.key}
+            style={{
+              width: `${s.pct}%`,
+              transition: "width 0.4s ease",
+              fontSize: 12,
+              fontWeight: 500,
+              color: "#1a1a1a",
+              textAlign: i === segmentos.length - 1 && s.pct < 100 ? "right" : "left",
+              minWidth: 0,
+              overflow: "hidden",
+              whiteSpace: "nowrap",
+              padding: s.valor > 0 ? "0 2px" : 0,
+            }}
+          >
+            {s.valor > 0 ? formatCurrency(s.valor) : null}
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -919,11 +1043,15 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
       const isImobilizado = form.tipo === "imobilizado"
       if (form.valor <= 0) return
       if (!isLiquido && !form.descricao.trim()) return
+      if (form.tipo === "participacao_societaria" && !form.empresa.trim()) return
       const bem = form.bemDeHeranca === "sim"
       const instituicao =
         isLiquido || exibeInstituicaoAtivo(form.tipo, form.descricao) ? form.instituicao.trim() : ""
       const observacao =
         (isLiquido || isImobilizado) && form.observacao.trim() ? form.observacao.trim() : undefined
+      const isParticipacao = form.tipo === "participacao_societaria"
+      const parsedPct = parsePercentualParticipacaoDigitado(form.percentualParticipacao)
+      if (isParticipacao && !parsedPct.valid) return
       setAtivos(
         ativos.concat({
           id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -932,6 +1060,9 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
             ? labelSubcategoriaLiquido(form.subcategoria)
             : form.descricao.trim(),
           instituicao,
+          empresa: isParticipacao ? form.empresa.trim() : undefined,
+          percentualParticipacao:
+            isParticipacao && parsedPct.valid && parsedPct.value != null ? parsedPct.value : undefined,
           subcategoria: isLiquido ? form.subcategoria : undefined,
           localizacao: isLiquido ? form.localizacao : undefined,
           observacao,
@@ -1040,6 +1171,11 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
       descricao: ativo.descricao ?? "",
       valor: Number(ativo.valor) || 0,
       instituicao: ativo.instituicao ?? "",
+      empresa: ativo.empresa ?? "",
+      percentualParticipacao:
+        ativo.percentualParticipacao != null && Number.isFinite(ativo.percentualParticipacao)
+          ? String(ativo.percentualParticipacao).replace(".", ",")
+          : "",
       subcategoria: isLiquido
         ? (resolveSubcategoriaLiquido(ativo) ?? SUBCATEGORIAS_LIQUIDO[0].value)
         : SUBCATEGORIAS_LIQUIDO[0].value,
@@ -1068,12 +1204,17 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
           const desc = normalizeAtivoDescricao(a.descricao)
           const inst = (a.instituicao ?? "").trim()
           const isLiquido = normalizeAtivoTipo(a.tipo, a.descricao) === "ativo_liquido"
+          const isParticipacao =
+            normalizeAtivoTipo(a.tipo, a.descricao) === "participacao_societaria"
           const subLiquido = isLiquido ? resolveSubcategoriaLiquido(a) : undefined
-          const label =
-            isLiquido && subLiquido
-              ? labelSubcategoriaLiquido(subLiquido)
+          const label = isLiquido && subLiquido
+            ? labelSubcategoriaLiquido(subLiquido)
+            : isParticipacao
+              ? labelEmpresaParticipacao(a.empresa)
               : desc || "Sem descrição"
           const sublabelParts = [
+            isParticipacao ? desc || null : null,
+            isParticipacao ? percentualParticipacaoLabel(a.percentualParticipacao) : null,
             isLiquido && (a.localizacao ?? "").trim()
               ? labelLocalizacaoAtivo(a.localizacao!)
               : null,
@@ -1120,6 +1261,11 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
   )
 
   const barrasGrupos = dataDonutGrupos
+
+  const composicaoLiquidosLocalizacao = useMemo(
+    () => calcularComposicaoLiquidosPorLocalizacao(ativos),
+    [ativos],
+  )
 
   const passivosDetalhe = useMemo(
     () =>
@@ -1360,6 +1506,8 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
       tipo,
       descricao,
       instituicao: tipo === "ativo_liquido" || exibeInstituicaoAtivo(tipo, descricao) ? prev.instituicao : "",
+      empresa: "",
+      percentualParticipacao: "",
       subcategoria: tipo === "ativo_liquido" ? SUBCATEGORIAS_LIQUIDO[0].value : prev.subcategoria,
       localizacao: tipo === "ativo_liquido" ? "nacional" : prev.localizacao,
       observacao:
@@ -1375,6 +1523,10 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
   const isFormAtivoLiquido = ativoTipoSelect === "ativo_liquido"
   const isFormImobilizado = ativoTipoSelect === "imobilizado"
   const isFormPrevidencia = ativoTipoSelect === "previdencia"
+  const isFormParticipacao = ativoTipoSelect === "participacao_societaria"
+  const parsedPercentualParticipacao = parsePercentualParticipacaoDigitado(
+    addAtivoForm.percentualParticipacao,
+  )
   const mostrarInstituicaoAtivo =
     !isFormAtivoLiquido && exibeInstituicaoAtivo(ativoTipoSelect, ativoDescricaoSelect)
   const passivoCategoriaSelect = addPassivoForm.categoria || DEFAULT_CATEGORIA_PASSIVO
@@ -1395,6 +1547,8 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
     if (addModal.kind === "ativo") {
       if (addAtivoForm.valor <= 0) return
       if (!isFormAtivoLiquido && !ativoDescricaoSelect) return
+      if (isFormParticipacao && !addAtivoForm.empresa.trim()) return
+      if (isFormParticipacao && !parsedPercentualParticipacao.valid) return
 
       const bem = addAtivoForm.bemDeHeranca === "sim"
       const instituicao =
@@ -1413,6 +1567,11 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
         tipo: ativoTipoSelect,
         descricao: descricaoFinal,
         instituicao,
+        empresa: isFormParticipacao ? addAtivoForm.empresa.trim() : undefined,
+        percentualParticipacao:
+          isFormParticipacao && parsedPercentualParticipacao.value != null
+            ? parsedPercentualParticipacao.value
+            : undefined,
         subcategoria: isFormAtivoLiquido ? addAtivoForm.subcategoria : undefined,
         localizacao: isFormAtivoLiquido ? addAtivoForm.localizacao : undefined,
         observacao,
@@ -1774,6 +1933,12 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
             Composição total de ativos
           </p>
           <DonutComLegenda data={dataDonutGrupos} formatCurrency={formatCurrency} />
+          {composicaoLiquidosLocalizacao ? (
+            <AtivosLiquidosPorLocalizacaoBar
+              composicao={composicaoLiquidosLocalizacao}
+              formatCurrency={formatCurrency}
+            />
+          ) : null}
         </div>
         <div className="pdf-section-card" style={{ background: "var(--surface)", borderRadius: 8, padding: 16 }}>
           <p style={{ fontSize: 13, color: "#393939", marginBottom: 12, fontWeight: 500 }}>
@@ -2283,7 +2448,7 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
                         onValueCommit={(v) => updateAtivoValor(linha.id, v)}
                         onRemove={() => removerAtivo(linha.id)}
                         onOpenEditModal={
-                          secao.id === "liquidos"
+                          secao.id === "liquidos" || secao.id === "participacoes"
                             ? () => {
                                 const ativo = ativos.find((a) => a.id === linha.id)
                                 if (ativo) abrirModalEditarAtivo(ativo)
@@ -2444,8 +2609,43 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
                 </>
               ) : (
                 <>
+                  {isFormParticipacao ? (
+                    <>
+                      <div className="space-y-2">
+                        <label className="field-label">Nome da empresa</label>
+                        <Input
+                          value={addAtivoForm.empresa}
+                          onChange={(e) =>
+                            setAddAtivoForm({ ...addAtivoForm, empresa: e.target.value })
+                          }
+                          placeholder="Ex.: Holding Familiar Ltda"
+                          className="form-card text-foreground"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="field-label">Participação (%)</label>
+                        <Input
+                          value={addAtivoForm.percentualParticipacao}
+                          onChange={(e) =>
+                            setAddAtivoForm({
+                              ...addAtivoForm,
+                              percentualParticipacao: e.target.value,
+                            })
+                          }
+                          placeholder="Ex.: 12,5"
+                          inputMode="decimal"
+                          className="form-card text-foreground"
+                        />
+                        {!parsedPercentualParticipacao.valid ? (
+                          <p className="text-xs text-destructive">Informe um valor entre 0 e 100.</p>
+                        ) : null}
+                      </div>
+                    </>
+                  ) : null}
                   <div className="space-y-2">
-                    <label className="field-label">Descrição</label>
+                    <label className="field-label">
+                      {isFormParticipacao ? "Tipo de participação" : "Descrição"}
+                    </label>
                     <Select
                       value={ativoDescricaoSelect}
                       onValueChange={(descricao) =>
@@ -2740,7 +2940,9 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
               disabled={
                 addModal?.kind === "ativo"
                   ? addAtivoForm.valor <= 0 ||
-                    (!isFormAtivoLiquido && !addAtivoForm.descricao)
+                    (!isFormAtivoLiquido && !addAtivoForm.descricao) ||
+                    (isFormParticipacao && !addAtivoForm.empresa.trim()) ||
+                    (isFormParticipacao && !parsedPercentualParticipacao.valid)
                   : addModal?.kind === "passivo"
                     ? !passivoCategoriaSelect ||
                       !addPassivoForm.descricao.trim() ||

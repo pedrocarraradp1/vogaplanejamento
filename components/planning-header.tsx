@@ -5,7 +5,9 @@ import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import type { ReactNode } from "react"
 import { usePlano } from "@/lib/plano-context"
+import { useAutosave } from "@/lib/autosave-context"
 import { SalvarSimulacaoModal } from "@/components/simulacoes/salvar-simulacao-modal"
+import { AutosaveIndicator } from "@/components/simulacoes/autosave-indicator"
 
 function ToggleMoeda() {
   const { state, setMoeda } = usePlano()
@@ -33,6 +35,7 @@ type PlanningHeaderProps = {
   breadcrumb?: ReactNode
   showMoedaToggle?: boolean
   showSalvar?: boolean
+  autosave?: boolean
 }
 
 export function PlanningHeader({
@@ -40,7 +43,11 @@ export function PlanningHeader({
   breadcrumb,
   showMoedaToggle = true,
   showSalvar = true,
+  autosave = true,
 }: PlanningHeaderProps) {
+  const { status, lastSavedAt, salvarAgora } = useAutosave()
+  const showIndicator = autosave && showSalvar
+
   return (
     <header
       className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between bg-navy px-8"
@@ -64,6 +71,14 @@ export function PlanningHeader({
         </Link>
         {breadcrumb}
         {showMoedaToggle && <ToggleMoeda />}
+        {showIndicator ? (
+          <AutosaveIndicator
+            status={status}
+            lastSavedAt={lastSavedAt}
+            onRetry={() => void salvarAgora()}
+            onReload={() => window.location.reload()}
+          />
+        ) : null}
         {showSalvar && <SalvarSimulacaoModal />}
       </div>
     </header>

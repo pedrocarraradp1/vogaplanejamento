@@ -39,6 +39,11 @@ import {
   getDespesas,
 } from "@/lib/despesa-utils"
 import { normalizarEntradasCapitais, type EntradaCapital } from "@/lib/entradas-capitais"
+import {
+  defaultProjecaoLivre,
+  hidratarProjecaoLivre,
+  type ProjecaoLivreState,
+} from "@/lib/projecao-livre"
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
@@ -113,6 +118,10 @@ export interface Ativo {
   tipo: string
   descricao: string
   instituicao?: string
+  /** Nome da empresa — apenas participação societária. Ativos antigos podem não ter o campo. */
+  empresa?: string
+  /** Percentual de participação (0–100). Opcional; ativos antigos podem não ter o campo. */
+  percentualParticipacao?: number
   valor: number
   subcategoria?: string
   localizacao?: string
@@ -265,6 +274,8 @@ export interface PlanoState {
   seguros: SeguroItem[]
   fluxoDeCaixa: FluxoDeCaixaState
   projecao: ProjecaoAno[]
+  /** Simulador isolado da seção Projeção Livre — nenhum outro cálculo lê esta chave. */
+  projecaoLivre: ProjecaoLivreState
   kpis: KPIs | null
   inventario: InventarioResult | null
   protecaoResult: ProtecaoResult | null
@@ -275,6 +286,7 @@ export interface SimulacaoMeta {
   clienteId: string | null
   nomeSimulacao: string | null
   nomeCenario: string | null
+  updatedAt: string | null
 }
 
 interface PlanoContextType {
@@ -294,6 +306,7 @@ interface PlanoContextType {
   setProtecao: (protecao: Partial<Protecao>) => void
   setSeguros: (seguros: SeguroItem[]) => void
   setFluxoDeCaixa: (fluxo: Partial<FluxoDeCaixaState>) => void
+  setProjecaoLivre: (projecaoLivre: Partial<ProjecaoLivreState>) => void
   /** Substitui o estado atual por um estado salvo (hidratando defaults) */
   loadState: (state: unknown, meta?: Partial<SimulacaoMeta>) => void
   /** Limpa meta de simulação (volta para "nova simulação") */
@@ -410,6 +423,7 @@ const initialState: PlanoState = {
     [],
     []
   ),
+  projecaoLivre: defaultProjecaoLivre,
   kpis:           null,
   inventario:     null,
   protecaoResult: null,
@@ -432,6 +446,7 @@ export function PlanoProvider({
     clienteId: null,
     nomeSimulacao: null,
     nomeCenario: null,
+    updatedAt: null,
   })
 
   const hydrateState = useCallback((raw: any): PlanoState => {
@@ -456,6 +471,7 @@ export function PlanoProvider({
       objetivos: Array.isArray(raw?.objetivos) ? raw.objetivos : [],
       fluxoDeCaixa: normalizarFluxoDeCaixa(raw?.fluxoDeCaixa),
       projecao: Array.isArray(raw?.projecao) ? raw.projecao : initialState.projecao,
+      projecaoLivre: hidratarProjecaoLivre(raw?.projecaoLivre),
       kpis: raw?.kpis ?? null,
       inventario: raw?.inventario ?? null,
       protecaoResult: raw?.protecaoResult ?? null,
@@ -752,6 +768,13 @@ export function PlanoProvider({
     }))
   }, [])
 
+  const setProjecaoLivre = useCallback((projecaoLivre: Partial<ProjecaoLivreState>) => {
+    setState((prev) => ({
+      ...prev,
+      projecaoLivre: hidratarProjecaoLivre({ ...prev.projecaoLivre, ...projecaoLivre }),
+    }))
+  }, [])
+
   const loadState = useCallback((raw: unknown, meta?: Partial<SimulacaoMeta>) => {
     setState(hydrateState(raw))
     if (meta) {
@@ -761,12 +784,19 @@ export function PlanoProvider({
         clienteId: meta.clienteId !== undefined ? meta.clienteId : prev.clienteId,
         nomeSimulacao: meta.nomeSimulacao !== undefined ? meta.nomeSimulacao : prev.nomeSimulacao,
         nomeCenario: meta.nomeCenario !== undefined ? meta.nomeCenario : prev.nomeCenario,
+        updatedAt: meta.updatedAt !== undefined ? meta.updatedAt : prev.updatedAt,
       }))
     }
   }, [hydrateState])
 
   const clearSimulacaoMeta = useCallback(() => {
-    setSimulacaoMeta({ simulacaoId: null, clienteId: null, nomeSimulacao: null, nomeCenario: null })
+    setSimulacaoMeta({
+      simulacaoId: null,
+      clienteId: null,
+      nomeSimulacao: null,
+      nomeCenario: null,
+      updatedAt: null,
+    })
   }, [])
 
   const setSimulacaoMetaPartial = useCallback((meta: Partial<SimulacaoMeta>) => {
@@ -894,7 +924,7 @@ export function PlanoProvider({
       setMoeda,
       setSimulacaoMeta: setSimulacaoMetaPartial,
       setDadosPessoais, setFontesRenda, setDespesas, setAtivos, setPassivos, setPatrimonio, setObjetivos,
-      setPremissas, setSucessao, setProtecao, setSeguros, setFluxoDeCaixa,
+      setPremissas, setSucessao, setProtecao, setSeguros, setFluxoDeCaixa, setProjecaoLivre,
       loadState, clearSimulacaoMeta,
       getPatrimonioLiquido, getSaldoInicialLiquido, getAtivosFinanceiros, getAtivosLiquidosImediatos,
       getPatrimonioTotalConsolidado, getAporteMensal, getDespesaMensalEm, getAporteMensalEm, getIdadeAtual,

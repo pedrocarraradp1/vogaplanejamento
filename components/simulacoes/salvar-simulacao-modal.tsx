@@ -116,7 +116,7 @@ export function SalvarSimulacaoModal() {
 
       // Salva simulação (sem depender da tabela `clientes`)
       if (isUpdate && simulacaoMeta.simulacaoId) {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from("simulacoes")
           .update({
             nome_simulacao: ncx,
@@ -127,10 +127,17 @@ export function SalvarSimulacaoModal() {
             updated_at: new Date().toISOString(),
           })
           .eq("id", simulacaoMeta.simulacaoId)
+          .select("id, updated_at")
+          .maybeSingle()
         if (error) throw new Error(error.message)
 
         toast({ title: "Cenário atualizado", description: `“${ncx}” salvo com sucesso.` })
-        loadState(payloadState, { nomeSimulacao: ncx, nomeCenario: ncx, clienteId })
+        loadState(payloadState, {
+          nomeSimulacao: ncx,
+          nomeCenario: ncx,
+          clienteId,
+          updatedAt: data?.updated_at ?? new Date().toISOString(),
+        })
       } else {
         const { data, error } = await supabase
           .from("simulacoes")
@@ -141,7 +148,7 @@ export function SalvarSimulacaoModal() {
             advisor_id: user.id,
             dados: payloadState,
           })
-          .select("id")
+          .select("id, updated_at")
           .single()
         if (error) throw new Error(error.message)
 
@@ -154,7 +161,13 @@ export function SalvarSimulacaoModal() {
             maximumFractionDigits: 0,
           }).format(patrimonioTotal)}`,
         })
-        loadState(payloadState, { simulacaoId: data?.id ?? null, nomeSimulacao: ncx, nomeCenario: ncx, clienteId })
+        loadState(payloadState, {
+          simulacaoId: data?.id ?? null,
+          nomeSimulacao: ncx,
+          nomeCenario: ncx,
+          clienteId,
+          updatedAt: data?.updated_at ?? null,
+        })
       }
 
       setOpen(false)
@@ -173,7 +186,7 @@ export function SalvarSimulacaoModal() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button className="btn-header-primary h-auto">
-          {isUpdate ? "Atualizar Cenário" : "Salvar Cenário"}
+          {isUpdate ? "Renomear / Salvar agora" : "Salvar Cenário"}
         </Button>
       </DialogTrigger>
       <DialogContent className="bg-card border border-border text-foreground">

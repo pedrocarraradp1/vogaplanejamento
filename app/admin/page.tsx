@@ -36,7 +36,7 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <PlanningHeader showMoedaToggle={false} showSalvar={false} />
+      <PlanningHeader showMoedaToggle={false} showSalvar={false} autosave={false} />
       <Sidebar
         activeSection={ADMIN_SECTION_ID}
         isAdmin

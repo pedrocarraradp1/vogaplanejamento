@@ -7,6 +7,7 @@ import { FluxoDeCaixa } from "./sections/fluxo-de-caixa"
 import { DiagnosticoFinanceiro } from "./sections/diagnostico-financeiro"
 import { InfoClientSection } from "./sections/infoclient-section"
 import { Projecao } from "./sections/projecao"
+import { ProjecaoLivre } from "./sections/projecao-livre"
 import { Cenarios } from "./sections/cenarios"
 import { PlanoFinanceiroCompleto } from "./sections/plano-financeiro-completo"
 import { Sucessorio } from "./sections/sucessorio"
@@ -40,6 +41,8 @@ export function ContentArea({ activeSection, onNavigate, readOnly = false }: Con
         return <InfoClientSection onNavigate={onNavigate} readOnly={readOnly} />
       case "projecao":
         return <Projecao onNavigate={onNavigate} readOnly={readOnly} />
+      case "projecao-livre":
+        return <ProjecaoLivre onNavigate={onNavigate} readOnly={readOnly} />
       case "cenarios":
         return <Cenarios onNavigate={onNavigate} readOnly={readOnly} />
       case "plano-financeiro-completo":

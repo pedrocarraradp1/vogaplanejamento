@@ -19,6 +19,7 @@ export const NAV_GROUPS_FULL: NavGroup[] = [
       { id: "patrimonio", label: "Balanço Patrimonial" },
       { id: "objetivos", label: "Objetivos" },
       { id: "projecao", label: "Projeções / Aposentadoria" },
+      { id: "projecao-livre", label: "Projeção Livre" },
       { id: "cenarios", label: "Cenários" },
       { id: "fluxo-de-caixa", label: "Fluxo de Caixa" },
       { id: "plano-financeiro-completo", label: "Plano Financeiro Completo" },

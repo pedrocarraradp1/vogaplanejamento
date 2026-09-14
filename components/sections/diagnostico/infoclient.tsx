@@ -19,6 +19,8 @@ import {
   metaReservaEmergenciaMeses,
   normalizeAtivoTipo,
   resolveSubcategoriaLiquido,
+  labelEmpresaParticipacao,
+  percentualParticipacaoLabel,
 } from "@/lib/patrimonio-utils"
 import { getDespesas, despesaMensalAtual } from "@/lib/despesa-utils"
 import { VOGA, VOGA_CHART_SCALE } from "@/lib/voga-tokens"
@@ -417,6 +419,19 @@ export function InfoClient() {
                 ) : (
                   ativos.map((a, i) => {
                     const cor = corTipoAtivo(a.tipo, a.descricao)
+                    const isParticipacao =
+                      normalizeAtivoTipo(a.tipo, a.descricao) === "participacao_societaria"
+                    const tituloParticipacao = isParticipacao
+                      ? labelEmpresaParticipacao(a.empresa)
+                      : a.descricao || "—"
+                    const detalheParticipacao = isParticipacao
+                      ? [
+                          a.descricao || null,
+                          percentualParticipacaoLabel(a.percentualParticipacao),
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")
+                      : ""
                     return (
                       <tr
                         key={a.id}
@@ -438,7 +453,18 @@ export function InfoClient() {
                             </span>
                           ) : null}
                         </td>
-                        <td className="px-3 py-2.5 text-foreground">{a.descricao || "—"}</td>
+                        <td className="px-3 py-2.5 text-foreground">
+                          {isParticipacao ? (
+                            <>
+                              <div>{tituloParticipacao}</div>
+                              {detalheParticipacao ? (
+                                <div className="text-xs text-muted-foreground">{detalheParticipacao}</div>
+                              ) : null}
+                            </>
+                          ) : (
+                            tituloParticipacao
+                          )}
+                        </td>
                         <td className="px-3 py-2.5 text-right tabular-nums font-medium text-foreground">
                           {fmt(Number(a.valor) || 0)}
                         </td>

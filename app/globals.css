@@ -454,6 +454,24 @@
     border-color: var(--accent);
   }
 
+  .clientes-filtro-assessor {
+    width: 280px;
+    height: auto;
+    min-height: 36px;
+    padding: 8px 14px 8px 36px;
+    font-size: 13px;
+    color: var(--text-primary);
+    background: var(--bg-page);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    outline: none;
+  }
+
+  .clientes-filtro-assessor:focus,
+  .clientes-filtro-assessor[data-state="open"] {
+    border-color: var(--accent);
+  }
+
   .clientes-empty {
     display: flex;
     flex-direction: column;

@@ -47,6 +47,18 @@ export const CORES_GRUPOS_ATIVO: Record<string, string> = {
   participacao_societaria: VOGA.onda,
 }
 
+/** Nacional / internacional — badges do accordion de líquidos e barra de localização. */
+export const CORES_LOCALIZACAO_ATIVO = {
+  nacional: {
+    fill: VOGA.nuvem,
+    muted: "#E6F0F8",
+  },
+  internacional: {
+    fill: VOGA.brasilia,
+    muted: "#E8F5EE",
+  },
+} as const
+
 export const CORES_SUBCATEGORIA: Record<string, string> = {
   carteira_geral: VOGA.concreto,
   pre_fixado: VOGA.noite,

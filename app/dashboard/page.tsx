@@ -6,7 +6,9 @@ import { createClient } from "@/lib/supabase"
 import { Sidebar } from "@/components/sidebar"
 import { ContentArea } from "@/components/content-area"
 import { PlanoProvider, usePlano } from "@/lib/plano-context"
+import { AutosaveProvider, useAutosave } from "@/lib/autosave-context"
 import { PlanningBreadcrumb, PlanningHeader } from "@/components/planning-header"
+import { DraftRestoreBanner } from "@/components/simulacoes/draft-restore-banner"
 import { useAdminSidebarNav } from "@/hooks/use-admin-sidebar-nav"
 
 function ClienteBootstrap() {
@@ -62,10 +64,28 @@ function ClienteBootstrap() {
 function DashboardShell() {
   const [activeSection, setActiveSection] = useState("dados-pessoais")
   const { isAdmin, onSectionChange } = useAdminSidebarNav(setActiveSection)
+  const { draft } = useAutosave()
 
   return (
     <>
       <PlanningHeader breadcrumb={<PlanningBreadcrumb />} />
+      {draft.exists ? (
+        <div
+          className="relative z-30"
+          style={{
+            marginLeft: "var(--sidebar-width)",
+            paddingTop: "calc(var(--header-height) + 12px)",
+            paddingLeft: 48,
+            paddingRight: 48,
+          }}
+        >
+          <DraftRestoreBanner
+            savedAt={draft.savedAt}
+            onRestore={draft.restaurar}
+            onDiscard={draft.descartar}
+          />
+        </div>
+      ) : null}
       <Sidebar
         activeSection={activeSection}
         onSectionChange={onSectionChange}
@@ -79,12 +99,14 @@ function DashboardShell() {
 export default function DashboardPage() {
   return (
     <PlanoProvider>
-      <div className="min-h-screen bg-background">
-        <Suspense fallback={null}>
-          <ClienteBootstrap />
-        </Suspense>
-        <DashboardShell />
-      </div>
+      <AutosaveProvider enabled>
+        <div className="min-h-screen bg-background">
+          <Suspense fallback={null}>
+            <ClienteBootstrap />
+          </Suspense>
+          <DashboardShell />
+        </div>
+      </AutosaveProvider>
     </PlanoProvider>
   )
 }

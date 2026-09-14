@@ -185,6 +185,14 @@ export function normalizeAtivoRecord(ativo: Ativo): Ativo {
   } else if (!descricao) {
     descricao = resolveDescricaoAtivo(tipo, descricao)
   }
+  const empresa =
+    tipo === "participacao_societaria"
+      ? (ativo.empresa ?? "").trim() || undefined
+      : undefined
+  const percentualParticipacao =
+    tipo === "participacao_societaria"
+      ? sanitizePercentualParticipacao(ativo.percentualParticipacao)
+      : undefined
   return {
     ...ativo,
     tipo,
@@ -193,10 +201,63 @@ export function normalizeAtivoRecord(ativo: Ativo): Ativo {
     localizacao,
     observacao,
     instituicao,
+    empresa,
+    percentualParticipacao,
     valor: Math.round((Number(ativo.valor) || 0) * 100) / 100,
     reservaLiquidez:
       tipo === "ativo_liquido" ? ativo.reservaLiquidez !== false : undefined,
   }
+}
+
+export const EMPRESA_PARTICIPACAO_NAO_INFORMADA = "Empresa não informada"
+
+export function labelEmpresaParticipacao(empresa?: string | null): string {
+  const nome = (empresa ?? "").trim()
+  return nome || EMPRESA_PARTICIPACAO_NAO_INFORMADA
+}
+
+export function sanitizePercentualParticipacao(valor: unknown): number | undefined {
+  if (valor == null || valor === "") return undefined
+  const n = typeof valor === "number" ? valor : Number(valor)
+  if (!Number.isFinite(n) || n < 0 || n > 100) return undefined
+  return Math.round(n * 100) / 100
+}
+
+/** Interpreta percentual digitado (aceita vírgula). Vazio é válido (campo opcional). */
+export function parsePercentualParticipacaoDigitado(digitado: string): {
+  empty: boolean
+  valid: boolean
+  value?: number
+} {
+  const raw = digitado.trim().replace(/%/g, "").trim()
+  if (!raw) return { empty: true, valid: true }
+  const normalized = raw.replace(/\s/g, "").replace(",", ".")
+  if (!/^\d+(\.\d+)?$/.test(normalized)) return { empty: false, valid: false }
+  const n = Number(normalized)
+  if (!Number.isFinite(n) || n < 0 || n > 100) return { empty: false, valid: false }
+  return { empty: false, valid: true, value: Math.round(n * 100) / 100 }
+}
+
+export function formatPercentualParticipacao(valor: number): string {
+  const rounded = Math.round(valor * 100) / 100
+  return `${String(rounded).replace(".", ",")}%`
+}
+
+export function percentualParticipacaoLabel(valor?: number | null): string | undefined {
+  if (valor == null || !Number.isFinite(valor)) return undefined
+  return formatPercentualParticipacao(valor)
+}
+
+export function agruparAtivosPorEmpresa(ativosLista: Ativo[]): Record<string, Ativo[]> {
+  return ativosLista.reduce(
+    (acc, ativo) => {
+      const key = labelEmpresaParticipacao(ativo.empresa)
+      if (!acc[key]) acc[key] = []
+      acc[key].push(ativo)
+      return acc
+    },
+    {} as Record<string, Ativo[]>,
+  )
 }
 
 export function resolveDescricaoAtivo(
@@ -598,6 +659,42 @@ export interface TotaisAtivos {
   totalParticipacoes: number
   totalAtivosFinanceiros: number
   patrimonioBruto: number
+}
+
+export interface ComposicaoLiquidosPorLocalizacao {
+  nacional: number
+  internacional: number
+  total: number
+  percentualNacional: number
+  percentualInternacional: number
+}
+
+/**
+ * Soma ativos líquidos (valor > 0) em nacional vs internacional.
+ * Não aplica filtro de UI. Localização vazia ou "outros" entra em nacional.
+ * Devolve null quando não há ativos líquidos com valor positivo.
+ */
+export function calcularComposicaoLiquidosPorLocalizacao(
+  ativos: Ativo[],
+): ComposicaoLiquidosPorLocalizacao | null {
+  let nacional = 0
+  let internacional = 0
+  for (const a of ativos ?? []) {
+    if (normalizeAtivoTipo(a.tipo, a.descricao) !== "ativo_liquido") continue
+    const valor = Number(a.valor) || 0
+    if (valor <= 0) continue
+    if ((a.localizacao ?? "").trim() === "internacional") internacional += valor
+    else nacional += valor
+  }
+  const total = nacional + internacional
+  if (total <= 0) return null
+  return {
+    nacional,
+    internacional,
+    total,
+    percentualNacional: (nacional / total) * 100,
+    percentualInternacional: (internacional / total) * 100,
+  }
 }
 
 export function computeTotaisAtivos(ativos: Ativo[]): TotaisAtivos {

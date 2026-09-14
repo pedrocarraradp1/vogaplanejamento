@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import { createClient } from "@/lib/supabase"
 import { PlanoProvider, usePlano } from "@/lib/plano-context"
+import { AutosaveProvider } from "@/lib/autosave-context"
 import { Sidebar } from "@/components/sidebar"
 import { ContentArea } from "@/components/content-area"
 import { PlanningBreadcrumb, PlanningHeader } from "@/components/planning-header"
@@ -23,13 +24,14 @@ function Loader({ simulacaoId }: { simulacaoId: string }) {
 
         const { data, error } = await supabase
           .from("simulacoes")
-          .select("id, cliente_id, nome_simulacao, nome_cenario, dados")
+          .select("id, cliente_id, nome_simulacao, nome_cenario, dados, updated_at")
           .eq("id", simulacaoId)
           .maybeSingle()
         if (error) throw new Error(error.message)
         if (!data?.dados) throw new Error("Simulação não encontrada.")
 
         let clienteId: string | null = data.cliente_id ?? null
+        let updatedAt: string | null = data.updated_at ?? null
         if (!clienteId) {
           const nomePlano = String((data.dados as any)?.dadosPessoais?.nome ?? "").trim()
           if (nomePlano) {
@@ -42,6 +44,7 @@ function Loader({ simulacaoId }: { simulacaoId: string }) {
             if (cli?.id) {
               clienteId = cli.id
               await supabase.from("simulacoes").update({ cliente_id: clienteId }).eq("id", simulacaoId)
+              updatedAt = null
             }
           }
         }
@@ -52,6 +55,7 @@ function Loader({ simulacaoId }: { simulacaoId: string }) {
             clienteId,
             nomeSimulacao: data.nome_simulacao,
             nomeCenario: data.nome_cenario ?? data.nome_simulacao ?? null,
+            updatedAt,
           })
         }
       } catch (e) {
@@ -95,10 +99,12 @@ export default function SimulacaoPage() {
 
   return (
     <PlanoProvider>
-      <Loader simulacaoId={simulacaoId} />
-      <div className="min-h-screen bg-background">
-        <SimulacaoShell />
-      </div>
+      <AutosaveProvider enabled>
+        <Loader simulacaoId={simulacaoId} />
+        <div className="min-h-screen bg-background">
+          <SimulacaoShell />
+        </div>
+      </AutosaveProvider>
     </PlanoProvider>
   )
 }
