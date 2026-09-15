@@ -96,6 +96,13 @@ export function montarEntradasProjecaoLivre(s: ProjecaoLivreState): EntradaCapit
   return entradas
 }
 
+/** `idadeApos <= idadeAtual`: acumulação pulada; a engine já marca `isAposentado` desde t=0. */
+export function clienteJaAposentadoLivre(
+  s: Pick<ProjecaoLivreState, "idadeAtual" | "idadeApos">,
+): boolean {
+  return s.idadeApos <= s.idadeAtual
+}
+
 export function montarPremissasProjecaoLivre(
   s: ProjecaoLivreState,
   opts?: {
@@ -107,15 +114,17 @@ export function montarPremissasProjecaoLivre(
 ): Premissas {
   const prazo = Math.max(0, opts?.prazo ?? s.prazo)
   const idadeApos = Math.max(0, opts?.idadeApos ?? s.idadeApos)
+  const idadeAtual = Math.max(0, s.idadeAtual)
   const taxa = Math.max(0, s.taxaRendimento)
+  const jaAposentado = clienteJaAposentadoLivre({ idadeAtual, idadeApos })
   return {
     saldoInicial: Math.max(0, s.saldoInicial),
-    aporteM: Math.max(0, opts?.aporteM ?? s.aporteMensal),
+    aporteM: jaAposentado ? 0 : Math.max(0, opts?.aporteM ?? s.aporteMensal),
     rendimento: taxa,
     rendimentoBruto: taxa,
     aliquotaImpostoRendimento: 0,
     inflacao: Math.max(0, s.inflacao),
-    idadeAtual: Math.max(0, s.idadeAtual),
+    idadeAtual,
     prazo,
     idadeApos,
     retiradaMensal: Math.max(0, opts?.retiradaMensal ?? s.rendaMensalDesejada),

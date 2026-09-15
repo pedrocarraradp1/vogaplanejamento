@@ -31,6 +31,7 @@ import { usePlano } from "@/lib/plano-context"
 import { usePlanoReadOnly } from "@/lib/plano-readonly-context"
 import {
   calcularAporteNecessarioLivre,
+  clienteJaAposentadoLivre,
   cortarAoAtingirRenda,
   defaultProjecaoLivre,
   enriquecerAnoProjecaoLivre,
@@ -58,7 +59,7 @@ const SALDO_SLIDER_MAX = 1000
 const APORTE_MAX = 100_000
 const RENDA_MAX = 200_000
 const IDADE_MIN = 18
-const IDADE_MAX = 90
+const IDADE_MAX = 100
 const PRAZO_MIN = 5
 const PRAZO_MAX = 60
 
@@ -129,6 +130,8 @@ export function ProjecaoLivre({ readOnly }: ProjecaoLivreProps) {
     }
   }, [formDebounced])
 
+  const jaAposentado = clienteJaAposentadoLivre(form)
+
   return (
     <div className="space-y-6">
       <div>
@@ -186,8 +189,7 @@ export function ProjecaoLivre({ readOnly }: ProjecaoLivreProps) {
               disabled={bloqueado}
               onChange={(tempoDesejado) => {
                 const tempo = clamp(Math.round(tempoDesejado), PRAZO_MIN, PRAZO_MAX)
-                const idadeApos = clamp(form.idadeAtual + tempo, IDADE_MIN + 1, IDADE_MAX)
-                patch({ tempoDesejado: tempo, idadeApos })
+                patch({ tempoDesejado: tempo })
               }}
             />
           ) : (
@@ -196,7 +198,8 @@ export function ProjecaoLivre({ readOnly }: ProjecaoLivreProps) {
               value={form.aporteMensal}
               moeda={moeda}
               format={formatarMoedaCompleta}
-              disabled={bloqueado}
+              disabled={bloqueado || jaAposentado}
+              hint={jaAposentado ? "Cliente já aposentado" : undefined}
               min={0}
               max={APORTE_MAX}
               step={500}
@@ -232,17 +235,29 @@ export function ProjecaoLivre({ readOnly }: ProjecaoLivreProps) {
             onChange={(inflacao) => patch({ inflacao: snap(clamp(inflacao, 0, 12), 0.25) })}
           />
 
-          <IdadesRangeSlider
-            idadeAtual={form.idadeAtual}
-            idadeApos={form.idadeApos}
+          <SliderNumero
+            label="Idade atual"
+            value={form.idadeAtual}
+            min={IDADE_MIN}
+            max={IDADE_MAX}
+            step={1}
+            format={(v) => `${Math.round(v)} anos`}
             disabled={bloqueado}
-            onChange={(idadeAtual, idadeApos) => {
-              const next: Partial<ProjecaoLivreState> = { idadeAtual, idadeApos }
-              if (form.modo === "aporte-necessario") {
-                next.tempoDesejado = clamp(idadeApos - idadeAtual, PRAZO_MIN, PRAZO_MAX)
-              }
-              patch(next)
-            }}
+            onChange={(idadeAtual) =>
+              patch({ idadeAtual: clamp(Math.round(idadeAtual), IDADE_MIN, IDADE_MAX) })
+            }
+          />
+          <SliderNumero
+            label="Idade de aposentadoria"
+            value={form.idadeApos}
+            min={IDADE_MIN}
+            max={IDADE_MAX}
+            step={1}
+            format={(v) => `${Math.round(v)} anos`}
+            disabled={bloqueado}
+            onChange={(idadeApos) =>
+              patch({ idadeApos: clamp(Math.round(idadeApos), IDADE_MIN, IDADE_MAX) })
+            }
           />
 
           <SliderMoeda
@@ -567,6 +582,7 @@ function SliderMoeda({
   moeda,
   format,
   disabled,
+  hint,
   min,
   max,
   step,
@@ -581,6 +597,7 @@ function SliderMoeda({
   moeda: "BRL" | "USD"
   format: (v: number) => string
   disabled?: boolean
+  hint?: string
   min?: number
   max?: number
   step?: number
@@ -615,6 +632,7 @@ function SliderMoeda({
           else onChange?.(pos)
         }}
       />
+      {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
     </div>
   )
 }
@@ -659,63 +677,6 @@ function SliderNumero({
         step={step}
         disabled={disabled}
         onValueChange={(values) => onChange(values[0] ?? value)}
-      />
-    </div>
-  )
-}
-
-function IdadesRangeSlider({
-  idadeAtual,
-  idadeApos,
-  disabled,
-  onChange,
-}: {
-  idadeAtual: number
-  idadeApos: number
-  disabled?: boolean
-  onChange: (idadeAtual: number, idadeApos: number) => void
-}) {
-  const lo = clamp(Math.round(idadeAtual) || IDADE_MIN, IDADE_MIN, IDADE_MAX - 1)
-  const hi = clamp(Math.round(idadeApos) || lo + 1, lo + 1, IDADE_MAX)
-
-  return (
-    <div className="space-y-2.5">
-      <div className="flex items-center justify-between gap-3">
-        <Label className="field-label">Idade atual → aposentadoria</Label>
-        <div className="flex items-center gap-1">
-          <ValorNumeroEditavel
-            value={idadeAtual}
-            format={(v) => `${Math.round(v)}`}
-            disabled={disabled}
-            onChange={(v) => {
-              const atual = clamp(Math.round(v), IDADE_MIN, IDADE_MAX - 1)
-              onChange(atual, Math.max(atual + 1, hi))
-            }}
-          />
-          <span className="text-muted-foreground text-sm">–</span>
-          <ValorNumeroEditavel
-            value={idadeApos}
-            format={(v) => `${Math.round(v)} anos`}
-            disabled={disabled}
-            onChange={(v) => {
-              const apos = clamp(Math.round(v), IDADE_MIN + 1, IDADE_MAX)
-              onChange(Math.min(lo, apos - 1), apos)
-            }}
-          />
-        </div>
-      </div>
-      <Slider
-        value={[lo, hi]}
-        min={IDADE_MIN}
-        max={IDADE_MAX}
-        step={1}
-        minStepsBetweenThumbs={1}
-        disabled={disabled}
-        onValueChange={(values) => {
-          const a = Math.round(values[0] ?? lo)
-          const b = Math.round(values[1] ?? hi)
-          onChange(Math.min(a, b), Math.max(a, b))
-        }}
       />
     </div>
   )
@@ -857,7 +818,10 @@ function ResultadoPadrao({
     () => enriquecerAnoProjecaoLivre(projecao, form, form.saldoInicial),
     [projecao, form],
   )
-  const anoApos = dados.find((p) => p.idade === form.idadeApos) ?? dados[dados.length - 1]
+  const jaAposentado = clienteJaAposentadoLivre(form)
+  const anoApos = jaAposentado
+    ? dados[0]
+    : (dados.find((p) => p.idade === form.idadeApos) ?? dados[dados.length - 1])
   const rendaGerada = Number(anoApos?.rendaMensalReal) || 0
   const idadeLF = idadeLiberdadeFinanceiraLivre(projecao, form)
 
@@ -872,7 +836,9 @@ function ResultadoPadrao({
     taxa: number,
     serie: typeof cenarios.conservador,
   ) => {
-    const ponto = serie.find((p) => p.idade === form.idadeApos) ?? serie[serie.length - 1]
+    const ponto = jaAposentado
+      ? serie[0]
+      : (serie.find((p) => p.idade === form.idadeApos) ?? serie[serie.length - 1])
     const lf = encontrarIdadeLiberdadeFinanceira(
       serie,
       taxa,

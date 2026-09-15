@@ -64,4 +64,32 @@ describe("Projeção Livre vs calcularProjecao", () => {
     const extras = (premissas.entradasCapitais ?? []).filter((e) => e.descricao === "Aporte extra anual")
     assert.equal(extras.length, 0)
   })
+
+  it("com idade atual 70 e aposentadoria 65 começa aposentado e sem aporte", () => {
+    const s: ProjecaoLivreState = {
+      ...params,
+      idadeAtual: 70,
+      idadeApos: 65,
+      aporteMensal: 3_000,
+      novaEntradaValor: 0,
+      novaEntradaIdade: 0,
+    }
+    const premissas = montarPremissasProjecaoLivre(s)
+    assert.equal(premissas.idadeAtual, 70)
+    assert.equal(premissas.idadeApos, 65)
+    assert.equal(premissas.aporteM, 0)
+
+    const livre = projetarLivre(s)
+    const direto = calcularProjecao(premissas, [], [])
+    assert.ok(livre.length > 0)
+    assert.equal(livre[0].idade, 70)
+    assert.equal(livre[0].isAposentado, true)
+    assert.equal(livre[0].saldoNominal, direto[0].saldoNominal)
+    for (const p of livre) {
+      assert.equal(p.isAposentado, true)
+      const ano = direto.find((d) => d.t === p.t)
+      assert.ok(ano)
+      assert.equal(p.saldoNominal, ano.saldoNominal)
+    }
+  })
 })
