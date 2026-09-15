@@ -1933,12 +1933,6 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
             Composição total de ativos
           </p>
           <DonutComLegenda data={dataDonutGrupos} formatCurrency={formatCurrency} />
-          {composicaoLiquidosLocalizacao ? (
-            <AtivosLiquidosPorLocalizacaoBar
-              composicao={composicaoLiquidosLocalizacao}
-              formatCurrency={formatCurrency}
-            />
-          ) : null}
         </div>
         <div className="pdf-section-card" style={{ background: "var(--surface)", borderRadius: 8, padding: 16 }}>
           <p style={{ fontSize: 13, color: "#393939", marginBottom: 12, fontWeight: 500 }}>
@@ -1949,6 +1943,12 @@ export function Patrimonio({ onNavigate, variant = "full" }: PatrimonioProps) {
             totalAtivoLiquido={ativosLiquidos}
             formatCurrency={formatCurrency}
           />
+          {composicaoLiquidosLocalizacao ? (
+            <AtivosLiquidosPorLocalizacaoBar
+              composicao={composicaoLiquidosLocalizacao}
+              formatCurrency={formatCurrency}
+            />
+          ) : null}
           <p style={{ fontSize: 11, color: "#5F85B8", marginTop: 12 }}>
             <LabelComTooltip label="Reserva de emergência" tooltip={tooltipReserva} />
             {": "}

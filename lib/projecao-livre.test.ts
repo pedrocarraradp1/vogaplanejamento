@@ -3,6 +3,7 @@ import { describe, it } from "node:test"
 import { calcularProjecao } from "./engine.ts"
 import {
   defaultProjecaoLivre,
+  hidratarProjecaoLivre,
   montarPremissasProjecaoLivre,
   projetarLivre,
   type ProjecaoLivreState,
@@ -13,7 +14,6 @@ describe("Projeção Livre vs calcularProjecao", () => {
     ...defaultProjecaoLivre,
     saldoInicial: 500_000,
     aporteMensal: 3_000,
-    aporteExtraAnual: 12_000,
     prazo: 25,
     taxaRendimento: 10,
     inflacao: 4,
@@ -42,15 +42,26 @@ describe("Projeção Livre vs calcularProjecao", () => {
     }
   })
 
-  it("inclui aporte extra anual e nova entrada nas premissas isoladas", () => {
+  it("inclui só a nova entrada nas premissas isoladas", () => {
     const premissas = montarPremissasProjecaoLivre(params)
     assert.equal(premissas.saldoInicial, 500_000)
     assert.equal(premissas.aporteM, 3_000)
     const extras = (premissas.entradasCapitais ?? []).filter((e) => e.descricao === "Aporte extra anual")
     const nova = (premissas.entradasCapitais ?? []).filter((e) => e.descricao === "Nova entrada")
-    assert.ok(extras.length > 0)
+    assert.equal(extras.length, 0)
     assert.equal(nova.length, 1)
     assert.equal(nova[0].valor, 200_000)
     assert.equal(nova[0].idade, 50)
+  })
+
+  it("ignora aporteExtraAnual legado ao hidratar cenários salvos", () => {
+    const hidratado = hidratarProjecaoLivre({
+      ...params,
+      aporteExtraAnual: 12_000,
+    })
+    assert.equal("aporteExtraAnual" in hidratado, false)
+    const premissas = montarPremissasProjecaoLivre(hidratado)
+    const extras = (premissas.entradasCapitais ?? []).filter((e) => e.descricao === "Aporte extra anual")
+    assert.equal(extras.length, 0)
   })
 })

@@ -10,6 +10,7 @@ import { FluxoDeCaixa } from "@/components/sections/fluxo-de-caixa"
 import { Projecao } from "@/components/sections/projecao"
 import { Cenarios } from "@/components/sections/cenarios"
 import { CompartilharPlanoModal } from "@/components/simulacoes/compartilhar-plano-modal"
+import { ComentariosConsultor } from "@/components/ui/comentarios-consultor"
 
 interface PlanoFinanceiroCompletoProps {
   onNavigate: (section: string) => void
@@ -196,6 +197,8 @@ export function PlanoFinanceiroCompleto({ onNavigate, readOnly = false }: PlanoF
           </div>
         )}
       </div>
+
+      <ComentariosConsultor campo="planoCompleto" readOnly={readOnly} />
 
       {SECOES.map((secao, index) => {
         const visivel = !ocultas.has(secao.id)

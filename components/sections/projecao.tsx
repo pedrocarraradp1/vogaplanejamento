@@ -56,6 +56,7 @@ import { CenariosRetiradaSection } from "@/components/ui/cenarios-retirada-secti
 import { ControlesSimulacao } from "@/components/ui/controles-simulacao"
 import { BlocoAporteNecessario } from "@/components/ui/bloco-aporte-necessario"
 import { CenariosInvestimento } from "@/components/ui/cenarios-investimento"
+import { ComentariosConsultor } from "@/components/ui/comentarios-consultor"
 import { isPlanoCompleto, type PlanoSecaoVariant } from "@/lib/plano-secoes"
 
 const GOLD = VOGA.brasilia
@@ -111,7 +112,7 @@ function KpiCardComTooltip({
   )
 }
 
-export function Projecao({ onNavigate, variant = "full" }: ProjecaoProps) {
+export function Projecao({ onNavigate, variant = "full", readOnly }: ProjecaoProps) {
   const resumo = isPlanoCompleto(variant)
   const { state, setPremissas, getSaldoInicialLiquido } = usePlano()
   const { premissas, objetivos, dadosPessoais } = state
@@ -1842,6 +1843,8 @@ export function Projecao({ onNavigate, variant = "full" }: ProjecaoProps) {
           ) : null}
         </CardContent>
       </Card>
+
+      <ComentariosConsultor campo="projecao" readOnly={readOnly} />
 
       {/* Footer */}
       <div className="nav-footer">

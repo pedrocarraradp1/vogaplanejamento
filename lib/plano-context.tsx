@@ -261,6 +261,22 @@ export interface Sucessao {
   questionario?: QuestionarioSucessorio
 }
 
+export interface ComentariosConsultor {
+  projecao?: string
+  planoCompleto?: string
+}
+
+const COMENTARIOS_MAX = 2000
+
+function hidratarComentariosConsultor(raw: unknown): ComentariosConsultor {
+  if (!raw || typeof raw !== "object") return {}
+  const r = raw as Record<string, unknown>
+  const out: ComentariosConsultor = {}
+  if (typeof r.projecao === "string") out.projecao = r.projecao.slice(0, COMENTARIOS_MAX)
+  if (typeof r.planoCompleto === "string") out.planoCompleto = r.planoCompleto.slice(0, COMENTARIOS_MAX)
+  return out
+}
+
 export interface PlanoState {
   moeda: "BRL" | "USD"
   dadosPessoais: DadosPessoais
@@ -279,6 +295,7 @@ export interface PlanoState {
   kpis: KPIs | null
   inventario: InventarioResult | null
   protecaoResult: ProtecaoResult | null
+  comentariosConsultor: ComentariosConsultor
 }
 
 export interface SimulacaoMeta {
@@ -307,6 +324,7 @@ interface PlanoContextType {
   setSeguros: (seguros: SeguroItem[]) => void
   setFluxoDeCaixa: (fluxo: Partial<FluxoDeCaixaState>) => void
   setProjecaoLivre: (projecaoLivre: Partial<ProjecaoLivreState>) => void
+  setComentariosConsultor: (comentarios: Partial<ComentariosConsultor>) => void
   /** Substitui o estado atual por um estado salvo (hidratando defaults) */
   loadState: (state: unknown, meta?: Partial<SimulacaoMeta>) => void
   /** Limpa meta de simulação (volta para "nova simulação") */
@@ -427,6 +445,7 @@ const initialState: PlanoState = {
   kpis:           null,
   inventario:     null,
   protecaoResult: null,
+  comentariosConsultor: {},
 }
 
 // ─── Context ──────────────────────────────────────────────────────────────────
@@ -475,6 +494,7 @@ export function PlanoProvider({
       kpis: raw?.kpis ?? null,
       inventario: raw?.inventario ?? null,
       protecaoResult: raw?.protecaoResult ?? null,
+      comentariosConsultor: hidratarComentariosConsultor(raw?.comentariosConsultor),
     }
 
     // Normaliza filhos (compatibilidade: modelos antigos tinham `filhos` como número)
@@ -775,6 +795,16 @@ export function PlanoProvider({
     }))
   }, [])
 
+  const setComentariosConsultor = useCallback((comentarios: Partial<ComentariosConsultor>) => {
+    setState((prev) => ({
+      ...prev,
+      comentariosConsultor: hidratarComentariosConsultor({
+        ...prev.comentariosConsultor,
+        ...comentarios,
+      }),
+    }))
+  }, [])
+
   const loadState = useCallback((raw: unknown, meta?: Partial<SimulacaoMeta>) => {
     setState(hydrateState(raw))
     if (meta) {
@@ -924,7 +954,7 @@ export function PlanoProvider({
       setMoeda,
       setSimulacaoMeta: setSimulacaoMetaPartial,
       setDadosPessoais, setFontesRenda, setDespesas, setAtivos, setPassivos, setPatrimonio, setObjetivos,
-      setPremissas, setSucessao, setProtecao, setSeguros, setFluxoDeCaixa, setProjecaoLivre,
+      setPremissas, setSucessao, setProtecao, setSeguros, setFluxoDeCaixa, setProjecaoLivre, setComentariosConsultor,
       loadState, clearSimulacaoMeta,
       getPatrimonioLiquido, getSaldoInicialLiquido, getAtivosFinanceiros, getAtivosLiquidosImediatos,
       getPatrimonioTotalConsolidado, getAporteMensal, getDespesaMensalEm, getAporteMensalEm, getIdadeAtual,

@@ -27,7 +27,6 @@ export interface ProjecaoLivreState {
   modo: ModoProjecaoLivre
   saldoInicial: number
   aporteMensal: number
-  aporteExtraAnual: number
   prazo: number
   taxaRendimento: number
   inflacao: number
@@ -43,7 +42,6 @@ export const defaultProjecaoLivre: ProjecaoLivreState = {
   modo: "padrao",
   saldoInicial: 0,
   aporteMensal: 0,
-  aporteExtraAnual: 0,
   prazo: 30,
   taxaRendimento: 10,
   inflacao: 4,
@@ -61,16 +59,13 @@ function n(value: unknown, fallback = 0): number {
 }
 
 export function hidratarProjecaoLivre(raw: unknown): ProjecaoLivreState {
-  const r = raw && typeof raw === "object" ? (raw as Partial<ProjecaoLivreState>) : {}
+  const r = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {}
   const modo: ModoProjecaoLivre =
     r.modo === "tempo-renda" || r.modo === "aporte-necessario" ? r.modo : "padrao"
   return {
-    ...defaultProjecaoLivre,
-    ...r,
     modo,
     saldoInicial: Math.max(0, n(r.saldoInicial, defaultProjecaoLivre.saldoInicial)),
     aporteMensal: Math.max(0, n(r.aporteMensal, defaultProjecaoLivre.aporteMensal)),
-    aporteExtraAnual: Math.max(0, n(r.aporteExtraAnual, defaultProjecaoLivre.aporteExtraAnual)),
     prazo: Math.max(0, n(r.prazo, defaultProjecaoLivre.prazo)),
     taxaRendimento: Math.max(0, n(r.taxaRendimento, defaultProjecaoLivre.taxaRendimento)),
     inflacao: Math.max(0, n(r.inflacao, defaultProjecaoLivre.inflacao)),
@@ -83,35 +78,9 @@ export function hidratarProjecaoLivre(raw: unknown): ProjecaoLivreState {
   }
 }
 
-function idadeFimAcumulacao(s: ProjecaoLivreState, idadeApos: number, prazo: number): number {
-  const tetoPrazo = s.idadeAtual + prazo
-  if (idadeApos > s.idadeAtual) return Math.min(tetoPrazo, idadeApos - 1)
-  return tetoPrazo
-}
-
-/** Aporte extra anual (fim de cada ano de acumulação) + nova entrada pontual — via entradasCapitais. */
-export function montarEntradasProjecaoLivre(
-  s: ProjecaoLivreState,
-  opts?: { prazo?: number; idadeApos?: number },
-): EntradaCapital[] {
-  const prazo = opts?.prazo ?? s.prazo
-  const idadeApos = opts?.idadeApos ?? s.idadeApos
+/** Nova entrada pontual — via entradasCapitais. `aporteExtraAnual` legado é ignorado (tratado como zero). */
+export function montarEntradasProjecaoLivre(s: ProjecaoLivreState): EntradaCapital[] {
   const entradas: EntradaCapital[] = []
-
-  const extra = Math.max(0, s.aporteExtraAnual)
-  if (extra > 0) {
-    const fim = idadeFimAcumulacao(s, idadeApos, prazo)
-    for (let idade = s.idadeAtual; idade <= fim; idade++) {
-      entradas.push(
-        criarEntradaCapital({
-          id: `livre-extra-${idade}`,
-          descricao: "Aporte extra anual",
-          valor: extra,
-          idade,
-        }),
-      )
-    }
-  }
 
   if (s.novaEntradaValor > 0 && s.novaEntradaIdade > 0) {
     entradas.push(
@@ -153,7 +122,7 @@ export function montarPremissasProjecaoLivre(
     rendaAposentadoria: 0,
     novaEntrada: 0,
     idadeEntrada: 0,
-    entradasCapitais: montarEntradasProjecaoLivre(s, { prazo, idadeApos }),
+    entradasCapitais: montarEntradasProjecaoLivre(s),
     modoRentabilidade: "padrao",
   }
 }
