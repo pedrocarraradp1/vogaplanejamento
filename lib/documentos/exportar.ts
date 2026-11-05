@@ -1,5 +1,6 @@
 import { Document, Packer, Paragraph, TextRun, Header, Footer } from "docx"
-import { jsPDF } from "jspdf"
+// Browser build: the Node entry pulls fflate workers and breaks Next/Turbopack SSR.
+import { jsPDF } from "jspdf/dist/jspdf.es.min.js"
 import { CABECALHO_VOGA, RODAPE_MINUTA } from "./preencher"
 
 function linhas(texto: string): string[] {
