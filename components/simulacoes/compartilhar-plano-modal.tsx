@@ -27,7 +27,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 
-export function CompartilharPlanoModal() {
+export function CompartilharPlanoModal({ label = "Compartilhar" }: { label?: string }) {
   const { simulacaoMeta } = usePlano()
   const { toast } = useToast()
   const simulacaoId = simulacaoMeta.simulacaoId
@@ -121,7 +121,7 @@ export function CompartilharPlanoModal() {
     return (
       <Button type="button" variant="outline" size="sm" disabled title="Salve o cenário antes de compartilhar">
         <Link2 className="w-4 h-4 mr-2" />
-        Compartilhar
+        {label}
       </Button>
     )
   }
@@ -131,7 +131,7 @@ export function CompartilharPlanoModal() {
       <DialogTrigger asChild>
         <Button type="button" variant="outline" size="sm">
           <Link2 className="w-4 h-4 mr-2" />
-          Compartilhar
+          {label}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">

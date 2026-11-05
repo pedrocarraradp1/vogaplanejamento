@@ -40,15 +40,19 @@ import {
 } from "@/lib/despesa-utils"
 import { normalizarEntradasCapitais, type EntradaCapital } from "@/lib/entradas-capitais"
 import {
+  DEFAULT_SUCESSAO_HOLDING,
   hidratarDiagnostico,
   hidratarDocumentos,
+  hidratarHolding,
   hidratarRoteiros,
   hidratarSimulador,
   type SucessaoDiagnostico,
   type SucessaoDocumentos,
+  type SucessaoHolding,
   type SucessaoRoteiros,
   type SucessaoSimulador,
 } from "@/lib/sucessorio/tipos"
+import { hidratarConsultoria, type SucessaoConsultoria } from "@/lib/sucessorio/consultoria"
 import {
   defaultProjecaoLivre,
   hidratarProjecaoLivre,
@@ -138,6 +142,12 @@ export interface Ativo {
   observacao?: string
   /** UF do imóvel (competência ITCMD). Demais ativos seguem o domicílio. */
   uf?: string
+  /** Valor de aquisição / declarado no IRPF (holding). */
+  valorIrpf?: number
+  /** Aluguel mensal do imóvel (holding). */
+  aluguelMensal?: number
+  municipio?: string
+  tipoImovel?: "residencial" | "comercial"
   /** Quando false, o valor não entra no cálculo da reserva de emergência. Padrão: true. */
   reservaLiquidez?: boolean
   /**
@@ -284,6 +294,8 @@ export interface Sucessao {
   simulador?: SucessaoSimulador
   roteiros?: SucessaoRoteiros
   documentos?: SucessaoDocumentos
+  holding?: SucessaoHolding
+  consultoria?: SucessaoConsultoria
 }
 
 export interface ComentariosConsultor {
@@ -463,6 +475,7 @@ const initialState: PlanoState = {
     },
     roteiros: {},
     documentos: { clausulasIncluidas: [], camposClausulas: {}, templates: {} },
+    holding: { ...DEFAULT_SUCESSAO_HOLDING, imoveis: [] },
   },
   protecao: {
     custoVida:   0,
@@ -580,6 +593,8 @@ export function PlanoProvider({
     merged.sucessao.simulador = hidratarSimulador(rawSuc?.simulador)
     merged.sucessao.roteiros = hidratarRoteiros(rawSuc?.roteiros)
     merged.sucessao.documentos = hidratarDocumentos(rawSuc?.documentos)
+    merged.sucessao.holding = hidratarHolding(rawSuc?.holding)
+    merged.sucessao.consultoria = hidratarConsultoria(rawSuc?.consultoria)
 
     merged.seguros = (Array.isArray(raw?.seguros) ? raw.seguros : []).map((s: any) => ({
       id: String(s?.id ?? `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`),

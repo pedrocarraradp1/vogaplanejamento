@@ -15,4 +15,6 @@ export type RelatorioA4Input = {
   assessor: string
   data: string
   secoes: RelatorioSecaoA4[]
+  /** Primeira página de capa (parecer da consultoria). */
+  capa?: boolean
 }

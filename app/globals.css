@@ -703,3 +703,414 @@
     border: none !important;
   }
 }
+
+/* Consultoria Sucessória e Fiscal */
+.consultoria-shell {
+  --consultoria-bg: #f6f8fb;
+  --consultoria-borda: #e5eaf1;
+  --consultoria-raio: 14px;
+  --consultoria-gutter: 24px;
+  --consultoria-max: 1180px;
+  --consultoria-navy: var(--voga-noite);
+  --consultoria-acento: #5b9bff;
+  --consultoria-risco: #d64545;
+  --consultoria-atencao: #e0a100;
+  --consultoria-ok: #1f9d6a;
+  --consultoria-neutro: #6b7a90;
+  background: var(--consultoria-bg);
+  max-width: var(--consultoria-max);
+  margin: 0 auto;
+  padding: 32px var(--consultoria-gutter) 96px;
+  color: var(--voga-noite);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 24px;
+}
+
+.consultoria-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--consultoria-gutter);
+}
+
+.consultoria-bloco {
+  margin-bottom: 64px;
+}
+
+.consultoria-col-5 { grid-column: span 5; }
+.consultoria-col-7 { grid-column: span 7; }
+.consultoria-col-12 { grid-column: span 12; }
+.consultoria-col-6 { grid-column: span 6; }
+.consultoria-col-4 { grid-column: span 4; }
+
+.consultoria-surface {
+  background: #fff;
+  border: 1px solid var(--consultoria-borda);
+  border-radius: var(--consultoria-raio);
+}
+
+.consultoria-navy {
+  background: var(--consultoria-navy);
+  color: #fff;
+  border-radius: var(--consultoria-raio);
+}
+
+.consultoria-navy .consultoria-rotulo {
+  color: var(--consultoria-acento);
+}
+
+.consultoria-display {
+  font-family: var(--font-heading);
+  font-size: 56px;
+  line-height: 60px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.consultoria-h1 {
+  font-family: var(--font-heading);
+  font-size: 32px;
+  line-height: 38px;
+  font-weight: 600;
+}
+
+.consultoria-h2 {
+  font-family: var(--font-heading);
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 600;
+}
+
+.consultoria-corpo {
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 24px;
+}
+
+.consultoria-rotulo {
+  font-family: var(--font-body);
+  font-size: 11px;
+  line-height: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--consultoria-neutro);
+}
+
+.consultoria-numero {
+  color: var(--voga-brasilia);
+  font-variant-numeric: tabular-nums;
+}
+
+.consultoria-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  line-height: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--consultoria-neutro);
+  border-bottom: 1px solid currentColor;
+  padding-bottom: 1px;
+}
+
+.consultoria-badge--risco { color: var(--consultoria-risco); }
+.consultoria-badge--atencao { color: var(--consultoria-atencao); }
+.consultoria-badge--ok { color: var(--consultoria-ok); }
+
+.consultoria-hero {
+  height: 320px;
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 32px;
+  padding: 36px 40px;
+  overflow: hidden;
+}
+
+.consultoria-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  line-height: 16px;
+  color: #fff;
+  border: 1px solid rgba(91, 155, 255, 0.45);
+  border-radius: 999px;
+  padding: 6px 12px;
+}
+
+.consultoria-card-ok,
+.consultoria-card-falta {
+  background: #fff;
+  border-radius: var(--consultoria-raio);
+  padding: 16px 18px;
+  min-height: 72px;
+}
+
+.consultoria-card-ok {
+  border: 1px solid var(--consultoria-borda);
+}
+
+.consultoria-card-falta {
+  border: 1px dashed var(--consultoria-neutro);
+}
+
+.consultoria-check {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--consultoria-ok);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.consultoria-opcao {
+  width: 280px;
+  height: 96px;
+  border: 1px solid var(--consultoria-borda);
+  border-radius: var(--consultoria-raio);
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-family: var(--font-heading);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--voga-noite);
+  transition: transform 220ms ease-out, border-color 220ms ease-out;
+}
+
+.consultoria-opcao:hover {
+  transform: translateY(-2px);
+}
+
+.consultoria-opcao.is-on {
+  border-color: var(--voga-brasilia);
+  border-width: 2px;
+  color: var(--voga-brasilia);
+}
+
+.consultoria-progresso {
+  height: 2px;
+  background: var(--consultoria-borda);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.consultoria-progresso > span {
+  display: block;
+  height: 100%;
+  background: var(--voga-brasilia);
+  transform-origin: left;
+  transition: width 400ms ease-out;
+}
+
+.consultoria-barra-seg {
+  height: 14px;
+  display: flex;
+  width: 100%;
+  border-radius: 99px;
+  overflow: hidden;
+  background: var(--consultoria-borda);
+}
+
+.consultoria-barra-seg > i {
+  display: block;
+  height: 100%;
+  transform-origin: left;
+  animation: consultoria-grow 400ms ease-out both;
+}
+
+.consultoria-btn {
+  height: 44px;
+  padding: 0 20px;
+  border-radius: 8px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.consultoria-btn-primario {
+  background: var(--voga-brasilia);
+  color: #fff;
+}
+
+.consultoria-btn-secundario {
+  background: transparent;
+  color: var(--voga-noite);
+  border-color: var(--consultoria-borda);
+}
+
+.consultoria-ajuda {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid var(--consultoria-neutro);
+  color: var(--consultoria-neutro);
+  font-size: 9px;
+  line-height: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-heading);
+  vertical-align: middle;
+  margin-left: 6px;
+}
+
+.consultoria-stepper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 40px;
+}
+
+.consultoria-stepper button {
+  font-size: 11px;
+  line-height: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--consultoria-neutro);
+  padding-bottom: 6px;
+  border-bottom: 1px solid transparent;
+}
+
+.consultoria-stepper button.is-on {
+  color: var(--voga-noite);
+  border-bottom-color: var(--voga-brasilia);
+}
+
+.consultoria-rodape {
+  position: sticky;
+  bottom: 0;
+  background: var(--consultoria-bg);
+  padding: 16px 0 8px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--consultoria-neutro);
+  border-top: 1px solid var(--consultoria-borda);
+}
+
+.consultoria-parecer-texto {
+  max-width: 680px;
+  font-size: 17px;
+  line-height: 30px;
+}
+
+.consultoria-capa-a4 {
+  width: 210px;
+  height: 297px;
+  padding: 22px 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.consultoria-carrossel {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 8px;
+}
+
+.consultoria-carrossel > * {
+  flex: 0 0 320px;
+  scroll-snap-align: start;
+}
+
+.consultoria-pulse {
+  animation: consultoria-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes consultoria-enter {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes consultoria-slide-next {
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes consultoria-slide-prev {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes consultoria-grow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@keyframes consultoria-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+.consultoria-enter { animation: consultoria-enter 220ms ease-out; }
+.consultoria-slide-next { animation: consultoria-slide-next 220ms ease-out; }
+.consultoria-slide-prev { animation: consultoria-slide-prev 220ms ease-out; }
+
+.consultoria-btn-progresso {
+  position: relative;
+  overflow: hidden;
+}
+
+.consultoria-btn-progresso::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  width: var(--consultoria-pdf, 40%);
+  background: #fff;
+  animation: consultoria-grow 1.2s ease-out infinite;
+}
+
+@media (max-width: 900px) {
+  .consultoria-hero {
+    height: auto;
+    min-height: 240px;
+    grid-template-columns: 1fr;
+    padding: 24px;
+  }
+  .consultoria-col-5,
+  .consultoria-col-7,
+  .consultoria-col-6,
+  .consultoria-col-4 {
+    grid-column: span 12;
+  }
+  .consultoria-display {
+    font-size: 40px;
+    line-height: 44px;
+  }
+  .consultoria-carrossel {
+    display: block;
+  }
+  .consultoria-carrossel > * {
+    width: 100%;
+    margin-bottom: 12px;
+  }
+  .consultoria-opcao {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .consultoria-enter,
+  .consultoria-slide-next,
+  .consultoria-slide-prev,
+  .consultoria-pulse,
+  .consultoria-barra-seg > i,
+  .consultoria-btn-progresso::after {
+    animation: none !important;
+  }
+  .consultoria-opcao {
+    transition: none;
+  }
+}

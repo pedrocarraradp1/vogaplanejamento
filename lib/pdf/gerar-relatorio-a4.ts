@@ -244,6 +244,35 @@ async function desenharTabela(ctx: Ctx, info: RelatorioA4Input, tabela: Relatori
   ctx.y -= 8
 }
 
+async function desenharCapa(ctx: Ctx, info: RelatorioA4Input) {
+  const { page, font, fontBold } = ctx
+  page.drawRectangle({ x: 0, y: 0, width: A4.width, height: A4.height, color: rgb(1, 1, 1) })
+  page.drawRectangle({ x: 0, y: A4.height - 8, width: A4.width, height: 8, color: BLUE })
+  if (ctx.logo) {
+    try {
+      const img = ctx.logo.isPng
+        ? await ctx.doc.embedPng(ctx.logo.bytes)
+        : await ctx.doc.embedJpg(ctx.logo.bytes)
+      const h = 36
+      const w = (img.width / img.height) * h
+      page.drawImage(img, { x: MARGIN, y: A4.height - 80, width: w, height: h })
+    } catch {
+      /* sem logo */
+    }
+  }
+  page.drawText("VOGA", { x: MARGIN, y: 520, size: 11, font: fontBold, color: BLUE })
+  const tituloLinhas = wrap(info.titulo || "Parecer", fontBold, 22, A4.width - MARGIN * 2)
+  let y = 480
+  for (const line of tituloLinhas) {
+    page.drawText(line, { x: MARGIN, y, size: 22, font: fontBold, color: NAVY })
+    y -= 28
+  }
+  page.drawText(info.cliente || "Cliente", { x: MARGIN, y: 380, size: 14, font, color: NAVY })
+  page.drawText(`Assessor: ${info.assessor || "—"}`, { x: MARGIN, y: 358, size: 10, font, color: GRAY })
+  page.drawText(info.data, { x: MARGIN, y: 342, size: 10, font, color: GRAY })
+  page.drawText(RODAPE_LEGAL_SUCESSORIO, { x: MARGIN, y: 56, size: 8, font, color: GRAY })
+}
+
 export async function gerarRelatorioA4(input: RelatorioA4Input): Promise<Uint8Array> {
   const doc = await PDFDocument.create()
   const font = await doc.embedFont(StandardFonts.Helvetica)
@@ -257,7 +286,12 @@ export async function gerarRelatorioA4(input: RelatorioA4Input): Promise<Uint8Ar
     y: A4.height - MARGIN,
     logo,
   }
-  await desenharCabecalho(ctx, input)
+  if (input.capa) {
+    await desenharCapa(ctx, input)
+    await novaPagina(ctx, input)
+  } else {
+    await desenharCabecalho(ctx, input)
+  }
 
   for (const secao of input.secoes) {
     await garantirEspaco(ctx, input, 28)

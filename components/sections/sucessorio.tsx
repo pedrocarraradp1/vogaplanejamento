@@ -42,6 +42,11 @@ import {
   type AbaRelatorioSucessorio,
 } from "@/lib/sucessorio/relatorio"
 import { baixarRelatorioSucessorio } from "@/lib/sucessorio/baixar-relatorio"
+import { textoParecerFallback } from "@/lib/sucessorio/texto-parecer"
+import { ComparadorHolding } from "@/components/sections/sucessorio/comparador-holding"
+import { ConsultoriaSucessoria } from "@/components/sections/sucessorio/consultoria"
+import { calcularComparadorHolding } from "@/lib/sucessorio/holding"
+import { hidratarHolding } from "@/lib/sucessorio/tipos"
 
 const UFS_BR = Object.keys(ITCMD_POR_UF) as UfBrasil[]
 
@@ -514,6 +519,11 @@ export function Sucessorio({ onNavigate }: SucessorioProps) {
     [dadosPessoais, ativos, sucessao],
   )
 
+  const holdingVisao = useMemo(
+    () => calcularComparadorHolding(hidratarHolding(sucessao.holding)),
+    [sucessao.holding],
+  )
+
   const gerarRelatorio = async (abas: AbaRelatorioSucessorio[]) => {
     if (gerandoPdf) return
     setGerandoPdf(true)
@@ -524,6 +534,11 @@ export function Sucessorio({ onNavigate }: SucessorioProps) {
         cliente: dadosPessoais.nome || "Cliente",
         assessor: assessorNome,
         moeda,
+        holding: holdingVisao,
+        parecerConsultoria: sucessao.consultoria?.parecer,
+        textoConsultoria:
+          sucessao.consultoria?.textoNarrativo ||
+          (sucessao.consultoria?.parecer ? textoParecerFallback(sucessao.consultoria.parecer) : ""),
       })
       await baixarRelatorioSucessorio(payload)
     } catch (err) {
@@ -558,23 +573,34 @@ export function Sucessorio({ onNavigate }: SucessorioProps) {
             Planejamento <span className="text-primary">Sucessório</span>
           </h1>
           <BotaoPdf
-            abas={["diagnostico", "itcmd", "exterior", "roteiro"]}
+            abas={["consultoria", "diagnostico", "itcmd", "exterior", "holding", "roteiro"]}
             label="Relatório completo"
           />
         </div>
         <p className="text-sm text-muted-foreground">
-          Diagnóstico, ITCMD por competência, custo de inventário e bens no exterior
+          Consultoria sucessória e fiscal, diagnóstico, ITCMD por competência e bens no exterior
         </p>
       </div>
 
-      <Tabs defaultValue="diagnostico" className="gap-4">
+      <Tabs defaultValue="consultoria" className="gap-4">
         <TabsList className="h-auto w-full flex-wrap justify-start">
+          <TabsTrigger value="consultoria">Consultoria</TabsTrigger>
           <TabsTrigger value="diagnostico">Diagnóstico</TabsTrigger>
           <TabsTrigger value="itcmd">ITCMD e inventário</TabsTrigger>
           <TabsTrigger value="exterior">Exterior</TabsTrigger>
+          <TabsTrigger value="holding">Holding</TabsTrigger>
           {!locked && <TabsTrigger value="roteiro">Roteiro</TabsTrigger>}
           {!locked && <TabsTrigger value="documentos">Documentos</TabsTrigger>}
         </TabsList>
+
+        <TabsContent value="consultoria">
+          <ConsultoriaSucessoria
+            gerandoPdf={gerandoPdf}
+            onGerarPdf={() => void gerarRelatorio(["consultoria"])}
+            onEditarCadastro={() => onNavigate("dados-pessoais")}
+            assessorNome={assessorNome}
+          />
+        </TabsContent>
 
         <TabsContent value="diagnostico" className="space-y-6">
           <div className="flex justify-end">
@@ -1426,6 +1452,13 @@ export function Sucessorio({ onNavigate }: SucessorioProps) {
               <RodapeSimulacao />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="holding" className="space-y-6">
+          <ComparadorHolding
+            gerandoPdf={gerandoPdf}
+            onGerarRelatorio={() => void gerarRelatorio(["holding"])}
+          />
         </TabsContent>
 
         <TabsContent value="roteiro">

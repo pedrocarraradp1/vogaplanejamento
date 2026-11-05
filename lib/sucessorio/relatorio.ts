@@ -1,4 +1,6 @@
 import type { RelatorioA4Input, RelatorioSecaoA4 } from "@/lib/pdf/tipos-relatorio"
+import type { Parecer } from "./consultoria"
+import type { ComparadorHolding } from "./holding"
 import type { VisaoSucessorio } from "./visao"
 
 function brl(n: number, moeda: "BRL" | "USD" = "BRL") {
@@ -29,7 +31,66 @@ const FRENTE: Record<string, string> = {
 }
 const NIVEL = { baixo: "Baixo", medio: "Médio", alto: "Alto" } as const
 
-export type AbaRelatorioSucessorio = "diagnostico" | "itcmd" | "exterior" | "roteiro"
+export type AbaRelatorioSucessorio =
+  | "diagnostico"
+  | "itcmd"
+  | "exterior"
+  | "roteiro"
+  | "holding"
+  | "consultoria"
+
+export function secaoConsultoria(p: Parecer, texto: string, moeda: "BRL" | "USD" = "BRL"): RelatorioSecaoA4 {
+  const top = p.recomendacao.ranqueadas[0]
+  return {
+    titulo: "Consultoria sucessória e fiscal",
+    kpis: [
+      { label: "Score de exposição", valor: String(Math.round(p.diagnostico.score)), hint: p.diagnostico.nivel },
+      { label: "ITCMD / inventário", valor: brl(p.simulacoes.inventario.total, moeda) },
+      { label: "Recomendação", valor: top?.nome ?? "—" },
+      { label: "Economia estimada", valor: brl(top?.economia ?? 0, moeda) },
+    ],
+    paragrafos: texto.split(/\n\n+/).filter(Boolean),
+    pontos: p.diagnostico.riscos.slice(0, 6).map((r) => `${r.titulo} (${brl(r.impactoReais, moeda)})`),
+  }
+}
+
+export function secaoHolding(r: ComparadorHolding, moeda: "BRL" | "USD" = "BRL"): RelatorioSecaoA4 {
+  const y1 = r.anos[0]
+  const payback = r.paybackDentro
+    ? `${r.paybackAnos} anos e ${r.paybackMeses} meses`
+    : "Além do horizonte"
+  return {
+    titulo: "Holding patrimonial vs. pessoa física",
+    kpis: [
+      { label: "Veredito", valor: r.veredito.frase },
+      { label: "Carga PF (1º ano)", valor: brl(y1?.pfCarga ?? 0, moeda) },
+      { label: "Carga holding (1º ano)", valor: brl(y1?.holdingCarga ?? 0, moeda) },
+      { label: "Economia 1º ano", valor: brl(y1?.economia ?? 0, moeda) },
+      { label: "Economia acumulada", valor: brl(r.economiaAnos, moeda) },
+      { label: "VPL", valor: brl(r.vpl, moeda), hint: payback },
+    ],
+    tabela: {
+      colunas: ["Ano", "PF", "Holding", "Economia", "Acumulada"],
+      linhas: r.anos.map((a) => [
+        String(a.ano) + (a.cbsAtivo ? (a.ibsFator >= 1 ? " · IBS" : " · CBS") : ""),
+        brl(a.pfCarga, moeda),
+        brl(a.holdingCarga, moeda),
+        brl(a.economia, moeda),
+        brl(a.economiaAcumulada, moeda),
+      ]),
+    },
+    memoria: [
+      { label: "ITBI de entrada", valor: brl(r.entrada.itbi, moeda) },
+      { label: "Ganho de capital", valor: brl(r.entrada.ganhoCapital, moeda) },
+      { label: "Abertura", valor: brl(r.entrada.abertura, moeda) },
+      { label: "Inventário hoje", valor: brl(r.sucessao.inventario.total, moeda) },
+      { label: "ITCMD doação (usufruto)", valor: brl(r.sucessao.doacao.imposto, moeda) },
+      { label: "ITCMD doação (reforma)", valor: brl(r.sucessao.doacao.impostoReforma, moeda) },
+      { label: "Custo da estrutura no período", valor: brl(r.sucessao.custoEstruturaPeriodo, moeda) },
+    ],
+    pontos: [...r.veredito.motivos, ...r.pontosAtencao],
+  }
+}
 
 export function secaoDiagnostico(v: VisaoSucessorio): RelatorioSecaoA4 {
   const d = v.diagnostico
@@ -147,13 +208,30 @@ export function montarRelatorioSucessorio(opts: {
   cliente: string
   assessor: string
   moeda?: "BRL" | "USD"
+  holding?: ComparadorHolding | null
+  parecerConsultoria?: Parecer | null
+  textoConsultoria?: string
 }): RelatorioA4Input {
   const moeda = opts.moeda ?? "BRL"
+  const holdingSecao = opts.holding
+    ? secaoHolding(opts.holding, moeda)
+    : {
+        titulo: "Holding patrimonial vs. pessoa física",
+        paragrafos: ["Sem simulação de holding neste relatório."],
+      }
+  const consultoriaSecao = opts.parecerConsultoria
+    ? secaoConsultoria(opts.parecerConsultoria, opts.textoConsultoria || "", moeda)
+    : {
+        titulo: "Consultoria sucessória e fiscal",
+        paragrafos: ["Consultoria ainda não gerada."],
+      }
   const mapa: Record<AbaRelatorioSucessorio, RelatorioSecaoA4> = {
     diagnostico: secaoDiagnostico(opts.visao),
     itcmd: secaoItcmd(opts.visao, moeda),
     exterior: secaoExterior(opts.visao),
     roteiro: secaoRoteiro(opts.visao),
+    holding: holdingSecao,
+    consultoria: consultoriaSecao,
   }
   const secoes = opts.abas.map((a) => mapa[a])
   const completo = opts.abas.length > 1
@@ -163,5 +241,6 @@ export function montarRelatorioSucessorio(opts: {
     assessor: opts.assessor,
     data: new Intl.DateTimeFormat("pt-BR").format(new Date()),
     secoes,
+    capa: opts.abas.length === 1 && opts.abas[0] === "consultoria",
   }
 }
