@@ -11,6 +11,8 @@ import { Projecao } from "@/components/sections/projecao"
 import { Cenarios } from "@/components/sections/cenarios"
 import { CompartilharPlanoModal } from "@/components/simulacoes/compartilhar-plano-modal"
 import { ComentariosConsultor } from "@/components/ui/comentarios-consultor"
+import { KpiCard, KpiGrid } from "@/components/ui/kpi-card"
+import { visaoSucessorio } from "@/lib/sucessorio/visao"
 
 interface PlanoFinanceiroCompletoProps {
   onNavigate: (section: string) => void
@@ -136,6 +138,15 @@ export function PlanoFinanceiroCompleto({ onNavigate, readOnly = false }: PlanoF
   }, [getPatrimonioTotalConsolidado, state.ativos, state.passivos])
 
   const temObjetivos = (state.objetivos?.length ?? 0) > 0
+
+  const visaoSuc = useMemo(() => visaoSucessorio(state), [state])
+  const moeda = state.moeda ?? "BRL"
+  const fmtSuc = (v: number) =>
+    new Intl.NumberFormat(moeda === "USD" ? "en-US" : "pt-BR", {
+      style: "currency",
+      currency: moeda === "USD" ? "USD" : "BRL",
+      maximumFractionDigits: 0,
+    }).format(v)
   const conteudoPorSecao: Record<SecaoId, ReactNode> = {
     patrimonio: temPatrimonio ? (
       <div className="plano-completo-embed">
@@ -199,6 +210,38 @@ export function PlanoFinanceiroCompleto({ onNavigate, readOnly = false }: PlanoF
       </div>
 
       <ComentariosConsultor campo="planoCompleto" readOnly={readOnly} />
+
+      <div className="rounded-xl border border-border bg-card p-5 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-[16px] font-semibold text-foreground">Sucessão</h2>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-primary hover:text-primary/90"
+            onClick={() => onNavigate("sucessorio")}
+          >
+            Ver planejamento sucessório
+            <ArrowRight className="w-4 h-4 ml-1.5" />
+          </Button>
+        </div>
+        <KpiGrid>
+          <KpiCard
+            label="Custo total do inventário hoje"
+            value={fmtSuc(visaoSuc.custoInv.total)}
+          />
+          <KpiCard
+            label="Aumento potencial com a reforma"
+            value={fmtSuc(visaoSuc.reforma.aumento)}
+            hint="LC 227/2026 · teto 8%"
+            valueColor="#B33A3A"
+          />
+          <KpiCard
+            label="Economia estimada com planejamento em vida"
+            value={fmtSuc(visaoSuc.economiaPlanejar)}
+            valueColor="#1F6D3E"
+          />
+        </KpiGrid>
+      </div>
 
       {SECOES.map((secao, index) => {
         const visivel = !ocultas.has(secao.id)

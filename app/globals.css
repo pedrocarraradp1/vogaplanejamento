@@ -683,4 +683,23 @@
   [data-sidebar] {
     display: none !important;
   }
+
+  body:has(.roteiro-pendencias-print) * {
+    visibility: hidden !important;
+  }
+
+  body:has(.roteiro-pendencias-print) .roteiro-pendencias-print,
+  body:has(.roteiro-pendencias-print) .roteiro-pendencias-print * {
+    visibility: visible !important;
+  }
+
+  body:has(.roteiro-pendencias-print) .roteiro-pendencias-print {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    max-width: none;
+    transform: none;
+    box-shadow: none !important;
+    border: none !important;
+  }
 }

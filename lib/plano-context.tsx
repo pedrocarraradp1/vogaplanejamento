@@ -40,6 +40,16 @@ import {
 } from "@/lib/despesa-utils"
 import { normalizarEntradasCapitais, type EntradaCapital } from "@/lib/entradas-capitais"
 import {
+  hidratarDiagnostico,
+  hidratarDocumentos,
+  hidratarRoteiros,
+  hidratarSimulador,
+  type SucessaoDiagnostico,
+  type SucessaoDocumentos,
+  type SucessaoRoteiros,
+  type SucessaoSimulador,
+} from "@/lib/sucessorio/tipos"
+import {
   defaultProjecaoLivre,
   hidratarProjecaoLivre,
   type ProjecaoLivreState,
@@ -126,6 +136,8 @@ export interface Ativo {
   subcategoria?: string
   localizacao?: string
   observacao?: string
+  /** UF do imóvel (competência ITCMD). Demais ativos seguem o domicílio. */
+  uf?: string
   /** Quando false, o valor não entra no cálculo da reserva de emergência. Padrão: true. */
   reservaLiquidez?: boolean
   /**
@@ -251,6 +263,15 @@ export interface PatrimonioState {
   passivos: number
 }
 
+export type {
+  SucessaoDiagnostico,
+  SucessaoDocumentos,
+  SucessaoRoteiroProgresso,
+  SucessaoRoteiros,
+  SucessaoSimulador,
+  ViaInventarioSimulador,
+} from "@/lib/sucessorio/tipos"
+
 export interface Sucessao {
   plEditavel: number
   itcmd: number
@@ -259,6 +280,10 @@ export interface Sucessao {
   herdeiros: number
   regimeSucessao: string
   questionario?: QuestionarioSucessorio
+  diagnostico?: SucessaoDiagnostico
+  simulador?: SucessaoSimulador
+  roteiros?: SucessaoRoteiros
+  documentos?: SucessaoDocumentos
 }
 
 export interface ComentariosConsultor {
@@ -427,6 +452,17 @@ const initialState: PlanoState = {
     cartoriais:     2,
     herdeiros:      0,
     regimeSucessao: "",
+    diagnostico: { respostas: Array.from({ length: 20 }, () => false) },
+    simulador: {
+      soHeranca: false,
+      via: "extrajudicial",
+      honorariosPct: 6,
+      custasPct: 1.5,
+      diasAteAbertura: 30,
+      custoPlanejarVida: 0,
+    },
+    roteiros: {},
+    documentos: { clausulasIncluidas: [], camposClausulas: {}, templates: {} },
   },
   protecao: {
     custoVida:   0,
@@ -538,6 +574,12 @@ export function PlanoProvider({
     const rawQuestionario = (raw?.sucessao as any)?.questionario
     merged.sucessao.questionario =
       rawQuestionario && typeof rawQuestionario === "object" ? { ...rawQuestionario } : undefined
+
+    const rawSuc = raw?.sucessao as Record<string, unknown> | undefined
+    merged.sucessao.diagnostico = hidratarDiagnostico(rawSuc?.diagnostico)
+    merged.sucessao.simulador = hidratarSimulador(rawSuc?.simulador)
+    merged.sucessao.roteiros = hidratarRoteiros(rawSuc?.roteiros)
+    merged.sucessao.documentos = hidratarDocumentos(rawSuc?.documentos)
 
     merged.seguros = (Array.isArray(raw?.seguros) ? raw.seguros : []).map((s: any) => ({
       id: String(s?.id ?? `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`),

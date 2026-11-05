@@ -204,6 +204,10 @@ export function normalizeAtivoRecord(ativo: Ativo): Ativo {
     empresa,
     percentualParticipacao,
     valor: Math.round((Number(ativo.valor) || 0) * 100) / 100,
+    uf:
+      tipo === "imobilizado"
+        ? (ativo.uf ?? "").trim().toUpperCase() || undefined
+        : undefined,
     reservaLiquidez:
       tipo === "ativo_liquido" ? ativo.reservaLiquidez !== false : undefined,
   }

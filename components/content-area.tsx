@@ -11,6 +11,7 @@ import { ProjecaoLivre } from "./sections/projecao-livre"
 import { Cenarios } from "./sections/cenarios"
 import { PlanoFinanceiroCompleto } from "./sections/plano-financeiro-completo"
 import { Sucessorio } from "./sections/sucessorio"
+import { DocumentosSucessorios } from "./sections/documentos-sucessorios"
 import { ProtecaoFinanceira } from "./sections/protecao-financeira"
 import { SimuladorSeguros } from "./sections/simulador-seguros"
 import { PgblVsVgbl } from "./sections/pgbl-vs-vgbl"
@@ -49,6 +50,8 @@ export function ContentArea({ activeSection, onNavigate, readOnly = false }: Con
         return <PlanoFinanceiroCompleto onNavigate={onNavigate} readOnly={readOnly} />
       case "sucessorio":
         return <Sucessorio onNavigate={onNavigate} readOnly={readOnly} />
+      case "documentos":
+        return <DocumentosSucessorios />
       case "protecao":
         return <ProtecaoFinanceira onNavigate={onNavigate} readOnly={readOnly} />
       case "simulador-seguros":

@@ -27,7 +27,10 @@ export const NAV_GROUPS_FULL: NavGroup[] = [
   },
   {
     title: "Planejamento Sucessório",
-    items: [{ id: "sucessorio", label: "Sucessório" }],
+    items: [
+      { id: "sucessorio", label: "Sucessório" },
+      { id: "documentos", label: "Documentos" },
+    ],
   },
   {
     title: "Gestão de Risco e Proteção",
@@ -61,6 +64,7 @@ export const PUBLIC_PLANO_SECTION_IDS = new Set([
   "projecao",
   "cenarios",
   "plano-financeiro-completo",
+  "sucessorio",
 ])
 
 export const NAV_GROUPS_PUBLIC: NavGroup[] = NAV_GROUPS_FULL.map((group) => ({
