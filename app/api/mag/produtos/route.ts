@@ -1,49 +1,28 @@
-import { NextResponse } from "next/server"
-import { getMagAccessToken } from "@/lib/mag/auth"
+import { NextRequest, NextResponse } from "next/server"
+import { fetchModeloProposta } from "@/lib/mag/mag-client"
+import { MODELO_PROPOSTA_ATUAL, parseMagModeloCodigo } from "@/lib/mag/config"
 
-/** Lista modelos de proposta disponíveis para o CNPJ do corretor. */
-export async function GET() {
+/**
+ * GET /api/mag/produtos?codigo=ER6|A75
+ * Busca GET /apiseguradora/v3/modeloproposta/{codigo}?cnpj=&completo=true&version=1
+ */
+export async function GET(req: NextRequest) {
   try {
-    const apiUrl = process.env.MAG_API_URL
-    const cnpj = process.env.MAG_CNPJ
-    if (!apiUrl || !cnpj) {
-      return NextResponse.json(
-        { error: "MAG_API_URL ou MAG_CNPJ não configurados" },
-        { status: 500 },
-      )
-    }
+    const codigoRaw = req.nextUrl.searchParams.get("codigo") ?? MODELO_PROPOSTA_ATUAL
+    const parsed = parseMagModeloCodigo(codigoRaw)
+    const codigo = parsed?.codigo ?? MODELO_PROPOSTA_ATUAL
 
-    const token = await getMagAccessToken()
-    const base = apiUrl.replace(/\/$/, "")
-    const url = new URL(`${base}/apiseguradora/v3/modeloproposta`)
-    url.searchParams.set("cnpj", cnpj.replace(/\D/g, ""))
-    url.searchParams.set("completo", "true")
-    url.searchParams.set("canalVenda", "4")
-
-    const res = await fetch(url.toString(), {
-      method: "GET",
-      headers: { Authorization: `Bearer ${token}` },
-      cache: "no-store",
-    })
-
-    const raw = await res.text()
-    let data: unknown
-    try {
-      data = JSON.parse(raw)
-    } catch {
-      data = raw
-    }
-
+    const res = await fetchModeloProposta(codigo)
     if (!res.ok) {
       return NextResponse.json(
-        { error: `MAG produtos HTTP ${res.status}`, detail: data },
+        { error: `MAG modeloproposta HTTP ${res.status}`, detail: res.data },
         { status: res.status },
       )
     }
 
-    return NextResponse.json(data)
+    return NextResponse.json(res.data)
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Erro ao listar produtos MAG"
+    const msg = e instanceof Error ? e.message : "Erro ao buscar modelo de proposta MAG"
     return NextResponse.json({ error: msg }, { status: 500 })
   }
 }

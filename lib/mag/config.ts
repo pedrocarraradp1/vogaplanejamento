@@ -20,8 +20,6 @@ export type MagModeloSpec = {
   idProduto: number
   nome: string
   susep: string
-  /** A75 usa calibração atuarial→comercial histórica. ER6 já vem na taxa da MAG. */
-  calibrarPremioComercial: boolean
 }
 
 export const MAG_MODELOS: Record<MagModeloProposta, MagModeloSpec> = {
@@ -30,14 +28,12 @@ export const MAG_MODELOS: Record<MagModeloProposta, MagModeloSpec> = {
     idProduto: MAG_PRODUTO_WHOLE_LIFE_A75,
     nome: "WHOLE LIFE 2019",
     susep: "2018",
-    calibrarPremioComercial: true,
   },
   ER6: {
     codigo: MAG_MODELO_ER6,
     idProduto: MAG_PRODUTO_WHOLE_LIFE_ER6,
     nome: "WHOLE LIFE INTEGRAL",
     susep: "15414.625879/2024-98",
-    calibrarPremioComercial: false,
   },
 }
 

@@ -1,48 +1,15 @@
 /**
- * Compara modelo A75 vs ER6 e roda simulação nos dois (STG).
+ * Teste de cotação: capital 1.000.000, nasc. 15/06/1985, masculino, DF, prazo 20.
+ * Compara ER6 (3109) e A75 (2111) com a fórmula local de prêmio.
  *
  *   node --env-file=.env.local --experimental-strip-types --import ./scripts/test-register.mjs ./scripts/compare-mag-er6.ts
  */
 import { writeFileSync } from "node:fs"
 import { requestMAGToken } from "../lib/mag/auth.ts"
+import { calcularPremiosDaSimulacao } from "../lib/mag/premio-cobertura.ts"
 
 const CNPJ = (process.env.MAG_CNPJ || "27945275000154").replace(/\D/g, "")
-
-function collectKeys(obj: unknown, prefix = "", out = new Set<string>()): Set<string> {
-  if (obj === null || typeof obj !== "object") return out
-  if (Array.isArray(obj)) {
-    if (obj.length > 0) collectKeys(obj[0], prefix + "[]", out)
-    return out
-  }
-  for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
-    const p = prefix ? `${prefix}.${k}` : k
-    out.add(p)
-    collectKeys(v, p, out)
-  }
-  return out
-}
-
-function findProdutos(obj: unknown, acc: { id?: number; descricao?: string; codigo?: string }[] = []) {
-  if (obj === null || typeof obj !== "object") return acc
-  const rec = obj as Record<string, unknown>
-  if (typeof rec.id === "number" && (rec.descricao || rec.descricaoComercial || rec.codigo)) {
-    acc.push({
-      id: rec.id,
-      descricao: String(rec.descricao ?? rec.descricaoComercial ?? ""),
-      codigo: rec.codigo != null ? String(rec.codigo) : undefined,
-    })
-  }
-  if (typeof rec.idProduto === "number") {
-    acc.push({
-      id: rec.idProduto,
-      descricao: String(rec.descricao ?? rec.nome ?? ""),
-    })
-  }
-  for (const v of Object.values(rec)) {
-    if (v && typeof v === "object") findProdutos(v, acc)
-  }
-  return acc
-}
+const CAPITAL = 1_000_000
 
 async function magFetch(apiUrl: string, token: string, path: string, init?: RequestInit) {
   const url = path.startsWith("http") ? path : `${apiUrl}${path}`
@@ -83,69 +50,100 @@ async function main() {
   }
   const token = tokenResult.token
 
-  for (const codigo of ["A75", "ER6"] as const) {
-    const path = `/apiseguradora/v3/modeloproposta/${codigo}?cnpj=${CNPJ}&completo=true&version=1`
-    console.log("\n=== MODELO", codigo, "===")
-    const r = await magFetch(apiUrl, token, path)
-    console.log("HTTP", r.status)
-    writeFileSync(`scripts/.tmp-modelo-${codigo}.json`, typeof r.parsed === "string" ? r.parsed : JSON.stringify(r.parsed, null, 2))
-    if (r.status !== 200) {
-      console.log("erro:", typeof r.parsed === "string" ? r.parsed.slice(0, 500) : JSON.stringify(r.parsed).slice(0, 800))
-      continue
-    }
-    const keys = [...collectKeys(r.parsed)].sort()
-    console.log("chaves (amostra):", keys.slice(0, 80).join("\n  "))
-    if (keys.length > 80) console.log(`  ... +${keys.length - 80} chaves`)
-    const prods = findProdutos(r.parsed)
-    const uniq = new Map(prods.map((p) => [`${p.id}-${p.descricao}`, p]))
-    console.log("produtos encontrados:", JSON.stringify([...uniq.values()], null, 2))
+  const payloadBase = {
+    proponente: {
+      tipoRelacaoSeguradoId: 1,
+      nome: "SIMULACAO VOGA",
+      cpf: "11144477735",
+      dataNascimento: "1985-06-15",
+      profissaoCbo: "2410-05",
+      renda: 15000,
+      sexoId: 1,
+      uf: "DF",
+      declaracaoIRId: 1,
+    },
+    periodicidadeCobrancaId: 30,
+    prazoPagamentoAntecipado: 20,
+    prazoDecrescimo: 20,
+    capitalSegurado: CAPITAL,
   }
 
-  const payload = {
-    simulacoes: [
-      {
-        proponente: {
-          tipoRelacaoSeguradoId: 1,
-          nome: "SIMULACAO VOGA",
-          cpf: "11144477735",
-          dataNascimento: "1985-06-15",
-          profissaoCbo: "2410-05",
-          renda: 15000,
-          sexoId: 1,
-          uf: "DF",
-          declaracaoIRId: 1,
-        },
-        periodicidadeCobrancaId: 30,
-        prazoPagamentoAntecipado: 20,
-        prazoDecrescimo: 20,
-        capitalSegurado: 1_000_000,
-      },
-    ],
-  }
+  const resultados: { codigo: string; idProduto: number; premioMensal: number; coberturas: string }[] =
+    []
 
   for (const spec of [
-    { codigo: "A75", idProduto: 2111 },
     { codigo: "ER6", idProduto: 3109 },
+    { codigo: "A75", idProduto: 2111 },
   ] as const) {
-    console.log("\n=== SIMULACAO", spec.codigo, "idProduto", spec.idProduto, "===")
-    const body = {
-      simulacoes: [{ ...payload.simulacoes[0], idProduto: spec.idProduto }],
+    console.log("\n===", spec.codigo, `(${spec.idProduto}) ===`)
+
+    const modeloPath =
+      `/apiseguradora/v3/modeloproposta/${spec.codigo}?cnpj=${CNPJ}&completo=true&version=1`
+    const modelo = await magFetch(apiUrl, token, modeloPath)
+    console.log("GET modeloproposta HTTP", modelo.status)
+    writeFileSync(
+      `scripts/.tmp-modelo-${spec.codigo}.json`,
+      typeof modelo.parsed === "string" ? modelo.parsed : JSON.stringify(modelo.parsed, null, 2),
+    )
+    if (modelo.status !== 200) {
+      console.log("erro modelo:", modelo.text.slice(0, 500))
+      continue
     }
-    const path = `/apiseguradora/v3/simulacao?cnpj=${CNPJ}&codigoModeloProposta=${spec.codigo}&canalVenda=4`
-    const r = await magFetch(apiUrl, token, path, {
+
+    const simPath =
+      `/apiseguradora/v3/simulacao?cnpj=${CNPJ}&codigoModeloProposta=${spec.codigo}`
+    const sim = await magFetch(apiUrl, token, simPath, {
       method: "POST",
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        simulacoes: [{ ...payloadBase, idProduto: spec.idProduto }],
+      }),
     })
-    console.log("HTTP", r.status)
+    console.log("POST simulacao HTTP", sim.status)
     writeFileSync(
       `scripts/.tmp-sim-${spec.codigo}.json`,
-      typeof r.parsed === "string" ? r.parsed : JSON.stringify(r.parsed, null, 2),
+      typeof sim.parsed === "string" ? sim.parsed : JSON.stringify(sim.parsed, null, 2),
     )
-    if (r.status !== 200) {
-      console.log("erro:", typeof r.parsed === "string" ? r.parsed.slice(0, 1200) : JSON.stringify(r.parsed).slice(0, 1200))
-    } else {
-      console.log("ok — trecho:", JSON.stringify(r.parsed).slice(0, 1500))
+    if (sim.status !== 200) {
+      console.log("erro sim:", sim.text.slice(0, 800))
+      continue
     }
+
+    const calc = calcularPremiosDaSimulacao({
+      simulacaoJson: sim.parsed,
+      capitalDesejado: CAPITAL,
+      idProduto: spec.idProduto,
+      modeloJson: modelo.parsed,
+    })
+
+    console.log("ticketMinimo:", calc.ticketMinimo)
+    console.log("abaixoDoTicketMinimo:", calc.abaixoDoTicketMinimo)
+    for (const c of calc.coberturas) {
+      console.log(
+        `  cobertura ${c.descricao}: capitalBase=${c.capitalBase} premioBase=${c.premioBase} custoFixo=${c.custoFixo} → premio=${c.premio.toFixed(2)}`,
+      )
+    }
+    console.log("PREMIO MENSAL TOTAL:", calc.premioMensal.toFixed(2))
+
+    resultados.push({
+      codigo: spec.codigo,
+      idProduto: spec.idProduto,
+      premioMensal: calc.premioMensal,
+      coberturas: calc.coberturas.map((c) => `${c.descricao}=${c.premio.toFixed(2)}`).join("; "),
+    })
+  }
+
+  console.log("\n========== COMPARAÇÃO ==========")
+  for (const r of resultados) {
+    console.log(
+      `${r.codigo} (${r.idProduto}): R$ ${r.premioMensal.toFixed(2)}/mês  [${r.coberturas}]`,
+    )
+  }
+  if (resultados.length === 2) {
+    const [er6, a75] = resultados
+    const delta = a75.premioMensal - er6.premioMensal
+    console.log(
+      `Diferença A75 − ER6: R$ ${delta.toFixed(2)} (${((delta / er6.premioMensal) * 100).toFixed(1)}%)`,
+    )
   }
 }
 

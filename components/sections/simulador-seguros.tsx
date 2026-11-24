@@ -190,6 +190,11 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
   const [pm0, setPm0] = useState(0)
   const [fontePremio, setFontePremio] = useState<"mag_api" | "estimativa">("estimativa")
   const [loadingMag, setLoadingMag] = useState(false)
+  const [coberturasPremio, setCoberturasPremio] = useState<
+    { descricao: string; premio: number; produtoDescricao?: string | null }[]
+  >([])
+  const [avisoTicketMinimo, setAvisoTicketMinimo] = useState<string | null>(null)
+  const [ticketMinimo, setTicketMinimo] = useState<number | null>(null)
   const [localInputs, setLocalInputs] = useState<Partial<Record<CampoKey, string>>>({})
   const [localSexo, setLocalSexo] = useState<SexoSelect>(() =>
     resolveSexoSelect(dadosPessoais.sexo),
@@ -343,12 +348,19 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const magAbortRef = useRef<AbortController | null>(null)
 
+  const aplicarEstimativa = useCallback(() => {
+    const fb = premioFallback(capitalSegurado, idadeAtualEff || 35, produto.mult)
+    setPm0(fb)
+    setFontePremio("estimativa")
+    setCoberturasPremio([])
+    setAvisoTicketMinimo(null)
+    setTicketMinimo(null)
+  }, [capitalSegurado, idadeAtualEff, produto.mult])
+
   const fetchSimulacao = useCallback(async () => {
     if (!dadosClienteOk) {
       magAbortRef.current?.abort()
-      const fb = premioFallback(capitalSegurado, idadeAtualEff || 35, produto.mult)
-      setPm0(fb)
-      setFontePremio("estimativa")
+      aplicarEstimativa()
       setLoadingMag(false)
       return
     }
@@ -373,28 +385,36 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
       })
       const data = (await res.json()) as {
         premioMensal?: number | null
-        premioAnual?: number | null
+        coberturas?: { descricao: string; premio: number; produtoDescricao?: string | null }[]
+        servicos?: { descricao: string; premio: number }[]
+        ticketMinimo?: number | null
+        abaixoDoTicketMinimo?: boolean
+        avisoTicketMinimo?: string | null
         rawResponse?: unknown
       }
       if (typeof data.premioMensal === "number" && data.premioMensal > 0) {
         setPm0(data.premioMensal)
         setFontePremio("mag_api")
+        const cob = Array.isArray(data.coberturas) ? data.coberturas : []
+        const serv = Array.isArray(data.servicos)
+          ? data.servicos.map((s) => ({ descricao: s.descricao, premio: s.premio }))
+          : []
+        setCoberturasPremio([...cob, ...serv])
+        setTicketMinimo(typeof data.ticketMinimo === "number" ? data.ticketMinimo : null)
+        setAvisoTicketMinimo(data.abaixoDoTicketMinimo ? data.avisoTicketMinimo ?? null : null)
         return
       }
-      const fb = premioFallback(capitalSegurado, idadeAtualEff || 35, produto.mult)
-      setPm0(fb)
-      setFontePremio("estimativa")
+      aplicarEstimativa()
       // eslint-disable-next-line no-console
       console.log("MAG fallback / raw:", data.rawResponse ?? data)
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") return
-      const fb = premioFallback(capitalSegurado, idadeAtualEff || 35, produto.mult)
-      setPm0(fb)
-      setFontePremio("estimativa")
+      aplicarEstimativa()
     } finally {
       if (!ac.signal.aborted) setLoadingMag(false)
     }
   }, [
+    aplicarEstimativa,
     dadosCliente,
     dadosClienteOk,
     prazoSelecionado,
@@ -410,12 +430,11 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
   // Sempre que o prazo mudar, refaz a simulação MAG (imediato)
   useEffect(() => {
     if (!dadosClienteOk) {
-      setPm0(premioFallback(capitalSegurado, idadeAtualEff || 35, produto.mult))
-      setFontePremio("estimativa")
+      aplicarEstimativa()
       return
     }
     void fetchSimulacaoRef.current()
-  }, [prazoSelecionado, dadosClienteOk, capitalSegurado, idadeAtualEff, produto.mult])
+  }, [prazoSelecionado, dadosClienteOk, capitalSegurado, idadeAtualEff, produto.mult, aplicarEstimativa])
 
   // Capital, dados pessoais etc. — debounce (sem re-disparar por prazo)
   useEffect(() => {
@@ -872,7 +891,7 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
           <p className="text-sm text-muted-foreground">{descricaoSeguro}</p>
           <div className="flex flex-wrap items-center gap-3">
             <div className="text-sm">
-              <span className="text-muted-foreground">Prêmio mensal (ano 1): </span>
+              <span className="text-muted-foreground">Prêmio mensal total (ano 1): </span>
               {loadingMag ? (
                 <span className="inline-block font-semibold tabular-nums text-muted-foreground animate-pulse">
                   …
@@ -895,6 +914,38 @@ export function SimuladorSeguros({ onNavigate }: SimuladorSegurosProps) {
               </Badge>
             )}
           </div>
+          {fontePremio === "mag_api" && coberturasPremio.length > 0 ? (
+            <div className="rounded-lg border border-border bg-secondary/40 divide-y divide-border">
+              {coberturasPremio.map((c, i) => (
+                <div key={`${c.descricao}-${i}`} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                  <div className="min-w-0">
+                    <p className="text-foreground truncate">{c.descricao}</p>
+                    {c.produtoDescricao ? (
+                      <p className="text-[11px] text-muted-foreground truncate">{c.produtoDescricao}</p>
+                    ) : null}
+                  </div>
+                  <p className="font-semibold tabular-nums text-foreground shrink-0">
+                    {fmtMoney(c.premio, moeda)}
+                  </p>
+                </div>
+              ))}
+              <div className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                <p className="font-medium text-foreground">Total</p>
+                <p className="font-semibold tabular-nums text-primary">{fmtMoney(pm0, moeda)}</p>
+              </div>
+            </div>
+          ) : null}
+          {avisoTicketMinimo ? (
+            <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
+              <p className="font-medium">Aviso antes de seguir</p>
+              <p className="text-amber-100/90 mt-0.5">{avisoTicketMinimo}</p>
+              {ticketMinimo != null ? (
+                <p className="text-xs text-amber-100/70 mt-1">
+                  Ticket mínimo do modelo: {fmtMoney(ticketMinimo, moeda)}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 
